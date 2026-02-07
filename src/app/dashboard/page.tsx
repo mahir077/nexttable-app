@@ -1,11 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import Sidebar from '@/components/Sidebar'
+import React, { useState, useEffect } from 'react';
+import Sidebar from '@/components/Sidebar';
+import type { Floor, Table } from '@/app/lib/api/tables';
+import { getFloors, getTablesByFloor } from '@/app/lib/api/tables';
 
 export default function DashboardPage() {
-  const [currentDate, setCurrentDate] = useState('')
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [currentDate, setCurrentDate] = useState<string>('');
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
+  const [floors, setFloors] = useState<Floor[]>([])
+  const [selectedFloor, setSelectedFloor] = useState<Floor | null>(null)
+  const [tables, setTables] = useState<Table[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const today = new Date()
@@ -17,6 +23,81 @@ export default function DashboardPage() {
     }
     setCurrentDate(today.toLocaleDateString('en-US', options).toUpperCase())
   }, [])
+
+  // Fetch floors on mount
+  useEffect(() => {
+    async function loadFloors() {
+      try {
+        const floorsData = await getFloors()
+        setFloors(floorsData)
+        if (floorsData.length > 0) {
+          setSelectedFloor(floorsData[0])
+        }
+      } catch (error) {
+        console.error('Error loading floors:', error)
+      }
+    }
+    loadFloors()
+  }, [])
+
+  // Fetch tables when floor changes
+  useEffect(() => {
+    async function loadTables() {
+      if (!selectedFloor) return
+      
+      setLoading(true)
+      try {
+        const tablesData = await getTablesByFloor(selectedFloor.id)
+        setTables(tablesData)
+      } catch (error) {
+        console.error('Error loading tables:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadTables()
+  }, [selectedFloor])
+
+  // Get status color classes
+  const getStatusColors = (status: string) => {
+    switch (status) {
+      case 'billing':
+        return {
+          bg: 'bg-blue-50',
+          border: 'border-blue-500',
+          text: 'text-blue-600',
+          badge: 'bg-blue-500'
+        }
+      case 'reserved':
+        return {
+          bg: 'bg-orange-50',
+          border: 'border-orange-500',
+          text: 'text-orange-600',
+          badge: 'bg-orange-500'
+        }
+      case 'occupied':
+        return {
+          bg: 'bg-rose-50',
+          border: 'border-rose-500',
+          text: 'text-rose-600',
+          badge: 'bg-rose-500'
+        }
+      case 'available':
+        return {
+          bg: 'bg-emerald-50',
+          border: 'border-emerald-500',
+          text: 'text-emerald-600',
+          badge: 'bg-emerald-500'
+        }
+      default:
+        return {
+          bg: 'bg-slate-50',
+          border: 'border-slate-500',
+          text: 'text-slate-600',
+          badge: 'bg-slate-500'
+        }
+    }
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
@@ -43,7 +124,7 @@ export default function DashboardPage() {
         <div className="bg-white border-b border-slate-200 px-4 lg:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              {/* Hamburger Menu - Mobile Only */}
+              {/* Hamburger Menu */}
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
                 className="lg:hidden p-2 rounded-lg hover:bg-slate-100 transition-colors"
@@ -184,127 +265,51 @@ export default function DashboardPage() {
 
           {/* Floor Tabs */}
           <div className="mb-4 flex gap-2 overflow-x-auto pb-2">
-            <button className="px-4 lg:px-6 py-2.5 rounded-full bg-slate-900 text-white text-sm font-bold whitespace-nowrap">
-              GROUND FLOOR
-            </button>
-            <button className="px-4 lg:px-6 py-2.5 rounded-full bg-white text-slate-700 text-sm font-bold border border-slate-200 whitespace-nowrap hover:border-slate-300">
-              1ST FLOOR
-            </button>
-            <button className="px-4 lg:px-6 py-2.5 rounded-full bg-white text-slate-700 text-sm font-bold border border-slate-200 whitespace-nowrap hover:border-slate-300">
-              ROOFTOP
-            </button>
+            {floors.map((floor) => (
+              <button
+                key={floor.id}
+                onClick={() => setSelectedFloor(floor)}
+                className={`px-4 lg:px-6 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-colors ${
+                  selectedFloor?.id === floor.id
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-white text-slate-700 border border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                {floor.name.toUpperCase()}
+              </button>
+            ))}
           </div>
 
           {/* Tables Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-24">
-            
-            {/* Table 1 - Billing */}
-            <div className="bg-blue-50 border-2 border-blue-500 rounded-2xl p-4 lg:p-6 cursor-pointer hover:shadow-xl transition-all active:scale-95">
-              <div className="text-center">
-                <div className="text-xs font-semibold text-blue-700 mb-2">TABLE</div>
-                <div className="text-4xl lg:text-5xl font-brand font-black text-blue-600 mb-3">1</div>
-                <div className="inline-flex items-center gap-1.5 px-3 lg:px-4 py-1.5 rounded-full bg-blue-500 text-white text-xs font-bold mb-3">
-                  <span className="w-2 h-2 rounded-full bg-white"></span>
-                  BILLING
-                </div>
-                <div className="text-sm text-blue-700 font-medium">👥 6 Seats</div>
-              </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="text-slate-500">Loading tables...</div>
             </div>
-
-            {/* Table 2 - Reserved */}
-            <div className="bg-orange-50 border-2 border-orange-500 rounded-2xl p-4 lg:p-6 cursor-pointer hover:shadow-xl transition-all active:scale-95">
-              <div className="text-center">
-                <div className="text-xs font-semibold text-orange-700 mb-2">TABLE</div>
-                <div className="text-4xl lg:text-5xl font-brand font-black text-orange-600 mb-3">2</div>
-                <div className="inline-flex items-center gap-1.5 px-3 lg:px-4 py-1.5 rounded-full bg-orange-500 text-white text-xs font-bold mb-3">
-                  <span className="w-2 h-2 rounded-full bg-white"></span>
-                  RESERVED
-                </div>
-                <div className="text-sm text-orange-700 font-medium">👥 4 Seats</div>
-              </div>
+          ) : (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-24">
+              {tables.map((table) => {
+                const colors = getStatusColors(table.status)
+                return (
+                  <div
+                    key={table.id}
+                    className={`${colors.bg} border-2 ${colors.border} rounded-2xl p-4 lg:p-6 cursor-pointer hover:shadow-xl transition-all active:scale-95`}
+                  >
+                    <div className="text-center">
+                      <div className={`text-xs font-semibold ${colors.text} mb-2`}>TABLE</div>
+                      <div className={`text-4xl lg:text-5xl font-brand font-black ${colors.text} mb-3`}>
+                        {table.table_number}
+                      </div>
+                      <div className={`inline-flex items-center gap-1.5 px-3 lg:px-4 py-1.5 rounded-full ${colors.badge} text-white text-xs font-bold mb-3`}>
+                        <span className="w-2 h-2 rounded-full bg-white"></span>
+                        {table.status.toUpperCase()}
+                      </div>
+                      <div className={`text-sm ${colors.text} font-medium`}>👥 {table.seats} Seats</div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
-
-            {/* Table 3 - Billing */}
-            <div className="bg-blue-50 border-2 border-blue-500 rounded-2xl p-4 lg:p-6 cursor-pointer hover:shadow-xl transition-all active:scale-95">
-              <div className="text-center">
-                <div className="text-xs font-semibold text-blue-700 mb-2">TABLE</div>
-                <div className="text-4xl lg:text-5xl font-brand font-black text-blue-600 mb-3">3</div>
-                <div className="inline-flex items-center gap-1.5 px-3 lg:px-4 py-1.5 rounded-full bg-blue-500 text-white text-xs font-bold mb-3">
-                  <span className="w-2 h-2 rounded-full bg-white"></span>
-                  BILLING
-                </div>
-                <div className="text-sm text-blue-700 font-medium">👥 6 Seats</div>
-              </div>
-            </div>
-
-            {/* Table 4 - Occupied */}
-            <div className="bg-rose-50 border-2 border-rose-500 rounded-2xl p-4 lg:p-6 cursor-pointer hover:shadow-xl transition-all active:scale-95">
-              <div className="text-center">
-                <div className="text-xs font-semibold text-rose-700 mb-2">TABLE</div>
-                <div className="text-4xl lg:text-5xl font-brand font-black text-rose-600 mb-3">4</div>
-                <div className="inline-flex items-center gap-1.5 px-3 lg:px-4 py-1.5 rounded-full bg-rose-500 text-white text-xs font-bold mb-3">
-                  <span className="w-2 h-2 rounded-full bg-white"></span>
-                  OCCUPIED
-                </div>
-                <div className="text-sm text-rose-700 font-medium">👥 4 Seats</div>
-              </div>
-            </div>
-
-            {/* Table 5 - Billing */}
-            <div className="bg-blue-50 border-2 border-blue-500 rounded-2xl p-4 lg:p-6 cursor-pointer hover:shadow-xl transition-all active:scale-95">
-              <div className="text-center">
-                <div className="text-xs font-semibold text-blue-700 mb-2">TABLE</div>
-                <div className="text-4xl lg:text-5xl font-brand font-black text-blue-600 mb-3">5</div>
-                <div className="inline-flex items-center gap-1.5 px-3 lg:px-4 py-1.5 rounded-full bg-blue-500 text-white text-xs font-bold mb-3">
-                  <span className="w-2 h-2 rounded-full bg-white"></span>
-                  BILLING
-                </div>
-                <div className="text-sm text-blue-700 font-medium">👥 4 Seats</div>
-              </div>
-            </div>
-
-            {/* Table 6 - Reserved */}
-            <div className="bg-orange-50 border-2 border-orange-500 rounded-2xl p-4 lg:p-6 cursor-pointer hover:shadow-xl transition-all active:scale-95">
-              <div className="text-center">
-                <div className="text-xs font-semibold text-orange-700 mb-2">TABLE</div>
-                <div className="text-4xl lg:text-5xl font-brand font-black text-orange-600 mb-3">6</div>
-                <div className="inline-flex items-center gap-1.5 px-3 lg:px-4 py-1.5 rounded-full bg-orange-500 text-white text-xs font-bold mb-3">
-                  <span className="w-2 h-2 rounded-full bg-white"></span>
-                  RESERVED
-                </div>
-                <div className="text-sm text-orange-700 font-medium">👥 2 Seats</div>
-              </div>
-            </div>
-
-            {/* Table 7 - Reserved */}
-            <div className="bg-orange-50 border-2 border-orange-500 rounded-2xl p-4 lg:p-6 cursor-pointer hover:shadow-xl transition-all active:scale-95">
-              <div className="text-center">
-                <div className="text-xs font-semibold text-orange-700 mb-2">TABLE</div>
-                <div className="text-4xl lg:text-5xl font-brand font-black text-orange-600 mb-3">7</div>
-                <div className="inline-flex items-center gap-1.5 px-3 lg:px-4 py-1.5 rounded-full bg-orange-500 text-white text-xs font-bold mb-3">
-                  <span className="w-2 h-2 rounded-full bg-white"></span>
-                  RESERVED
-                </div>
-                <div className="text-sm text-orange-700 font-medium">👥 2 Seats</div>
-              </div>
-            </div>
-
-            {/* Table 8 - Available */}
-            <div className="bg-emerald-50 border-2 border-emerald-500 rounded-2xl p-4 lg:p-6 cursor-pointer hover:shadow-xl transition-all active:scale-95">
-              <div className="text-center">
-                <div className="text-xs font-semibold text-emerald-700 mb-2">TABLE</div>
-                <div className="text-4xl lg:text-5xl font-brand font-black text-emerald-600 mb-3">8</div>
-                <div className="inline-flex items-center gap-1.5 px-3 lg:px-4 py-1.5 rounded-full bg-emerald-500 text-white text-xs font-bold mb-3">
-                  <span className="w-2 h-2 rounded-full bg-white"></span>
-                  AVAILABLE
-                </div>
-                <div className="text-sm text-emerald-700 font-medium">👥 4 Seats</div>
-              </div>
-            </div>
-
-            {/* Remaining tables 9-12 same pattern... */}
-            {/* Add rest of tables here following same pattern */}
-          </div>
+          )}
         </div>
 
         {/* Bottom Action Bar */}
