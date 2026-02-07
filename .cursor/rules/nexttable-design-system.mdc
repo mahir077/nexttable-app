@@ -1,0 +1,21 @@
+---
+description: NextTable POS UI/UX - Bento-box design system for components and pages
+globs: "**/*.tsx,**/globals.css,**/tailwind.config.ts"
+alwaysApply: false
+---
+
+# NextTable Design System (Bento-Box Premium)
+
+Follow **docs/DESIGN_SYSTEM.md** for the full spec. Summary for UI work:
+
+**Typography:** `font-brand` = Outfit (logo, big numbers, headings). `font-sans` / `font-ui` = Inter (labels, buttons, body).
+
+**Colors:** Primary = `primary-500` / `primary-600` (emerald). Dark = `dark-900` / `dark-950` (slate). Background = `bg-slate-50`. Status: `emerald-500` Available, `orange-500` Reserved, `rose-500` Occupied, `blue-600` Billing, `purple-500` KOT Sent.
+
+**Logo:** "Next" in `text-slate-900`, "Table" in `text-emerald-500`, both `font-brand font-black`.
+
+**Bento style:** Cards/buttons `rounded-bento` (2rem). Modals `rounded-bento-lg`. Use `shadow-bento` / `shadow-bento-lg`. Borders `border-slate-200`. Touch targets min 44px (`min-h-touch` or `h-12`).
+
+**White-label:** When building Settings or branded UI, support dynamic branding from restaurant_settings (display_name, primary_color, secondary_color, show_nexttable_branding).
+
+Build components to match this system; prefer Tailwind utility classes and design tokens above.
