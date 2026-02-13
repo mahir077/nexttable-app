@@ -195,7 +195,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-4 lg:p-6">
+        <div className="flex-1 overflow-y-auto p-4 lg:p-6 bg-white">
           
           {/* Today Snapshot */}
           <div className="mb-6">
@@ -324,14 +324,14 @@ export default function DashboardPage() {
               <div className="text-slate-500">Loading tables...</div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-24">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-4 mb-24">
               {tables.map((table) => {
                 const colors = getStatusColors(table.status)
                 return (
                   <div
                     key={table.id}
                     onClick={() => handleTableClick(table)}
-                    className={`${colors.bg} border-2 ${colors.border} rounded-2xl p-4 lg:p-6 cursor-pointer hover:shadow-xl transition-all active:scale-95`}
+                    className={`${colors.bg} border-2 ${colors.border} rounded-2xl p-3 lg:p-5 cursor-pointer hover:shadow-xl transition-all active:scale-95`}
                   >
                     <div className="text-center">
                       <div className={`text-xs font-semibold ${colors.text} mb-2`}>TABLE</div>

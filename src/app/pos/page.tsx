@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getCategories, getAllMenuItems, Category, MenuItem, CartItem } from '@/app/lib/api/menu'
+import { createOrder } from '@/app/lib/api/orders'
 
 export default function POSPage() {
   const [categories, setCategories] = useState<Category[]>([])
@@ -9,6 +10,7 @@ export default function POSPage() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
   const [cart, setCart] = useState<CartItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Fetch categories and menu items
   useEffect(() => {
@@ -68,6 +70,33 @@ export default function POSPage() {
   // Remove from cart
   const removeFromCart = (itemId: string) => {
     setCart(prevCart => prevCart.filter(item => item.id !== itemId))
+  }
+
+  // Send to kitchen - CLEAN IMPLEMENTATION
+  const handleSendToKitchen = async () => {
+    if (cart.length === 0 || isSubmitting) return
+
+    setIsSubmitting(true)
+
+    try {
+      const order = await createOrder({
+        order_type: 'dine-in',
+        items: cart,
+        notes: 'Order from POS'
+      })
+
+      if (order) {
+        alert(`✅ Order Created!\n\nOrder #: ${order.order_number}\nTotal: ৳${order.total.toFixed(2)}\n\nSent to Kitchen!`)
+        setCart([])
+      } else {
+        alert('❌ Failed to create order. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error:', error)
+      alert('❌ Error creating order. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   // Calculate total
@@ -192,7 +221,7 @@ export default function POSPage() {
           )}
         </div>
 
-        {/* Total & Actions */}
+        {/* Total & Send Button */}
         <div className="p-6 border-t border-slate-200 space-y-4">
           <div className="flex justify-between items-center">
             <span className="text-lg font-bold text-slate-600">Total:</span>
@@ -201,13 +230,15 @@ export default function POSPage() {
             </span>
           </div>
           <button
-            disabled={cart.length === 0}
-            className="w-full py-4 rounded-xl bg-emerald-500 text-white font-bold text-lg hover:bg-emerald-600 transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed"
+            onClick={handleSendToKitchen}
+            disabled={cart.length === 0 || isSubmitting}
+            className="w-full py-4 rounded-xl bg-emerald-500 text-white font-bold text-lg hover:bg-emerald-600 transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed active:scale-95"
           >
-            Send to Kitchen
+            {isSubmitting ? '⏳ Sending...' : '🔥 Send to Kitchen'}
           </button>
         </div>
       </div>
     </div>
   )
 }
+
