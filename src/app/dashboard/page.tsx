@@ -5,6 +5,9 @@ import Sidebar from '@/components/Sidebar';
 import type { Floor, Table } from '@/app/lib/api/tables';
 import { getFloors, getTablesByFloor } from '@/app/lib/api/tables';
 
+import TableModal from '@/components/TableModal'
+import { supabase } from '@/app/lib/api/tables'
+
 export default function DashboardPage() {
   const [currentDate, setCurrentDate] = useState<string>('');
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
@@ -13,6 +16,8 @@ export default function DashboardPage() {
   const [tables, setTables] = useState<Table[]>([])
   const [loading, setLoading] = useState(true)
 
+  const [selectedTable, setSelectedTable] = useState<Table | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   useEffect(() => {
     const today = new Date()
     const options: Intl.DateTimeFormatOptions = { 
@@ -58,6 +63,39 @@ export default function DashboardPage() {
     loadTables()
   }, [selectedFloor])
 
+
+// Handle table click
+  const handleTableClick = (table: Table) => {
+    setSelectedTable(table)
+    setIsModalOpen(true)
+  }
+
+  // Handle status change
+  const handleStatusChange = async (tableId: string, newStatus: string) => {
+    try {
+      // Update in database
+      const { error } = await supabase
+        .from('tables')
+        .update({ status: newStatus })
+        .eq('id', tableId)
+
+      if (error) throw error
+
+      // Update in local state
+      setTables(prevTables => 
+        prevTables.map(table => 
+          table.id === tableId 
+            ? { ...table, status: newStatus as any }
+            : table
+        )
+      )
+
+      console.log('Status updated successfully!')
+    } catch (error) {
+      console.error('Error updating status:', error)
+      alert('Failed to update table status')
+    }
+  }
   // Get status color classes
   const getStatusColors = (status: string) => {
     switch (status) {
@@ -292,6 +330,7 @@ export default function DashboardPage() {
                 return (
                   <div
                     key={table.id}
+                    onClick={() => handleTableClick(table)}
                     className={`${colors.bg} border-2 ${colors.border} rounded-2xl p-4 lg:p-6 cursor-pointer hover:shadow-xl transition-all active:scale-95`}
                   >
                     <div className="text-center">
@@ -330,6 +369,13 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      <TableModal
+        table={selectedTable}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onStatusChange={handleStatusChange}
+      />
     </div>
   )
 }
