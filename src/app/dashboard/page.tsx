@@ -208,28 +208,28 @@ export default function DashboardPage() {
           {/* Today Snapshot - modern cards */}
           <section className="mb-10">
             <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Today</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-              <div className="bg-emerald-50 rounded-2xl p-4 lg:p-6 border-2 border-emerald-200">
-                <div className="text-xs text-emerald-600 font-semibold mb-1">Daily Sale</div>
-                <div className="text-xl lg:text-3xl font-brand font-black text-emerald-700">
+            <div className="grid grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
+              <div className="bg-emerald-50 rounded-xl lg:rounded-2xl p-3 lg:p-6 border-2 border-emerald-200">
+                <div className="text-[10px] sm:text-xs text-emerald-600 font-semibold mb-1">Daily Sale</div>
+                <div className="text-base sm:text-xl lg:text-3xl font-brand font-black text-emerald-700 leading-tight">
                   ৳{todayStats.totalRevenue.toLocaleString()}
                 </div>
               </div>
-              <div className="bg-blue-50 rounded-2xl p-4 lg:p-6 border-2 border-blue-200">
-                <div className="text-xs text-blue-600 font-semibold mb-1">Orders</div>
-                <div className="text-xl lg:text-3xl font-brand font-black text-blue-700">
+              <div className="bg-blue-50 rounded-xl lg:rounded-2xl p-3 lg:p-6 border-2 border-blue-200">
+                <div className="text-[10px] sm:text-xs text-blue-600 font-semibold mb-1">Orders</div>
+                <div className="text-base sm:text-xl lg:text-3xl font-brand font-black text-blue-700 leading-tight">
                   {todayStats.totalOrders}
                 </div>
               </div>
-              <div className="bg-purple-50 rounded-2xl p-4 lg:p-6 border-2 border-purple-200">
-                <div className="text-xs text-purple-600 font-semibold mb-1">Weekly Revenue</div>
-                <div className="text-xl lg:text-3xl font-brand font-black text-purple-700">
+              <div className="bg-purple-50 rounded-xl lg:rounded-2xl p-3 lg:p-6 border-2 border-purple-200">
+                <div className="text-[10px] sm:text-xs text-purple-600 font-semibold mb-1">Weekly Revenue</div>
+                <div className="text-base sm:text-xl lg:text-3xl font-brand font-black text-purple-700 leading-tight">
                   ৳{weeklyRevenue.toLocaleString()}
                 </div>
               </div>
-              <div className="bg-orange-50 rounded-2xl p-4 lg:p-6 border-2 border-orange-200">
-                <div className="text-xs text-orange-600 font-semibold mb-1">Avg Order</div>
-                <div className="text-xl lg:text-3xl font-brand font-black text-orange-700">
+              <div className="bg-orange-50 rounded-xl lg:rounded-2xl p-3 lg:p-6 border-2 border-orange-200">
+                <div className="text-[10px] sm:text-xs text-orange-600 font-semibold mb-1">Avg Order</div>
+                <div className="text-base sm:text-xl lg:text-3xl font-brand font-black text-orange-700 leading-tight">
                   ৳{todayStats.totalOrders > 0 ? (todayStats.totalRevenue / todayStats.totalOrders).toFixed(0) : '0'}
                 </div>
               </div>
@@ -295,7 +295,7 @@ export default function DashboardPage() {
                 <LoadingSpinner size="lg" />
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3 mb-24">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3 mb-24">
                 {tables.map((table) => {
                   const colors = getStatusColors(table.status)
                   return (
@@ -305,22 +305,22 @@ export default function DashboardPage() {
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTableClick(table); } }}
-                      className={`${colors.bg} border-2 ${colors.border} rounded-2xl p-4 lg:p-5 cursor-pointer hover:shadow-xl transition-all active:scale-95 min-h-[140px] lg:min-h-[160px]`}
+                      className={`${colors.bg} border-2 ${colors.border} rounded-xl lg:rounded-2xl p-3 lg:p-5 cursor-pointer hover:shadow-xl transition-all active:scale-95 min-h-[120px] sm:min-h-[140px] lg:min-h-[160px]`}
                     >
                       <div className="text-center">
-                        <div className="text-xs text-slate-500 font-semibold mb-1">TABLE</div>
-                        <div className={`text-4xl lg:text-5xl font-brand font-black ${colors.text} mb-2 lg:mb-3`}>
+                        <div className="text-[10px] sm:text-xs text-slate-500 font-semibold mb-1">TABLE</div>
+                        <div className={`text-3xl sm:text-4xl lg:text-5xl font-brand font-black ${colors.text} mb-2`}>
                           {table.table_number}
                         </div>
-                        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full ${colors.badge} text-white mb-2 lg:mb-3`}>
-                          <span className="w-2 h-2 rounded-full bg-white"></span>
-                          <span className="font-bold text-xs uppercase">{table.status}</span>
+                        <div className={`inline-flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full ${colors.badge} text-white mb-2`}>
+                          <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white"></span>
+                          <span className="font-bold text-[10px] sm:text-xs uppercase">{table.status}</span>
                         </div>
                         <div className="flex items-center justify-center gap-1 text-slate-600">
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
                           </svg>
-                          <span className="text-sm font-semibold">{table.seats} Seats</span>
+                          <span className="text-[11px] sm:text-sm font-semibold">{table.seats}</span>
                         </div>
                       </div>
                     </div>
