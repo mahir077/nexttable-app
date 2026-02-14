@@ -4,7 +4,12 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-export default function Sidebar() {
+interface SidebarProps {
+  isOpen?: boolean
+  onClose?: () => void
+}
+
+export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({})
   const pathname = usePathname()
 
@@ -198,17 +203,44 @@ export default function Sidebar() {
   ]
 
   return (
-    <div className="w-80 bg-slate-950 text-white h-screen overflow-y-auto flex flex-col">
-      {/* Header */}
-      <div className="p-6 border-b border-slate-800">
-        <h1 className="text-2xl font-brand font-black">
-          <span className="text-white">Next</span>
-          <span className="text-emerald-500">Table</span>
-        </h1>
-        <p className="text-xs text-slate-400 mt-1 font-semibold tracking-wide">
-          CLOUD POS SYSTEM
-        </p>
-      </div>
+    <>
+      {/* Mobile backdrop */}
+      {onClose && (
+        <div
+          className={`fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+      <div
+        className={`fixed lg:relative top-0 left-0 z-50 w-80 bg-slate-950 text-white h-screen overflow-y-auto flex flex-col transition-transform duration-300 ease-out lg:translate-x-0 ${
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        {/* Header */}
+        <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-brand font-black">
+              <span className="text-white">Next</span>
+              <span className="text-emerald-500">Table</span>
+            </h1>
+            <p className="text-xs text-slate-400 mt-1 font-semibold tracking-wide">
+              CLOUD POS SYSTEM
+            </p>
+          </div>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="lg:hidden p-2 rounded-lg hover:bg-slate-800 text-slate-400"
+              aria-label="Close menu"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
 
       {/* Menu Items */}
       <nav className="flex-1 py-4">
@@ -249,6 +281,7 @@ export default function Sidebar() {
           </div>
         ))}
       </nav>
-    </div>
+      </div>
+    </>
   )
 }

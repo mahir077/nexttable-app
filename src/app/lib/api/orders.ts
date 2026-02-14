@@ -218,3 +218,165 @@ export async function getPaidOrders(): Promise<Order[]> {
   if (error) throw error
   return data || []
 }
+
+// --- Analytics types ---
+export interface TodayStats {
+  totalRevenue: number
+  totalOrders: number
+  paymentBreakdown: Record<string, number>
+  popularItems: { name: string; name_bangla: string | null; quantity: number; revenue: number }[]
+  orders: Order[]
+}
+
+export interface WeeklyStats {
+  totalRevenue: number
+  totalOrders: number
+  dailyRevenue: Record<string, number>
+}
+
+function getStartOfTodayISO(): string {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d.toISOString()
+}
+
+function getEndOfTodayISO(): string {
+  const d = new Date()
+  d.setHours(23, 59, 59, 999)
+  return d.toISOString()
+}
+
+function getStartOfDaysAgoISO(days: number): string {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() - days)
+  return d.toISOString()
+}
+
+// Today's statistics (paid orders only)
+export async function getTodayStats(): Promise<TodayStats> {
+  const empty: TodayStats = {
+    totalRevenue: 0,
+    totalOrders: 0,
+    paymentBreakdown: {},
+    popularItems: [],
+    orders: []
+  }
+
+  try {
+    const startOfToday = getStartOfTodayISO()
+    const endOfToday = getEndOfTodayISO()
+
+    const { data: orders, error: ordersError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('status', 'paid')
+      .gte('paid_at', startOfToday)
+      .lte('paid_at', endOfToday)
+      .order('paid_at', { ascending: false })
+
+    if (ordersError) {
+      console.error('Error fetching today orders:', ordersError)
+      return empty
+    }
+
+    const orderList = orders || []
+
+    const totalRevenue = orderList.reduce((sum, o) => sum + o.total, 0)
+    const totalOrders = orderList.length
+
+    const paymentBreakdown: Record<string, number> = {}
+    for (const o of orderList) {
+      const method = o.payment_method || 'unknown'
+      paymentBreakdown[method] = (paymentBreakdown[method] || 0) + o.total
+    }
+
+    let popularItems: TodayStats['popularItems'] = []
+    if (orderList.length > 0) {
+      const orderIds = orderList.map(o => o.id)
+      const { data: items, error: itemsError } = await supabase
+        .from('order_items')
+        .select('item_name, item_name_bangla, quantity, subtotal')
+        .in('order_id', orderIds)
+
+      if (!itemsError && items?.length) {
+        const byItem = new Map<string, { name: string; name_bangla: string | null; quantity: number; revenue: number }>()
+        for (const row of items as { item_name: string; item_name_bangla: string | null; quantity: number; subtotal: number }[]) {
+          const key = `${row.item_name}|${row.item_name_bangla ?? ''}`
+          const existing = byItem.get(key)
+          if (existing) {
+            existing.quantity += row.quantity
+            existing.revenue += row.subtotal
+          } else {
+            byItem.set(key, {
+              name: row.item_name,
+              name_bangla: row.item_name_bangla,
+              quantity: row.quantity,
+              revenue: row.subtotal
+            })
+          }
+        }
+        popularItems = Array.from(byItem.values())
+          .sort((a, b) => b.quantity - a.quantity)
+          .slice(0, 10)
+      }
+    }
+
+    return {
+      totalRevenue,
+      totalOrders,
+      paymentBreakdown,
+      popularItems,
+      orders: orderList
+    }
+  } catch (error) {
+    console.error('Error in getTodayStats:', error)
+    return empty
+  }
+}
+
+// Last 7 days statistics (paid orders only)
+export async function getWeeklyStats(): Promise<WeeklyStats> {
+  const empty: WeeklyStats = {
+    totalRevenue: 0,
+    totalOrders: 0,
+    dailyRevenue: {}
+  }
+
+  try {
+    const startOfWeek = getStartOfDaysAgoISO(7)
+    const endOfToday = getEndOfTodayISO()
+
+    const { data: orders, error } = await supabase
+      .from('orders')
+      .select('total, paid_at')
+      .eq('status', 'paid')
+      .gte('paid_at', startOfWeek)
+      .lte('paid_at', endOfToday)
+
+    if (error) {
+      console.error('Error fetching weekly orders:', error)
+      return empty
+    }
+
+    const orderList = orders || []
+
+    const totalRevenue = orderList.reduce((sum, o) => sum + o.total, 0)
+    const totalOrders = orderList.length
+
+    const dailyRevenue: Record<string, number> = {}
+    for (const o of orderList) {
+      const dateStr = o.paid_at ? o.paid_at.slice(0, 10) : new Date().toISOString().slice(0, 10)
+      dailyRevenue[dateStr] = (dailyRevenue[dateStr] || 0) + o.total
+    }
+
+    return {
+      totalRevenue,
+      totalOrders,
+      dailyRevenue
+    }
+  } catch (error) {
+    console.error('Error in getWeeklyStats:', error)
+    return empty
+  }
+}
