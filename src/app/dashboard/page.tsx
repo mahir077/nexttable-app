@@ -210,26 +210,26 @@ export default function DashboardPage() {
             <h2 className="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3">Today</h2>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="bg-white rounded-xl p-4 lg:p-5 border border-slate-100 min-w-0 shadow-sm">
-                <div className="text-xs text-slate-500 font-medium mb-0.5">Daily Sale</div>
-                <div className="text-lg sm:text-xl lg:text-2xl font-semibold text-slate-800 leading-tight">
+                <div className="text-xs text-slate-500 font-black mb-0.5">Daily Sale</div>
+                <div className="text-lg sm:text-xl lg:text-2xl font-black text-slate-900 leading-tight font-brand">
                   ৳{todayStats.totalRevenue.toLocaleString()}
                 </div>
               </div>
               <div className="bg-white rounded-xl p-4 lg:p-5 border border-slate-100 min-w-0 shadow-sm">
-                <div className="text-xs text-slate-500 font-medium mb-0.5">Orders</div>
-                <div className="text-lg sm:text-xl lg:text-2xl font-semibold text-slate-800 leading-tight">
+                <div className="text-xs text-slate-500 font-black mb-0.5">Orders</div>
+                <div className="text-lg sm:text-xl lg:text-2xl font-black text-slate-900 leading-tight font-brand">
                   {todayStats.totalOrders}
                 </div>
               </div>
               <div className="bg-white rounded-xl p-4 lg:p-5 border border-slate-100 min-w-0 shadow-sm">
-                <div className="text-xs text-slate-500 font-medium mb-0.5">Weekly Revenue</div>
-                <div className="text-lg sm:text-xl lg:text-2xl font-semibold text-slate-800 leading-tight">
+                <div className="text-xs text-slate-500 font-black mb-0.5">Weekly Revenue</div>
+                <div className="text-lg sm:text-xl lg:text-2xl font-black text-slate-900 leading-tight font-brand">
                   ৳{weeklyRevenue.toLocaleString()}
                 </div>
               </div>
               <div className="bg-white rounded-xl p-4 lg:p-5 border border-slate-100 min-w-0 shadow-sm">
-                <div className="text-xs text-slate-500 font-medium mb-0.5">Avg Order</div>
-                <div className="text-lg sm:text-xl lg:text-2xl font-semibold text-slate-800 leading-tight">
+                <div className="text-xs text-slate-500 font-black mb-0.5">Avg Order</div>
+                <div className="text-lg sm:text-xl lg:text-2xl font-black text-slate-900 leading-tight font-brand">
                   ৳{todayStats.totalOrders > 0 ? (todayStats.totalRevenue / todayStats.totalOrders).toFixed(0) : '0'}
                 </div>
               </div>
