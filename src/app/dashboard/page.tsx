@@ -204,10 +204,10 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-50/50 overflow-hidden">
+    <div className="flex h-screen bg-slate-100 overflow-hidden">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
         {/* Header - compact on mobile */}
         <header className="bg-white border-b border-slate-100 px-4 sm:px-5 md:px-6 lg:px-8 py-3 sm:py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 min-w-0">
@@ -233,11 +233,11 @@ export default function DashboardPage() {
         </header>
 
         {/* Main Content - row by row, responsive: mobile → tablet → PC */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6 lg:p-8 bg-slate-50/30">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6 lg:p-8 bg-slate-50">
           <div className="w-full space-y-8 md:space-y-10">
             {/* Row 1: Today stats */}
             <section>
-              <h2 className="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3 sm:mb-4">Today</h2>
+              <h2 className="text-xs font-semibold text-slate-600 uppercase tracking-widest mb-3 sm:mb-4">Today</h2>
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                 <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-100 shadow-sm">
                   <div className="text-xs text-slate-500 font-black uppercase">Daily Sale</div>
@@ -260,7 +260,7 @@ export default function DashboardPage() {
 
             {/* Row 2: Order type */}
             <section>
-              <h3 className="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3 sm:mb-4">Order type</h3>
+              <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-widest mb-3 sm:mb-4">Order type</h3>
               <div className="flex flex-wrap gap-2 sm:gap-3">
                 <Link href="/pos?type=dine-in" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-colors">
                   <span>🍽️</span> Dine-in
@@ -269,7 +269,7 @@ export default function DashboardPage() {
                   <span>🥡</span> Takeaway
                 </Link>
                 <Link href="/pos?type=online" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-colors">
-                  <span>📱</span> Online
+                  <span>🛵</span> Online
                 </Link>
                 <Link href="/pos?type=event" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-colors">
                   <span>🎉</span> Event
@@ -282,7 +282,7 @@ export default function DashboardPage() {
 
             {/* Row 3: Quick Actions */}
             <section>
-              <h3 className="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3 sm:mb-4">Quick Actions</h3>
+              <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-widest mb-3 sm:mb-4">Quick Actions</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
                 <Link href="/billing" className="flex flex-col items-center justify-center gap-2 p-4 sm:p-5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white shadow-sm transition-all min-h-[88px] sm:min-h-[96px]">
                   <svg className="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
@@ -313,7 +313,7 @@ export default function DashboardPage() {
 
             {/* Row 4: Tables */}
             <section>
-              <h2 className="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3 sm:mb-4">Tables</h2>
+              <h2 className="text-xs font-semibold text-slate-600 uppercase tracking-widest mb-3 sm:mb-4">Tables</h2>
               <div className="flex gap-2 mb-4 overflow-x-auto pb-1 -mx-1 px-1 sm:mx-0 sm:px-0">
                 {floors.map((floor) => (
                   <button
@@ -335,6 +335,7 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
                   {tables.map((table) => {
                     const colors = getStatusColors(table.status)
+                    const foodStatus = tableFoodStatus[table.id]
                     return (
                       <div
                         key={table.id}
@@ -342,26 +343,33 @@ export default function DashboardPage() {
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTableClick(table); } }}
-                        className={`${colors.bg} border ${colors.border} rounded-xl p-3 sm:p-4 cursor-pointer hover:shadow-md transition-all active:scale-[0.98] min-h-[120px] sm:min-h-[130px] flex flex-col items-center justify-center text-center`}
+                        className={`${colors.bg} border ${colors.border} rounded-xl p-3 sm:p-4 cursor-pointer hover:shadow-md transition-all active:scale-[0.98] min-h-[120px] sm:min-h-[140px] flex flex-col items-center justify-between text-center`}
                       >
-                        <div className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 font-brand leading-none">{table.table_number}</div>
-                        <div className="flex items-center gap-1.5 mt-2 text-slate-600">
+                        {/* Top: capacity */}
+                        <div className="flex items-center gap-1.5 text-slate-600 w-full justify-center">
                           <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
                           </svg>
-                          <span className="text-sm font-bold">{table.seats} Seats</span>
+                          <span className="text-xs sm:text-sm font-bold">{table.seats} Seats</span>
                         </div>
-                        <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md ${colors.badge} text-white mt-2`}>
-                          <span className="w-1.5 h-1.5 rounded-full bg-white/90" />
-                          <span className="font-bold text-[10px] uppercase">{table.status}</span>
+                        {/* Center: table number */}
+                        <div className="flex-1 flex items-center justify-center min-h-[2.5rem]">
+                          <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 font-brand leading-none">{table.table_number}</span>
                         </div>
-                        {tableFoodStatus[table.id] && (
-                          <div className={`mt-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                            tableFoodStatus[table.id] === 'kot' ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'
-                          }`}>
-                            {tableFoodStatus[table.id] === 'kot' ? 'In KOT' : 'At table'}
+                        {/* Bottom: status + food status */}
+                        <div className="flex flex-col items-center gap-1.5 w-full">
+                          <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md ${colors.badge} text-white`}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-white/90" />
+                            <span className="font-bold text-[10px] uppercase">{table.status}</span>
                           </div>
-                        )}
+                          {foodStatus && (
+                            <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              foodStatus === 'kot' ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'
+                            }`}>
+                              {foodStatus === 'kot' ? 'In KOT' : 'At table'}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )
                   })}
@@ -372,7 +380,7 @@ export default function DashboardPage() {
             {/* Row 5: Top selling (if any) */}
           {todayStats.popularItems.length > 0 && (
             <div className="mb-8">
-              <h2 className="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3">Top selling today</h2>
+              <h2 className="text-xs font-semibold text-slate-600 uppercase tracking-widest mb-3">Top selling today</h2>
               <div className="bg-white rounded-xl border border-slate-100 overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[500px]">
