@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -11,7 +11,19 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({})
+  const [isCollapsed, setIsCollapsed] = useState(false)
   const pathname = usePathname()
+
+  useEffect(() => {
+    const saved = localStorage.getItem('sidebarCollapsed')
+    if (saved !== null) setIsCollapsed(saved === 'true')
+  }, [])
+
+  const toggleCollapsed = () => {
+    const newState = !isCollapsed
+    setIsCollapsed(newState)
+    localStorage.setItem('sidebarCollapsed', String(newState))
+  }
 
   const toggleMenu = (menu: string) => {
     setExpandedMenus(prev => ({
@@ -213,70 +225,101 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
         />
       )}
       <div
-        className={`fixed lg:relative top-0 left-0 z-50 w-80 bg-slate-950 text-white h-screen overflow-y-auto flex flex-col transition-transform duration-300 ease-out lg:translate-x-0 ${
+        className={`fixed lg:relative top-0 left-0 z-50 bg-slate-950 text-white h-screen overflow-y-auto flex flex-col transition-all duration-300 ease-out lg:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        } ${isCollapsed ? 'w-20' : 'w-80'}`}
       >
         {/* Header */}
-        <div className="p-6 border-b border-slate-800 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-brand font-black">
-              <span className="text-white">Next</span>
-              <span className="text-emerald-500">Table</span>
-            </h1>
-            <p className="text-xs text-slate-400 mt-1 font-semibold tracking-wide">
-              CLOUD POS SYSTEM
-            </p>
-          </div>
-          {onClose && (
+        <div className={`border-b border-slate-800 flex items-center justify-between ${isCollapsed ? 'p-3 justify-center' : 'p-6'}`}>
+          {!isCollapsed && (
+            <div>
+              <h1 className="text-2xl font-brand font-black">
+                <span className="text-white">Next</span>
+                <span className="text-emerald-500">Table</span>
+              </h1>
+              <p className="text-xs text-slate-400 mt-1 font-semibold tracking-wide">
+                CLOUD POS SYSTEM
+              </p>
+            </div>
+          )}
+          {isCollapsed && <div className="text-xl font-black text-emerald-500">NT</div>}
+          <div className="flex items-center gap-1">
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="lg:hidden p-2 rounded-lg hover:bg-slate-800 text-slate-400"
+                aria-label="Close menu"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
             <button
               type="button"
-              onClick={onClose}
-              className="lg:hidden p-2 rounded-lg hover:bg-slate-800 text-slate-400"
-              aria-label="Close menu"
+              onClick={toggleCollapsed}
+              className="hidden lg:flex p-2 rounded-lg hover:bg-slate-800 text-slate-400"
+              aria-label="Toggle sidebar"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {isCollapsed ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                )}
               </svg>
             </button>
-          )}
+          </div>
         </div>
 
       {/* Menu Items */}
       <nav className="flex-1 py-4">
         {menuItems.map((item) => (
           <div key={item.id} className="mb-1">
-            <button
-              onClick={() => toggleMenu(item.id)}
-              className="w-full px-6 py-3 flex items-center justify-between hover:bg-slate-900 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-lg">{item.icon}</span>
-                <span className="text-sm font-semibold tracking-wide">
-                  {item.title}
-                </span>
-              </div>
-              <span className="text-slate-400">
-                {expandedMenus[item.id] ? '∧' : '∨'}
-              </span>
-            </button>
-            
-            {expandedMenus[item.id] && (
-              <div className="bg-slate-900/50 border-l-2 border-emerald-500">
-                {item.submenu.map((subItem) => (
-                  <Link
-                    key={subItem.path}
-                    href={subItem.path}
-                    className={`block px-6 py-2.5 pl-14 text-sm hover:bg-slate-800 transition-colors ${
-                      pathname === subItem.path
-                        ? 'bg-emerald-500/20 text-emerald-400 font-semibold'
-                        : 'text-slate-300'
-                    }`}
-                  >
-                    {subItem.name}
-                  </Link>
-                ))}
-              </div>
+            {isCollapsed ? (
+              <Link
+                href={item.submenu[0]?.path ?? '#'}
+                className="w-full px-3 py-3 flex items-center justify-center hover:bg-slate-900 transition-colors"
+                title={item.title}
+              >
+                <span className="text-xl">{item.icon}</span>
+              </Link>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => toggleMenu(item.id)}
+                  className="w-full px-6 py-3 flex items-center justify-between hover:bg-slate-900 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">{item.icon}</span>
+                    <span className="text-sm font-semibold tracking-wide">
+                      {item.title}
+                    </span>
+                  </div>
+                  <span className="text-slate-400">
+                    {expandedMenus[item.id] ? '∧' : '∨'}
+                  </span>
+                </button>
+                {expandedMenus[item.id] && (
+                  <div className="bg-slate-900/50 border-l-2 border-emerald-500">
+                    {item.submenu.map((subItem) => (
+                      <Link
+                        key={subItem.path}
+                        href={subItem.path}
+                        className={`block px-6 py-2.5 pl-14 text-sm hover:bg-slate-800 transition-colors ${
+                          pathname === subItem.path
+                            ? 'bg-emerald-500/20 text-emerald-400 font-semibold'
+                            : 'text-slate-300'
+                        }`}
+                      >
+                        {subItem.name}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         ))}

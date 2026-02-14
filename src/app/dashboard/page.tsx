@@ -237,82 +237,82 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          {/* Quick Actions */}
+          {/* Quick Actions - Cleaner Design */}
           <div className="mb-6">
             <h3 className="text-sm font-bold text-slate-500 mb-3 uppercase tracking-wide">Quick Actions</h3>
             <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-6 gap-2">
               <Link
                 href="/billing"
-                className="flex flex-col items-center gap-2 p-3 rounded-xl bg-blue-50 border-2 border-blue-200 hover:bg-blue-100 hover:border-blue-300 transition-all active:scale-95"
+                className="flex flex-col items-center gap-2 p-3 rounded-xl bg-white border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all active:scale-95 shadow-sm"
               >
-                <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center">
                   <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
                 </div>
-                <span className="text-xs font-bold text-blue-700 text-center leading-tight">Billing Hub</span>
+                <span className="text-xs font-bold text-slate-700 text-center leading-tight">Billing Hub</span>
               </Link>
 
               <Link
                 href="/kitchen"
-                className="flex flex-col items-center gap-2 p-3 rounded-xl bg-orange-50 border-2 border-orange-200 hover:bg-orange-100 hover:border-orange-300 transition-all active:scale-95"
+                className="flex flex-col items-center gap-2 p-3 rounded-xl bg-white border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all active:scale-95 shadow-sm"
               >
-                <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center">
                   <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                   </svg>
                 </div>
-                <span className="text-xs font-bold text-orange-700 text-center leading-tight">KOT</span>
+                <span className="text-xs font-bold text-slate-700 text-center leading-tight">KOT</span>
               </Link>
 
               <button
                 type="button"
                 onClick={() => alert('Merge Token feature coming in Week 3!')}
-                className="flex flex-col items-center gap-2 p-3 rounded-xl bg-purple-50 border-2 border-purple-200 hover:bg-purple-100 hover:border-purple-300 transition-all active:scale-95"
+                className="flex flex-col items-center gap-2 p-3 rounded-xl bg-white border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all active:scale-95 shadow-sm"
               >
-                <div className="w-10 h-10 rounded-full bg-purple-500 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center">
                   <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                   </svg>
                 </div>
-                <span className="text-xs font-bold text-purple-700 text-center leading-tight">Merge Token</span>
+                <span className="text-xs font-bold text-slate-700 text-center leading-tight">Merge Token</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => alert('Merge Table feature coming in Week 4!')}
-                className="flex flex-col items-center gap-2 p-3 rounded-xl bg-pink-50 border-2 border-pink-200 hover:bg-pink-100 hover:border-pink-300 transition-all active:scale-95"
+                className="flex flex-col items-center gap-2 p-3 rounded-xl bg-white border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all active:scale-95 shadow-sm"
               >
-                <div className="w-10 h-10 rounded-full bg-pink-500 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center">
                   <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                   </svg>
                 </div>
-                <span className="text-xs font-bold text-pink-700 text-center leading-tight">Merge Table</span>
+                <span className="text-xs font-bold text-slate-700 text-center leading-tight">Merge Table</span>
               </button>
 
               <Link
                 href="/orders"
-                className="flex flex-col items-center gap-2 p-3 rounded-xl bg-emerald-50 border-2 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 transition-all active:scale-95"
+                className="flex flex-col items-center gap-2 p-3 rounded-xl bg-white border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all active:scale-95 shadow-sm"
               >
                 <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center">
                   <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
                 </div>
-                <span className="text-xs font-bold text-emerald-700 text-center leading-tight">Daily Sales</span>
+                <span className="text-xs font-bold text-slate-700 text-center leading-tight">Daily Sales</span>
               </Link>
 
               <Link
                 href="/menu"
-                className="flex flex-col items-center gap-2 p-3 rounded-xl bg-amber-50 border-2 border-amber-200 hover:bg-amber-100 hover:border-amber-300 transition-all active:scale-95"
+                className="flex flex-col items-center gap-2 p-3 rounded-xl bg-white border-2 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all active:scale-95 shadow-sm"
               >
-                <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center">
                   <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                   </svg>
                 </div>
-                <span className="text-xs font-bold text-amber-700 text-center leading-tight">Stock</span>
+                <span className="text-xs font-bold text-slate-700 text-center leading-tight">Stock</span>
               </Link>
             </div>
           </div>
