@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { getOrders, getOrderWithItems, updateOrderStatus } from '@/app/lib/api/orders'
+import LoadingSpinner from '@/components/LoadingSpinner'
+import EmptyState from '@/components/EmptyState'
 
 interface Order {
   id: string
@@ -34,7 +36,7 @@ export default function KitchenPage() {
       )
       setOrders(activeOrders)
     } catch (error) {
-      console.error('Error fetching orders:', error)
+      console.error('Error fetching pending orders (kitchen):', error)
     } finally {
       setLoading(false)
     }
@@ -53,7 +55,7 @@ export default function KitchenPage() {
       const data = await getOrderWithItems(order.id)
       setSelectedOrder(data)
     } catch (error) {
-      console.error('Error fetching order details:', error)
+      console.error('Error fetching order details (kitchen):', error)
     }
   }
 
@@ -102,14 +104,14 @@ export default function KitchenPage() {
       {/* Orders Grid */}
       {loading ? (
         <div className="flex items-center justify-center h-64">
-          <div className="text-2xl text-slate-400">Loading orders...</div>
+          <LoadingSpinner size="lg" />
         </div>
       ) : orders.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-          <div className="text-8xl mb-4">✨</div>
-          <p className="text-2xl font-bold">All Clear!</p>
-          <p className="text-lg">No pending orders</p>
-        </div>
+        <EmptyState
+          icon="✨"
+          title="All Clear!"
+          description="No pending orders. Kitchen is ready for new orders!"
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {orders.map((order) => (

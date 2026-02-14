@@ -21,6 +21,7 @@ export interface Table {
   status: 'available' | 'occupied' | 'reserved' | 'billing'
   is_active: boolean
   floor?: Floor
+  location?: string
 }
 
 // Fetch all floors

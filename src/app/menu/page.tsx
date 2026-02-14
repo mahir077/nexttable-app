@@ -43,7 +43,7 @@ export default function MenuManagementPage() {
         setFormData(prev => ({ ...prev, category_id: categoriesData[0].id }))
       }
     } catch (error) {
-      console.error('Error fetching data:', error)
+      console.error('Error fetching categories and menu items:', error)
     } finally {
       setLoading(false)
     }

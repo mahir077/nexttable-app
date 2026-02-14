@@ -1,389 +1,504 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { getFloors, getTablesByFloor, Floor, Table } from '@/app/lib/api/tables'
+import { supabase } from '@/app/lib/api/tables'
 
 export default function SettingsPage() {
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [successMessage, setSuccessMessage] = useState('')
+  const [activeTab, setActiveTab] = useState<'restaurant' | 'tables'>('restaurant')
   
-  const [formData, setFormData] = useState({
-    display_name: '',
-    address: '',
-    city: '',
-    phone: '',
-    email: '',
-    vat_number: '',
-    vat_rate: 0,
-    vat_type: 'exclusive',
-    primary_color: '#10b981',
-    secondary_color: '#0f172a',
-    show_nexttable_branding: true,
-    invoice_footer_text: '',
+  // Restaurant info state
+  const [restaurantInfo, setRestaurantInfo] = useState({
+    name: 'NextTable Restaurant',
+    address: 'Dhaka, Bangladesh',
+    phone: '+880 1234-567890',
+    email: 'info@nexttable.com'
   })
 
+  // Tables state
+  const [floors, setFloors] = useState<Floor[]>([])
+  const [selectedFloor, setSelectedFloor] = useState<Floor | null>(null)
+  const [tables, setTables] = useState<Table[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Modals
+  const [showFloorModal, setShowFloorModal] = useState(false)
+  const [showTableModal, setShowTableModal] = useState(false)
+  const [editingFloor, setEditingFloor] = useState<Floor | null>(null)
+  const [editingTable, setEditingTable] = useState<Table | null>(null)
+
+  // Form states
+  const [floorForm, setFloorForm] = useState({ name: '' })
+  const [tableForm, setTableForm] = useState({ 
+    table_number: '', 
+    seats: '4',
+    location: ''
+  })
+
+  // Fetch data
   useEffect(() => {
-    fetchSettings()
+    fetchFloors()
   }, [])
 
-  const fetchSettings = async () => {
-    try {
-      setIsLoading(true)
-      
-      const response = await fetch('/api/settings')
-      const result = await response.json()
+  useEffect(() => {
+    if (selectedFloor) {
+      fetchTables()
+    }
+  }, [selectedFloor])
 
-      if (result.success && result.data) {
-        setFormData({
-          display_name: result.data.display_name || '',
-          address: result.data.address || '',
-          city: result.data.city || '',
-          phone: result.data.phone || '',
-          email: result.data.email || '',
-          vat_number: result.data.vat_number || '',
-          vat_rate: result.data.vat_rate || 0,
-          vat_type: result.data.vat_type || 'exclusive',
-          primary_color: result.data.primary_color || '#10b981',
-          secondary_color: result.data.secondary_color || '#0f172a',
-          show_nexttable_branding: result.data.show_nexttable_branding ?? true,
-          invoice_footer_text: result.data.invoice_footer_text || '',
-        })
+  const fetchFloors = async () => {
+    try {
+      const data = await getFloors()
+      setFloors(data)
+      if (data.length > 0 && !selectedFloor) {
+        setSelectedFloor(data[0])
       }
     } catch (error) {
-      console.error('Error fetching settings:', error)
-      alert('Failed to load settings')
+      console.error('Error fetching floors:', error)
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target
-    
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'number' ? parseFloat(value) || 0 : value
-    }))
+  const fetchTables = async () => {
+    if (!selectedFloor) return
+    try {
+      const data = await getTablesByFloor(selectedFloor.id)
+      setTables(data)
+    } catch (error) {
+      console.error('Error fetching tables:', error)
+    }
   }
 
-  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, checked } = e.target
-    
-    setFormData(prev => ({
-      ...prev,
-      [name]: checked
-    }))
+  // Save restaurant info
+  const handleSaveRestaurantInfo = () => {
+    // In production, this would save to database
+    localStorage.setItem('restaurantInfo', JSON.stringify(restaurantInfo))
+    alert('✅ Restaurant information saved!')
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!formData.display_name.trim()) {
-      alert('Restaurant name is required!')
+  // Add/Edit Floor
+  const handleSaveFloor = async () => {
+    if (!floorForm.name.trim()) {
+      alert('❌ Please enter floor name')
       return
     }
 
     try {
-      setIsSaving(true)
-      setSuccessMessage('')
+      if (editingFloor) {
+        // Update floor
+        const { error } = await supabase
+          .from('floors')
+          .update({ name: floorForm.name })
+          .eq('id', editingFloor.id)
 
-      const response = await fetch('/api/settings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        setSuccessMessage('✅ Settings saved successfully!')
-        setTimeout(() => setSuccessMessage(''), 3000)
+        if (error) throw error
+        alert('✅ Floor updated!')
       } else {
-        alert('Failed to save settings: ' + result.error)
+        // Add new floor
+        const { error } = await supabase
+          .from('floors')
+          .insert({ name: floorForm.name, is_active: true })
+
+        if (error) throw error
+        alert('✅ Floor added!')
       }
+
+      setShowFloorModal(false)
+      setEditingFloor(null)
+      setFloorForm({ name: '' })
+      fetchFloors()
     } catch (error) {
-      console.error('Error saving settings:', error)
-      alert('Failed to save settings')
-    } finally {
-      setIsSaving(false)
+      console.error('Error saving floor:', error)
+      alert('❌ Failed to save floor')
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-emerald-500 mx-auto mb-4"></div>
-          <p className="text-slate-600 font-medium">Loading settings...</p>
-        </div>
-      </div>
-    )
+  // Delete Floor
+  const handleDeleteFloor = async (floor: Floor) => {
+    if (!confirm(`Delete floor "${floor.name}"? This will delete all tables on this floor.`)) return
+
+    try {
+      const { error } = await supabase
+        .from('floors')
+        .delete()
+        .eq('id', floor.id)
+
+      if (error) throw error
+      alert('✅ Floor deleted!')
+      fetchFloors()
+    } catch (error) {
+      console.error('Error deleting floor:', error)
+      alert('❌ Failed to delete floor')
+    }
+  }
+
+  // Add/Edit Table
+  const handleSaveTable = async () => {
+    if (!selectedFloor || !tableForm.table_number.trim()) {
+      alert('❌ Please enter table number')
+      return
+    }
+
+    try {
+      if (editingTable) {
+        // Update table
+        const { error } = await supabase
+          .from('tables')
+          .update({
+            table_number: tableForm.table_number,
+            seats: parseInt(tableForm.seats),
+            location: tableForm.location
+          })
+          .eq('id', editingTable.id)
+
+        if (error) throw error
+        alert('✅ Table updated!')
+      } else {
+        // Add new table
+        const { error } = await supabase
+          .from('tables')
+          .insert({
+            floor_id: selectedFloor.id,
+            table_number: tableForm.table_number,
+            seats: parseInt(tableForm.seats),
+            location: tableForm.location,
+            status: 'available'
+          })
+
+        if (error) throw error
+        alert('✅ Table added!')
+      }
+
+      setShowTableModal(false)
+      setEditingTable(null)
+      setTableForm({ table_number: '', seats: '4', location: '' })
+      fetchTables()
+    } catch (error) {
+      console.error('Error saving table:', error)
+      alert('❌ Failed to save table')
+    }
+  }
+
+  // Delete Table
+  const handleDeleteTable = async (table: Table) => {
+    if (!confirm(`Delete Table ${table.table_number}?`)) return
+
+    try {
+      const { error } = await supabase
+        .from('tables')
+        .delete()
+        .eq('id', table.id)
+
+      if (error) throw error
+      alert('✅ Table deleted!')
+      fetchTables()
+    } catch (error) {
+      console.error('Error deleting table:', error)
+      alert('❌ Failed to delete table')
+    }
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8 px-4">
-      <div className="max-w-4xl mx-auto">
-        
-        <div className="mb-8">
-          <h1 className="text-4xl font-black text-slate-900 mb-2">
-            <span className="text-slate-900">Next</span>
-            <span className="text-emerald-500">Table</span>
-          </h1>
-          <p className="text-slate-600 text-sm">RESTAURANT CONTROL HUB</p>
-          <h2 className="text-2xl font-bold text-slate-900 mt-4">
-            ⚙️ Restaurant Settings
-          </h2>
-          <p className="text-slate-600 mt-1">
-            Configure your restaurant information
-          </p>
-        </div>
+    <div className="min-h-screen bg-slate-50 p-6">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-4xl font-brand font-black text-slate-900 mb-2">⚙️ SETTINGS</h1>
+        <p className="text-slate-600">Manage your restaurant configuration</p>
+      </div>
 
-        {successMessage && (
-          <div className="mb-6 bg-emerald-100 border-2 border-emerald-500 rounded-[2rem] p-6 animate-pulse">
-            <p className="text-emerald-700 font-semibold text-center">
-              {successMessage}
-            </p>
-          </div>
-        )}
+      {/* Tabs */}
+      <div className="flex gap-2 mb-8">
+        <button
+          onClick={() => setActiveTab('restaurant')}
+          className={`px-8 py-4 rounded-2xl font-bold transition-all ${
+            activeTab === 'restaurant'
+              ? 'bg-slate-900 text-white shadow-lg'
+              : 'bg-white text-slate-700 border-2 border-slate-200 hover:border-slate-300'
+          }`}
+        >
+          🏪 Restaurant Info
+        </button>
+        <button
+          onClick={() => setActiveTab('tables')}
+          className={`px-8 py-4 rounded-2xl font-bold transition-all ${
+            activeTab === 'tables'
+              ? 'bg-slate-900 text-white shadow-lg'
+              : 'bg-white text-slate-700 border-2 border-slate-200 hover:border-slate-300'
+          }`}
+        >
+          🪑 Tables & Floors
+        </button>
+      </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Restaurant Info Tab */}
+      {activeTab === 'restaurant' && (
+        <div className="bg-white rounded-2xl p-8 border-2 border-slate-200">
+          <h2 className="text-2xl font-bold text-slate-900 mb-6">Restaurant Information</h2>
           
-          <div className="bg-white rounded-[2rem] shadow-lg p-8 border border-slate-200">
-            <h3 className="text-xl font-bold text-slate-900 mb-6">
-              🏪 Basic Information
-            </h3>
-            
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">Restaurant Name</label>
+              <input
+                type="text"
+                value={restaurantInfo.name}
+                onChange={(e) => setRestaurantInfo({ ...restaurantInfo, name: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">Address</label>
+              <input
+                type="text"
+                value={restaurantInfo.address}
+                onChange={(e) => setRestaurantInfo({ ...restaurantInfo, address: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Restaurant Name *
-                </label>
-                <input
-                  type="text"
-                  name="display_name"
-                  value={formData.display_name}
-                  onChange={handleChange}
-                  required
-                  placeholder="e.g., Spice Garden Restaurant"
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Address
-                </label>
-                <input
-                  type="text"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
-                  placeholder="e.g., House 123, Road 4, Gulshan"
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900"
-                />
-              </div>
-
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  City
-                </label>
-                <input
-                  type="text"
-                  name="city"
-                  value={formData.city}
-                  onChange={handleChange}
-                  placeholder="e.g., Dhaka"
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Phone
-                </label>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Phone</label>
                 <input
                   type="tel"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  placeholder="e.g., +880 1234-567890"
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900"
+                  value={restaurantInfo.phone}
+                  onChange={(e) => setRestaurantInfo({ ...restaurantInfo, phone: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Email
-                </label>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Email</label>
                 <input
                   type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="e.g., info@restaurant.com"
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900"
+                  value={restaurantInfo.email}
+                  onChange={(e) => setRestaurantInfo({ ...restaurantInfo, email: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none"
                 />
               </div>
             </div>
+
+            <button
+              onClick={handleSaveRestaurantInfo}
+              className="px-8 py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors"
+            >
+              💾 Save Restaurant Info
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tables & Floors Tab */}
+      {activeTab === 'tables' && (
+        <div className="space-y-6">
+          {/* Floors Section */}
+          <div className="bg-white rounded-2xl p-8 border-2 border-slate-200">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-slate-900">Floors ({floors.length})</h2>
+              <button
+                onClick={() => {
+                  setEditingFloor(null)
+                  setFloorForm({ name: '' })
+                  setShowFloorModal(true)
+                }}
+                className="px-6 py-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold transition-colors"
+              >
+                ➕ Add Floor
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {floors.map(floor => (
+                <div key={floor.id} className="bg-slate-50 rounded-xl p-4 border-2 border-slate-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-bold text-lg">{floor.name}</h3>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingFloor(floor)
+                          setFloorForm({ name: floor.name })
+                          setShowFloorModal(true)
+                        }}
+                        className="text-blue-600 hover:text-blue-700 font-bold text-sm"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => handleDeleteFloor(floor)}
+                        className="text-rose-600 hover:text-rose-700 font-bold text-sm"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedFloor(floor)}
+                    className={`w-full py-2 rounded-lg font-semibold text-sm transition-colors ${
+                      selectedFloor?.id === floor.id
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-white text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    View Tables
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div className="bg-white rounded-[2rem] shadow-lg p-8 border border-slate-200">
-            <h3 className="text-xl font-bold text-slate-900 mb-6">
-              💰 Tax & Charges
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
+          {/* Tables Section */}
+          {selectedFloor && (
+            <div className="bg-white rounded-2xl p-8 border-2 border-slate-200">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-slate-900">
+                  Tables on {selectedFloor.name} ({tables.length})
+                </h2>
+                <button
+                  onClick={() => {
+                    setEditingTable(null)
+                    setTableForm({ table_number: '', seats: '4', location: '' })
+                    setShowTableModal(true)
+                  }}
+                  className="px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors"
+                >
+                  ➕ Add Table
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {tables.map(table => (
+                  <div key={table.id} className="bg-slate-50 rounded-xl p-4 border-2 border-slate-200">
+                    <div className="text-center mb-3">
+                      <div className="text-3xl font-brand font-black text-emerald-600">
+                        {table.table_number}
+                      </div>
+                      <div className="text-sm text-slate-600">{table.seats} seats</div>
+                      {table.location && (
+                        <div className="text-xs text-slate-500 mt-1">{table.location}</div>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingTable(table)
+                          setTableForm({
+                            table_number: table.table_number.toString(),
+                            seats: table.seats.toString(),
+                            location: table.location || ''
+                          })
+                          setShowTableModal(true)
+                        }}
+                        className="flex-1 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-bold text-sm"
+                      >
+                        ✏️ Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteTable(table)}
+                        className="flex-1 py-2 rounded-lg bg-rose-500 hover:bg-rose-600 text-white font-bold text-sm"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Floor Modal */}
+      {showFloorModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowFloorModal(false)}>
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-2xl font-bold mb-6">
+              {editingFloor ? '✏️ Edit Floor' : '➕ Add Floor'}
+            </h2>
+            <div className="mb-6">
+              <label className="block text-sm font-bold text-slate-700 mb-2">Floor Name</label>
+              <input
+                type="text"
+                value={floorForm.name}
+                onChange={(e) => setFloorForm({ name: e.target.value })}
+                placeholder="e.g., Ground Floor"
+                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowFloorModal(false)}
+                className="flex-1 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveFloor}
+                className="flex-1 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Table Modal */}
+      {showTableModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowTableModal(false)}>
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-2xl font-bold mb-6">
+              {editingTable ? '✏️ Edit Table' : '➕ Add Table'}
+            </h2>
+            <div className="space-y-4 mb-6">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  VAT Registration Number
-                </label>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Table Number*</label>
                 <input
                   type="text"
-                  name="vat_number"
-                  value={formData.vat_number}
-                  onChange={handleChange}
-                  placeholder="e.g., 123456789"
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900"
+                  value={tableForm.table_number}
+                  onChange={(e) => setTableForm({ ...tableForm, table_number: e.target.value })}
+                  placeholder="e.g., 1, A1, VIP-1"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none"
                 />
               </div>
-
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  VAT Rate (%)
-                </label>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Number of Seats*</label>
                 <input
                   type="number"
-                  name="vat_rate"
-                  value={formData.vat_rate}
-                  onChange={handleChange}
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  placeholder="e.g., 5.00"
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900"
+                  min="1"
+                  value={tableForm.seats}
+                  onChange={(e) => setTableForm({ ...tableForm, seats: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none"
                 />
               </div>
-
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  VAT Type
-                </label>
-                <select
-                  name="vat_type"
-                  value={formData.vat_type}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900"
-                >
-                  <option value="exclusive">Exclusive (Added to price)</option>
-                  <option value="inclusive">Inclusive (Included in price)</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-[2rem] shadow-lg p-8 border border-slate-200">
-            <h3 className="text-xl font-bold text-slate-900 mb-6">
-              🎨 Branding
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Primary Color
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    name="primary_color"
-                    value={formData.primary_color}
-                    onChange={handleChange}
-                    className="h-12 w-20 rounded-xl border-2 border-slate-200 cursor-pointer"
-                  />
-                  <input
-                    type="text"
-                    value={formData.primary_color}
-                    readOnly
-                    className="flex-1 px-4 py-3 rounded-xl border-2 border-slate-200 text-slate-900 bg-slate-50"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Secondary Color
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    name="secondary_color"
-                    value={formData.secondary_color}
-                    onChange={handleChange}
-                    className="h-12 w-20 rounded-xl border-2 border-slate-200 cursor-pointer"
-                  />
-                  <input
-                    type="text"
-                    value={formData.secondary_color}
-                    readOnly
-                    className="flex-1 px-4 py-3 rounded-xl border-2 border-slate-200 text-slate-900 bg-slate-50"
-                  />
-                </div>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    name="show_nexttable_branding"
-                    checked={formData.show_nexttable_branding}
-                    onChange={handleCheckboxChange}
-                    className="w-5 h-5 rounded border-2 border-slate-300 text-emerald-500 focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-                  />
-                  <span className="text-sm font-semibold text-slate-700">
-                    Show "Powered by NextTable" on invoices
-                  </span>
-                </label>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Invoice Footer Text
-                </label>
-                <textarea
-                  name="invoice_footer_text"
-                  value={formData.invoice_footer_text}
-                  onChange={handleChange}
-                  rows={3}
-                  placeholder="e.g., Thank you for dining with us!"
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900"
+                <label className="block text-sm font-bold text-slate-700 mb-2">Location (Optional)</label>
+                <input
+                  type="text"
+                  value={tableForm.location}
+                  onChange={(e) => setTableForm({ ...tableForm, location: e.target.value })}
+                  placeholder="e.g., By Window, Corner"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none"
                 />
               </div>
             </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowTableModal(false)}
+                className="flex-1 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveTable}
+                className="flex-1 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold"
+              >
+                Save
+              </button>
+            </div>
           </div>
-
-          <div className="flex justify-end gap-4">
-            <button
-              type="button"
-              onClick={fetchSettings}
-              disabled={isSaving}
-              className="px-8 py-4 rounded-[1.5rem] border-2 border-slate-300 text-slate-700 font-bold hover:bg-slate-50 transition-all disabled:opacity-50"
-            >
-              Reset
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="px-8 py-4 rounded-[1.5rem] bg-emerald-500 text-white font-bold shadow-lg hover:bg-emerald-600 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSaving ? 'Saving...' : '💾 Save Settings'}
-            </button>
-          </div>
-        </form>
-      </div>
+        </div>
+      )}
     </div>
   )
 }

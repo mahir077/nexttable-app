@@ -18,7 +18,7 @@ export default function OrdersPage() {
         setOrders(data)
         setFilteredOrders(data)
       } catch (error) {
-        console.error('Error fetching orders:', error)
+        console.error('Error fetching order history:', error)
       } finally {
         setLoading(false)
       }
@@ -44,7 +44,7 @@ export default function OrdersPage() {
       const data = await getOrderWithItems(order.id)
       setSelectedOrder(data)
     } catch (error) {
-      console.error('Error fetching order details:', error)
+      console.error('Error fetching order details (history):', error)
     }
   }
 
