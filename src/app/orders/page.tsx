@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/app/lib/api/tables'
+import { getOrderWithItems } from '@/app/lib/api/orders'
 import { openCashDrawer } from '@/app/lib/cashDrawer'
 import BackButton from '@/components/BackButton'
 
@@ -110,27 +111,13 @@ export default function OrdersPage() {
 
   const fetchOrderDetails = async (orderId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          order_items (
-            quantity,
-            price,
-            menu_item:menu_items (
-              name,
-              name_bangla
-            )
-          ),
-          table:tables (
-            table_number
-          )
-        `)
-        .eq('id', orderId)
-        .single()
-
-      if (error) throw error
-      setSelectedOrder(data)
+      const { order, items } = await getOrderWithItems(orderId)
+      const orderItems = (items || []).map((item: { item_name: string; item_name_bangla: string | null; quantity: number; unit_price: number }) => ({
+        quantity: item.quantity,
+        price: item.unit_price,
+        menu_item: { name: item.item_name, name_bangla: item.item_name_bangla }
+      }))
+      setSelectedOrder({ ...order, order_items: orderItems } as OrderWithItems)
       setShowModal(true)
     } catch (error) {
       console.error('Error fetching order details:', error)
@@ -305,14 +292,14 @@ export default function OrdersPage() {
       <div className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-slate-50">
+            <thead className="bg-slate-50/80">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-bold text-slate-600">ORDER #</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-slate-600">DATE & TIME</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-slate-600">TYPE</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-slate-600">PAYMENT</th>
-                <th className="px-4 py-3 text-right text-xs font-bold text-slate-600">AMOUNT</th>
-                <th className="px-4 py-3 text-right text-xs font-bold text-slate-600">ACTIONS</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">ORDER #</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">DATE & TIME</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">TYPE</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">PAYMENT</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">AMOUNT</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">ACTIONS</th>
               </tr>
             </thead>
             <tbody>
@@ -338,45 +325,45 @@ export default function OrdersPage() {
                       <span className="text-sm text-slate-600">{formatDate(order.created_at)}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-block px-2 py-1 rounded-full text-xs font-bold ${
-                        order.order_type === 'dine-in' ? 'bg-blue-100 text-blue-700' :
-                        order.order_type === 'takeaway' ? 'bg-orange-100 text-orange-700' :
-                        order.order_type === 'online' ? 'bg-purple-100 text-purple-700' :
-                        'bg-slate-100 text-slate-700'
+                      <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                        order.order_type === 'dine-in' ? 'bg-blue-50 text-blue-600' :
+                        order.order_type === 'takeaway' ? 'bg-amber-50 text-amber-600' :
+                        order.order_type === 'online' ? 'bg-violet-50 text-violet-600' :
+                        'bg-slate-100 text-slate-600'
                       }`}>
                         {order.order_type?.toUpperCase() || 'DINE-IN'}
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-block px-2 py-1 rounded-full text-xs font-bold ${
-                        order.payment_method === 'cash' ? 'bg-emerald-100 text-emerald-700' :
-                        order.payment_method === 'card' ? 'bg-blue-100 text-blue-700' :
-                        order.payment_method === 'mobile' ? 'bg-purple-100 text-purple-700' :
-                        'bg-slate-100 text-slate-700'
+                      <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                        order.payment_method === 'cash' ? 'bg-emerald-50 text-emerald-600' :
+                        order.payment_method === 'card' ? 'bg-sky-50 text-sky-600' :
+                        order.payment_method === 'mobile' ? 'bg-violet-50 text-violet-600' :
+                        'bg-slate-100 text-slate-600'
                       }`}>
                         {order.payment_method?.toUpperCase() || 'CASH'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="font-bold text-emerald-600">৳{order.total.toFixed(2)}</span>
+                      <span className="font-semibold text-emerald-600">৳{order.total.toFixed(2)}</span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => fetchOrderDetails(order.id)}
-                          className="px-3 py-1 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold transition-colors"
+                          className="px-3 py-1 rounded-lg bg-sky-50 text-sky-600 border border-sky-200 hover:bg-sky-100 text-xs font-medium transition-colors"
                         >
                           View
                         </button>
                         <button
                           onClick={() => handleEdit(order.id)}
-                          className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-colors"
+                          className="px-3 py-1 rounded-lg bg-amber-50 text-amber-600 border border-amber-200 hover:bg-amber-100 text-xs font-medium transition-colors"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => handleDelete(order.id, order.order_number)}
-                          className="px-3 py-1 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition-colors"
+                          className="px-3 py-1 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 text-xs font-medium transition-colors"
                         >
                           Delete
                         </button>
@@ -388,13 +375,13 @@ export default function OrdersPage() {
             </tbody>
             {/* Total Row */}
             {filteredOrders.length > 0 && (
-              <tfoot className="bg-emerald-50 border-t-4 border-emerald-500">
+              <tfoot className="bg-emerald-50/80 border-t-2 border-emerald-200">
                 <tr>
                   <td colSpan={4} className="px-4 py-4 text-right">
-                    <span className="text-lg font-bold text-slate-900">TOTAL ({totalOrders} orders):</span>
+                    <span className="text-lg font-semibold text-slate-700">TOTAL ({totalOrders} orders):</span>
                   </td>
                   <td className="px-4 py-4 text-right" colSpan={2}>
-                    <span className="text-2xl font-brand font-black text-emerald-700">৳{totalRevenue.toFixed(2)}</span>
+                    <span className="text-2xl font-brand font-bold text-emerald-600">৳{totalRevenue.toFixed(2)}</span>
                   </td>
                 </tr>
               </tfoot>
@@ -429,17 +416,17 @@ export default function OrdersPage() {
               <div className="flex gap-4 mb-4">
                 <div>
                   <div className="text-sm text-slate-500">Type</div>
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
-                    selectedOrder.order_type === 'dine-in' ? 'bg-blue-100 text-blue-700' :
-                    selectedOrder.order_type === 'takeaway' ? 'bg-orange-100 text-orange-700' :
-                    'bg-purple-100 text-purple-700'
+                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                    selectedOrder.order_type === 'dine-in' ? 'bg-blue-50 text-blue-600' :
+                    selectedOrder.order_type === 'takeaway' ? 'bg-amber-50 text-amber-600' :
+                    'bg-violet-50 text-violet-600'
                   }`}>
                     {selectedOrder.order_type?.toUpperCase()}
                   </span>
                 </div>
                 <div>
                   <div className="text-sm text-slate-500">Payment</div>
-                  <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
+                  <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-600">
                     {selectedOrder.payment_method?.toUpperCase()}
                   </span>
                 </div>
