@@ -22,6 +22,8 @@ export interface Order {
   notes?: string
   created_at: string
   updated_at: string
+  payment_method?: string
+  paid_at?: string
 }
 
 export interface OrderItem {
