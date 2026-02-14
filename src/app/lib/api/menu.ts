@@ -74,3 +74,137 @@ export async function getAllMenuItems(): Promise<MenuItem[]> {
   if (error) throw error
   return data || []
 }
+
+// Create new menu item
+export async function createMenuItem(itemData: {
+  category_id: string
+  name: string
+  name_bangla?: string
+  description?: string
+  price: number
+  image_url?: string
+}) {
+  const { data, error } = await supabase
+    .from('menu_items')
+    .insert({
+      ...itemData,
+      is_available: true,
+      is_active: true
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error creating menu item:', error)
+    return null
+  }
+  return data
+}
+
+// Update menu item
+export async function updateMenuItem(
+  itemId: string,
+  updates: Partial<{
+    name: string
+    name_bangla: string
+    description: string
+    price: number
+    category_id: string
+    image_url: string
+    is_available: boolean
+  }>
+) {
+  const { data, error } = await supabase
+    .from('menu_items')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', itemId)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error updating menu item:', error)
+    return null
+  }
+  return data
+}
+
+// Delete menu item
+export async function deleteMenuItem(itemId: string) {
+  const { error } = await supabase
+    .from('menu_items')
+    .delete()
+    .eq('id', itemId)
+
+  if (error) {
+    console.error('Error deleting menu item:', error)
+    return false
+  }
+  return true
+}
+
+// Toggle item availability
+export async function toggleItemAvailability(itemId: string, isAvailable: boolean) {
+  return updateMenuItem(itemId, { is_available: isAvailable })
+}
+
+// Create new category
+export async function createCategory(categoryData: {
+  name: string
+  icon?: string
+  display_order: number
+}) {
+  const { data, error } = await supabase
+    .from('categories')
+    .insert({
+      ...categoryData,
+      is_active: true
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error creating category:', error)
+    return null
+  }
+  return data
+}
+
+// Update category
+export async function updateCategory(
+  categoryId: string,
+  updates: Partial<{
+    name: string
+    icon: string
+    display_order: number
+  }>
+) {
+  const { data, error } = await supabase
+    .from('categories')
+    .update(updates)
+    .eq('id', categoryId)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error updating category:', error)
+    return null
+  }
+  return data
+}
+
+// Delete category
+export async function deleteCategory(categoryId: string) {
+  const { error } = await supabase
+    .from('categories')
+    .delete()
+    .eq('id', categoryId)
+
+  if (error) {
+    console.error('Error deleting category:', error)
+    return false
+  }
+  return true
+}
