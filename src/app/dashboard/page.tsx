@@ -237,6 +237,48 @@ export default function DashboardPage() {
             </div>
           </section>
 
+          {/* Order type: Dine-in, Takeaway, Online, Event, Reservation */}
+          <section className="mb-8">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Order type</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              <Link
+                href="/pos"
+                className="flex flex-col items-center gap-2 p-4 rounded-xl bg-blue-50 border-2 border-blue-200 hover:border-blue-400 hover:bg-blue-100 transition-all active:scale-95"
+              >
+                <span className="text-2xl">🍽️</span>
+                <span className="text-sm font-bold text-blue-700">Dine-in</span>
+              </Link>
+              <Link
+                href="/pos"
+                className="flex flex-col items-center gap-2 p-4 rounded-xl bg-orange-50 border-2 border-orange-200 hover:border-orange-400 hover:bg-orange-100 transition-all active:scale-95"
+              >
+                <span className="text-2xl">🥡</span>
+                <span className="text-sm font-bold text-orange-700">Takeaway</span>
+              </Link>
+              <Link
+                href="/pos"
+                className="flex flex-col items-center gap-2 p-4 rounded-xl bg-violet-50 border-2 border-violet-200 hover:border-violet-400 hover:bg-violet-100 transition-all active:scale-95"
+              >
+                <span className="text-2xl">📱</span>
+                <span className="text-sm font-bold text-violet-700">Online</span>
+              </Link>
+              <Link
+                href="/pos"
+                className="flex flex-col items-center gap-2 p-4 rounded-xl bg-amber-50 border-2 border-amber-200 hover:border-amber-400 hover:bg-amber-100 transition-all active:scale-95"
+              >
+                <span className="text-2xl">🎉</span>
+                <span className="text-sm font-bold text-amber-700">Event</span>
+              </Link>
+              <Link
+                href="/reservation/table"
+                className="flex flex-col items-center gap-2 p-4 rounded-xl bg-teal-50 border-2 border-teal-200 hover:border-teal-400 hover:bg-teal-100 transition-all active:scale-95"
+              >
+                <span className="text-2xl">📅</span>
+                <span className="text-sm font-bold text-teal-700">Reservation</span>
+              </Link>
+            </div>
+          </section>
+
           {/* Quick Actions - Cleaner Design */}
           <div className="mb-6">
             <h3 className="text-sm font-bold text-slate-500 mb-3 uppercase tracking-wide">Quick Actions</h3>
