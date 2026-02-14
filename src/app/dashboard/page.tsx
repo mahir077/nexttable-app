@@ -204,10 +204,10 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-100 overflow-hidden">
+    <div className="flex h-screen bg-white overflow-hidden">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
+      <div className="flex-1 flex flex-col overflow-hidden bg-white">
         {/* Header - compact on mobile */}
         <header className="bg-white border-b border-slate-100 px-4 sm:px-5 md:px-6 lg:px-8 py-3 sm:py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 min-w-0">
@@ -233,7 +233,7 @@ export default function DashboardPage() {
         </header>
 
         {/* Main Content - row by row, responsive: mobile → tablet → PC */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6 lg:p-8 bg-slate-50">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6 lg:p-8 bg-white">
           <div className="w-full space-y-8 md:space-y-10">
             {/* Row 1: Today stats */}
             <section>

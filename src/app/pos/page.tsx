@@ -521,12 +521,12 @@ export default function POSPage() {
                       setSelectedTable(t.id)
                       setShowTableModal(false)
                     }}
-                    className={`py-4 rounded-xl font-bold text-slate-900 border-2 transition-all ${
+                    className={`py-4 rounded-xl font-bold text-slate-900 border-2 transition-all flex flex-col items-center justify-center text-center ${
                       selectedTable === t.id ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white border-slate-200 hover:border-emerald-400'
                     }`}
                   >
-                    {t.table_number}
-                    <div className="text-xs font-normal opacity-80">{t.seats} seats</div>
+                    <span>{t.table_number}</span>
+                    <span className="text-xs font-normal opacity-80">{t.seats} seats</span>
                   </button>
                 ))}
               </div>
