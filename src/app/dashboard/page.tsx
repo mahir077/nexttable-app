@@ -39,6 +39,8 @@ export default function DashboardPage() {
     popularItems: []
   })
   const [weeklyRevenue, setWeeklyRevenue] = useState(0)
+  // Per-table food status: 'kot' = in kitchen, 'table' = at table
+  const [tableFoodStatus, setTableFoodStatus] = useState<Record<string, 'kot' | 'table'>>({})
 
   // Set current date
   useEffect(() => {
@@ -84,6 +86,34 @@ export default function DashboardPage() {
     }
     loadTables()
   }, [selectedFloor])
+
+  // Fetch order/food status per table (KOT vs At table)
+  useEffect(() => {
+    if (tables.length === 0) {
+      setTableFoodStatus({})
+      return
+    }
+    const tableIds = tables.map(t => t.id)
+    async function fetchFoodStatus() {
+      try {
+        const { data } = await supabase
+          .from('orders')
+          .select('table_id, status')
+          .in('table_id', tableIds)
+          .in('status', ['pending', 'preparing', 'ready', 'served'])
+        const map: Record<string, 'kot' | 'table'> = {}
+        ;(data || []).forEach((row: { table_id: string | null; status: string }) => {
+          if (!row.table_id) return
+          if (row.status === 'preparing' || row.status === 'pending') map[row.table_id] = 'kot'
+          if (row.status === 'ready' || row.status === 'served') map[row.table_id] = 'table'
+        })
+        setTableFoodStatus(map)
+      } catch {
+        setTableFoodStatus({})
+      }
+    }
+    fetchFoodStatus()
+  }, [tables])
 
   // Fetch analytics
   useEffect(() => {
@@ -232,16 +262,16 @@ export default function DashboardPage() {
             <section>
               <h3 className="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3 sm:mb-4">Order type</h3>
               <div className="flex flex-wrap gap-2 sm:gap-3">
-                <Link href="/pos" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-colors">
+                <Link href="/pos?type=dine-in" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-colors">
                   <span>🍽️</span> Dine-in
                 </Link>
-                <Link href="/pos" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-colors">
+                <Link href="/pos?type=takeaway" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-colors">
                   <span>🥡</span> Takeaway
                 </Link>
-                <Link href="/pos" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-colors">
+                <Link href="/pos?type=online" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-colors">
                   <span>📱</span> Online
                 </Link>
-                <Link href="/pos" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-colors">
+                <Link href="/pos?type=event" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-colors">
                   <span>🎉</span> Event
                 </Link>
                 <Link href="/reservation/table" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-colors">
@@ -312,15 +342,26 @@ export default function DashboardPage() {
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTableClick(table); } }}
-                        className={`${colors.bg} border ${colors.border} rounded-xl p-3 sm:p-4 cursor-pointer hover:shadow-md transition-all active:scale-[0.98] min-h-[100px] sm:min-h-[110px]`}
+                        className={`${colors.bg} border ${colors.border} rounded-xl p-3 sm:p-4 cursor-pointer hover:shadow-md transition-all active:scale-[0.98] min-h-[120px] sm:min-h-[130px] flex flex-col items-center justify-center text-center`}
                       >
-                        <div className="text-[10px] text-slate-400 font-semibold mb-1 uppercase tracking-wider">Table</div>
-                        <div className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 font-brand mb-1.5 leading-none">{table.table_number}</div>
-                        <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md ${colors.badge} text-white`}>
+                        <div className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 font-brand leading-none">{table.table_number}</div>
+                        <div className="flex items-center gap-1.5 mt-2 text-slate-600">
+                          <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                          </svg>
+                          <span className="text-sm font-bold">{table.seats} Seats</span>
+                        </div>
+                        <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md ${colors.badge} text-white mt-2`}>
                           <span className="w-1.5 h-1.5 rounded-full bg-white/90" />
                           <span className="font-bold text-[10px] uppercase">{table.status}</span>
                         </div>
-                        <div className="text-xs text-slate-500 mt-1">{table.seats} Seats</div>
+                        {tableFoodStatus[table.id] && (
+                          <div className={`mt-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            tableFoodStatus[table.id] === 'kot' ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'
+                          }`}>
+                            {tableFoodStatus[table.id] === 'kot' ? 'In KOT' : 'At table'}
+                          </div>
+                        )}
                       </div>
                     )
                   })}

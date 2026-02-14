@@ -17,8 +17,12 @@ export interface Order {
   tax: number
   discount: number
   total: number
-  customer_name?: string
-  customer_phone?: string
+  customer_name?: string | null
+  customer_phone?: string | null
+  delivery_address?: string | null
+  delivery_time?: string | null
+  guest_count?: number | null
+  event_date?: string | null
   notes?: string
   created_at: string
   updated_at: string
@@ -46,6 +50,10 @@ export interface CreateOrderData {
   items: CartItem[]
   customer_name?: string
   customer_phone?: string
+  delivery_address?: string
+  delivery_time?: string
+  guest_count?: number
+  event_date?: string
   notes?: string
 }
 
