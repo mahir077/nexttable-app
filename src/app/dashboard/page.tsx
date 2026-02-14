@@ -204,7 +204,7 @@ export default function DashboardPage() {
 
         {/* Main Content - row by row, responsive: mobile → tablet → PC */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-6 lg:p-8 bg-slate-50/30">
-          <div className="max-w-7xl mx-auto space-y-8 md:space-y-10">
+          <div className="w-full space-y-8 md:space-y-10">
             {/* Row 1: Today stats */}
             <section>
               <h2 className="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3 sm:mb-4">Today</h2>
