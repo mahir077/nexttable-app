@@ -166,3 +166,53 @@ export async function updateOrderStatus(orderId: string, status: string): Promis
   }
   return true
 }
+
+// Get orders ready for billing (ready or served)
+export async function getOrdersForBilling(): Promise<Order[]> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*')
+    .in('status', ['ready', 'served'])
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data || []
+}
+
+// Mark order as served via RPC
+export async function markOrderAsServed(orderId: string): Promise<boolean> {
+  const { error } = await supabase.rpc('mark_order_served', { order_id: orderId })
+
+  if (error) {
+    console.error('Error marking order as served:', error)
+    return false
+  }
+  return true
+}
+
+// Process payment via RPC
+export async function processPayment(orderId: string, paymentMethod: string): Promise<boolean> {
+  const { error } = await supabase.rpc('process_payment', {
+    order_id: orderId,
+    payment_type: paymentMethod
+  })
+
+  if (error) {
+    console.error('Error processing payment:', error)
+    return false
+  }
+  return true
+}
+
+// Get paid orders (for history/reports)
+export async function getPaidOrders(): Promise<Order[]> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('status', 'paid')
+    .order('paid_at', { ascending: false })
+    .limit(50)
+
+  if (error) throw error
+  return data || []
+}
