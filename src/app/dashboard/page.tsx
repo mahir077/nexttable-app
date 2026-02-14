@@ -209,27 +209,27 @@ export default function DashboardPage() {
           <section className="mb-10">
             <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Today</h2>
             <div className="grid grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
-              <div className="bg-emerald-50 rounded-xl lg:rounded-2xl p-3 lg:p-6 border-2 border-emerald-200">
+              <div className="bg-emerald-50 rounded-xl lg:rounded-2xl p-3 lg:p-6 border-2 border-emerald-200 overflow-hidden min-w-0">
                 <div className="text-[10px] sm:text-xs text-emerald-600 font-semibold mb-1">Daily Sale</div>
-                <div className="text-base sm:text-xl lg:text-3xl font-brand font-black text-emerald-700 leading-tight">
+                <div className="text-base sm:text-xl lg:text-3xl font-brand font-black text-emerald-700 leading-tight overflow-hidden text-ellipsis">
                   ৳{todayStats.totalRevenue.toLocaleString()}
                 </div>
               </div>
-              <div className="bg-blue-50 rounded-xl lg:rounded-2xl p-3 lg:p-6 border-2 border-blue-200">
+              <div className="bg-blue-50 rounded-xl lg:rounded-2xl p-3 lg:p-6 border-2 border-blue-200 overflow-hidden min-w-0">
                 <div className="text-[10px] sm:text-xs text-blue-600 font-semibold mb-1">Orders</div>
-                <div className="text-base sm:text-xl lg:text-3xl font-brand font-black text-blue-700 leading-tight">
+                <div className="text-base sm:text-xl lg:text-3xl font-brand font-black text-blue-700 leading-tight overflow-hidden text-ellipsis">
                   {todayStats.totalOrders}
                 </div>
               </div>
-              <div className="bg-purple-50 rounded-xl lg:rounded-2xl p-3 lg:p-6 border-2 border-purple-200">
+              <div className="bg-purple-50 rounded-xl lg:rounded-2xl p-3 lg:p-6 border-2 border-purple-200 overflow-hidden min-w-0">
                 <div className="text-[10px] sm:text-xs text-purple-600 font-semibold mb-1">Weekly Revenue</div>
-                <div className="text-base sm:text-xl lg:text-3xl font-brand font-black text-purple-700 leading-tight">
+                <div className="text-base sm:text-xl lg:text-3xl font-brand font-black text-purple-700 leading-tight overflow-hidden text-ellipsis">
                   ৳{weeklyRevenue.toLocaleString()}
                 </div>
               </div>
-              <div className="bg-orange-50 rounded-xl lg:rounded-2xl p-3 lg:p-6 border-2 border-orange-200">
+              <div className="bg-orange-50 rounded-xl lg:rounded-2xl p-3 lg:p-6 border-2 border-orange-200 overflow-hidden min-w-0">
                 <div className="text-[10px] sm:text-xs text-orange-600 font-semibold mb-1">Avg Order</div>
-                <div className="text-base sm:text-xl lg:text-3xl font-brand font-black text-orange-700 leading-tight">
+                <div className="text-base sm:text-xl lg:text-3xl font-brand font-black text-orange-700 leading-tight overflow-hidden text-ellipsis">
                   ৳{todayStats.totalOrders > 0 ? (todayStats.totalRevenue / todayStats.totalOrders).toFixed(0) : '0'}
                 </div>
               </div>
