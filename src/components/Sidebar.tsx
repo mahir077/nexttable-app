@@ -10,7 +10,6 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
-  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({})
   const [isCollapsed, setIsCollapsed] = useState(false)
   const pathname = usePathname()
 
@@ -25,192 +24,77 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     localStorage.setItem('sidebarCollapsed', String(newState))
   }
 
-  const toggleMenu = (menu: string) => {
-    setExpandedMenus(prev => ({
-      ...prev,
-      [menu]: !prev[menu]
-    }))
-  }
-
   const menuItems = [
     {
-      id: 'dashboard',
-      title: 'HOME DASHBOARD',
-      icon: '🏠',
-      submenu: [
-        { name: 'TABLE GRID', path: '/dashboard' },
-        { name: 'DINE-IN', path: '/dashboard/dine-in' },
-        { name: 'TAKEAWAY', path: '/dashboard/takeaway' },
-        { name: 'ONLINE', path: '/dashboard/online' },
-        { name: 'EVENT', path: '/dashboard/event' },
-        { name: 'RESERVATION', path: '/dashboard/reservation' }
-      ]
+      name: 'Dashboard',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+        </svg>
+      ),
+      href: '/dashboard',
+      active: pathname === '/dashboard'
     },
     {
-      id: 'pos',
-      title: 'POS ORDER SCREEN',
-      icon: '🛒',
-      submenu: [
-        { name: 'NEW ORDER', path: '/pos' },
-        { name: 'HOLD ORDERS', path: '/pos/hold' },
-        { name: 'RUNNING TAB', path: '/pos/running-tab' }
-      ]
+      name: 'POS',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+        </svg>
+      ),
+      href: '/pos',
+      active: pathname === '/pos'
     },
     {
-      id: 'kot',
-      title: 'KOT + TOKEN + BUZZER',
-      icon: '👨‍🍳',
-      submenu: [
-        { name: 'KITCHEN DISPLAY', path: '/kitchen' },
-        { name: 'TOKEN MANAGEMENT', path: '/kitchen/tokens' },
-        { name: 'BUZZER SYSTEM', path: '/kitchen/buzzer' },
-        { name: 'KOT HISTORY', path: '/kitchen/history' }
-      ]
+      name: 'Kitchen',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+      ),
+      href: '/kitchen',
+      active: pathname === '/kitchen'
     },
     {
-      id: 'billing',
-      title: 'BILLING & PAYMENT',
-      icon: '💳',
-      submenu: [
-        { name: 'BILLING CENTER', path: '/billing' },
-        { name: 'CUSTOMER DUE', path: '/billing/customer-due' },
-        { name: 'PAYMENT HISTORY', path: '/billing/history' },
-        { name: 'VOID & REFUND', path: '/billing/void-refund' }
-      ]
+      name: 'Billing',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+      ),
+      href: '/billing',
+      active: pathname === '/billing'
     },
     {
-      id: 'menu',
-      title: 'MENU, PRICE & VAT',
-      icon: '🍴',
-      submenu: [
-        { name: 'ITEM SETUP', path: '/menu/items' },
-        { name: 'CATEGORY SETUP', path: '/menu/categories' },
-        { name: 'PRICE CONFIG', path: '/menu/pricing' },
-        { name: 'MODIFIER SETUP', path: '/menu/modifiers' },
-        { name: 'VAT CONFIG', path: '/menu/vat' }
-      ]
+      name: 'Orders',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      ),
+      href: '/orders',
+      active: pathname === '/orders'
     },
     {
-      id: 'stock',
-      title: 'STOCK MANAGEMENT',
-      icon: '📦',
-      submenu: [
-        { name: 'STOCK VALUE', path: '/stock/value' },
-        { name: 'STOCK ADJUSTMENT', path: '/stock/adjustment' },
-        { name: 'LOW STOCK ALERT', path: '/stock/alerts' },
-        { name: 'STOCK REPORT', path: '/stock/report' }
-      ]
+      name: 'Menu',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+        </svg>
+      ),
+      href: '/menu',
+      active: pathname === '/menu' || pathname.startsWith('/menu/')
     },
     {
-      id: 'reservation',
-      title: 'RESERVATION & EVENT',
-      icon: '📅',
-      submenu: [
-        { name: 'TABLE RESERVATION', path: '/reservation/table' },
-        { name: 'EVENT BOOKING', path: '/reservation/event' },
-        { name: 'ADVANCE PAYMENT', path: '/reservation/payment' }
-      ]
-    },
-    {
-      id: 'cashbook',
-      title: 'DAILY CASHBOOK',
-      icon: '💰',
-      submenu: [
-        { name: 'DAY OPEN/CLOSE', path: '/cashbook/daily' },
-        { name: 'CASH IN', path: '/cashbook/cash-in' },
-        { name: 'CASH OUT', path: '/cashbook/cash-out' },
-        { name: 'SHIFT REPORT', path: '/cashbook/shift' }
-      ]
-    },
-    {
-      id: 'customer',
-      title: 'CUSTOMER',
-      icon: '👤',
-      submenu: [
-        { name: 'CUSTOMER LIST', path: '/customer/list' },
-        { name: 'DUE LEDGER', path: '/customer/due' },
-        { name: 'PAYMENT RECEIVE', path: '/customer/payment' },
-        { name: 'AGING REPORT', path: '/customer/aging' }
-      ]
-    },
-    {
-      id: 'supplier',
-      title: 'SUPPLIER',
-      icon: '🏭',
-      submenu: [
-        { name: 'SUPPLIER LIST', path: '/supplier/list' },
-        { name: 'PAYABLE LEDGER', path: '/supplier/payable' },
-        { name: 'PAYMENT MADE', path: '/supplier/payment' },
-        { name: 'PURCHASE HISTORY', path: '/supplier/purchase' }
-      ]
-    },
-    {
-      id: 'attendance',
-      title: 'ATTENDANCE & SALARY',
-      icon: '👥',
-      submenu: [
-        { name: 'DAILY ATTENDANCE', path: '/attendance/daily' },
-        { name: 'SALARY CONFIG', path: '/attendance/salary-config' },
-        { name: 'SALARY PAYMENT', path: '/attendance/payment' },
-        { name: 'SALARY SHEET', path: '/attendance/sheet' },
-        { name: 'STAFF ADVANCE', path: '/attendance/advance' }
-      ]
-    },
-    {
-      id: 'vat',
-      title: 'VAT REPORT',
-      icon: '🧾',
-      submenu: [
-        { name: 'VAT SUMMARY', path: '/vat/summary' },
-        { name: 'INVOICE-WISE VAT', path: '/vat/invoice' },
-        { name: 'MUSHAK FORMAT', path: '/vat/mushak' },
-        { name: 'EXPORT PDF/CSV', path: '/vat/export' }
-      ]
-    },
-    {
-      id: 'sales',
-      title: 'SALES & PROFIT REPORTS',
-      icon: '📊',
-      submenu: [
-        { name: 'TODAY/MONTH SUMMARY', path: '/reports/summary' },
-        { name: 'ITEM-WISE SALES', path: '/reports/item-wise' },
-        { name: 'CATEGORY-WISE SALES', path: '/reports/category-wise' },
-        { name: 'PAYMENT METHOD', path: '/reports/payment' },
-        { name: 'DISCOUNT REPORT', path: '/reports/discount' }
-      ]
-    },
-    {
-      id: 'users',
-      title: 'USER & ROLE',
-      icon: '🔐',
-      submenu: [
-        { name: 'USER LIST', path: '/users/list' },
-        { name: 'ROLE SETUP', path: '/users/roles' },
-        { name: 'PERMISSIONS', path: '/users/permissions' }
-      ]
-    },
-    {
-      id: 'settings',
-      title: 'SETTINGS & HARDWARE',
-      icon: '⚙️',
-      submenu: [
-        { name: 'RESTAURANT INFO', path: '/settings' },
-        { name: 'TABLE & FLOOR SETUP', path: '/settings/tables' },
-        { name: 'BRANDING & LOGO', path: '/settings/branding' },
-        { name: 'PRINTER CONFIG', path: '/settings/printer' },
-        { name: 'CASH DRAWER', path: '/settings/cash-drawer' },
-        { name: 'LANGUAGE & FORMAT', path: '/settings/language' }
-      ]
-    },
-    {
-      id: 'audit',
-      title: 'AUDIT LOG',
-      icon: '📜',
-      submenu: [
-        { name: 'VIEW LOGS', path: '/audit/logs' },
-        { name: 'SEARCH & FILTER', path: '/audit/search' },
-        { name: 'EXPORT LOGS', path: '/audit/export' }
-      ]
+      name: 'Settings',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      ),
+      href: '/settings',
+      active: pathname === '/settings' || pathname.startsWith('/settings/')
     }
   ]
 
@@ -273,57 +157,26 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           </div>
         </div>
 
-      {/* Menu Items */}
-      <nav className="flex-1 py-4">
-        {menuItems.map((item) => (
-          <div key={item.id} className="mb-1">
-            {isCollapsed ? (
-              <Link
-                href={item.submenu[0]?.path ?? '#'}
-                className="w-full px-3 py-3 flex items-center justify-center hover:bg-slate-900 transition-colors"
-                title={item.title}
-              >
-                <span className="text-xl">{item.icon}</span>
-              </Link>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => toggleMenu(item.id)}
-                  className="w-full px-6 py-3 flex items-center justify-between hover:bg-slate-900 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">{item.icon}</span>
-                    <span className="text-sm font-semibold tracking-wide">
-                      {item.title}
-                    </span>
-                  </div>
-                  <span className="text-slate-400">
-                    {expandedMenus[item.id] ? '∧' : '∨'}
-                  </span>
-                </button>
-                {expandedMenus[item.id] && (
-                  <div className="bg-slate-900/50 border-l-2 border-emerald-500">
-                    {item.submenu.map((subItem) => (
-                      <Link
-                        key={subItem.path}
-                        href={subItem.path}
-                        className={`block px-6 py-2.5 pl-14 text-sm hover:bg-slate-800 transition-colors ${
-                          pathname === subItem.path
-                            ? 'bg-emerald-500/20 text-emerald-400 font-semibold'
-                            : 'text-slate-300'
-                        }`}
-                      >
-                        {subItem.name}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        ))}
-      </nav>
+        {/* Menu Items */}
+        <nav className="flex-1 py-4">
+          {menuItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              title={isCollapsed ? item.name : undefined}
+              className={`w-full flex items-center gap-3 px-6 py-3 hover:bg-slate-900 transition-colors ${
+                item.active ? 'bg-emerald-500/20 text-emerald-400 border-l-4 border-emerald-500' : 'text-slate-300 border-l-4 border-transparent'
+              } ${isCollapsed ? 'justify-center px-3' : ''}`}
+            >
+              <span className="flex-shrink-0 [&_svg]:text-current">
+                {item.icon}
+              </span>
+              {!isCollapsed && (
+                <span className="text-sm font-semibold tracking-wide">{item.name}</span>
+              )}
+            </Link>
+          ))}
+        </nav>
       </div>
     </>
   )
