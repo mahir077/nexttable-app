@@ -177,29 +177,29 @@ export default function DashboardPage() {
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header - clean & minimal */}
-        <header className="bg-white/80 backdrop-blur-sm border-b border-slate-100 px-4 lg:px-8 py-4 flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-4">
+        {/* Header - compact on mobile */}
+        <header className="bg-white border-b border-slate-200 px-4 lg:px-6 py-3 lg:py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 lg:gap-4">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden p-2.5 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors"
+              className="lg:hidden p-2 rounded-lg hover:bg-slate-100"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
             <div>
-              <h1 className="text-lg lg:text-xl font-semibold text-slate-900 tracking-tight">
+              <h1 className="text-lg lg:text-2xl font-brand font-black text-slate-900">
                 NextTable
               </h1>
-              <p className="text-xs text-slate-400 font-medium">Restaurant control hub</p>
+              <p className="text-xs lg:text-sm text-slate-500 font-semibold hidden sm:block">RESTAURANT CONTROL HUB</p>
             </div>
           </div>
           <div className="text-right">
             <div className="text-xs lg:text-sm font-semibold text-slate-900">
               TODAY: ৳{todayStats.totalRevenue.toFixed(0)} • {todayStats.totalOrders} Orders
             </div>
-            <div className="text-xs text-slate-400">{currentDate}</div>
+            <div className="text-xs text-slate-500 hidden sm:block">{currentDate}</div>
           </div>
         </header>
 
@@ -208,79 +208,78 @@ export default function DashboardPage() {
           {/* Today Snapshot - modern cards */}
           <section className="mb-10">
             <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Today</h2>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white rounded-2xl p-5 lg:p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                <p className="text-xs font-medium text-slate-400 mb-1">Daily sale</p>
-                <p className="text-2xl lg:text-3xl font-semibold text-slate-900 tracking-tight">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+              <div className="bg-emerald-50 rounded-2xl p-4 lg:p-6 border-2 border-emerald-200">
+                <div className="text-xs text-emerald-600 font-semibold mb-1">Daily Sale</div>
+                <div className="text-xl lg:text-3xl font-brand font-black text-emerald-700">
                   ৳{todayStats.totalRevenue.toLocaleString()}
-                </p>
+                </div>
               </div>
-              <div className="bg-white rounded-2xl p-5 lg:p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                <p className="text-xs font-medium text-slate-400 mb-1">Orders</p>
-                <p className="text-2xl lg:text-3xl font-semibold text-slate-900 tracking-tight">
+              <div className="bg-blue-50 rounded-2xl p-4 lg:p-6 border-2 border-blue-200">
+                <div className="text-xs text-blue-600 font-semibold mb-1">Orders</div>
+                <div className="text-xl lg:text-3xl font-brand font-black text-blue-700">
                   {todayStats.totalOrders}
-                </p>
+                </div>
               </div>
-              <div className="bg-white rounded-2xl p-5 lg:p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                <p className="text-xs font-medium text-slate-400 mb-1">Weekly revenue</p>
-                <p className="text-2xl lg:text-3xl font-semibold text-slate-900 tracking-tight">
+              <div className="bg-purple-50 rounded-2xl p-4 lg:p-6 border-2 border-purple-200">
+                <div className="text-xs text-purple-600 font-semibold mb-1">Weekly Revenue</div>
+                <div className="text-xl lg:text-3xl font-brand font-black text-purple-700">
                   ৳{weeklyRevenue.toLocaleString()}
-                </p>
+                </div>
               </div>
-              <div className="bg-white rounded-2xl p-5 lg:p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                <p className="text-xs font-medium text-slate-400 mb-1">Avg order</p>
-                <p className="text-2xl lg:text-3xl font-semibold text-slate-900 tracking-tight">
+              <div className="bg-orange-50 rounded-2xl p-4 lg:p-6 border-2 border-orange-200">
+                <div className="text-xs text-orange-600 font-semibold mb-1">Avg Order</div>
+                <div className="text-xl lg:text-3xl font-brand font-black text-orange-700">
                   ৳{todayStats.totalOrders > 0 ? (todayStats.totalRevenue / todayStats.totalOrders).toFixed(0) : '0'}
-                </p>
+                </div>
               </div>
             </div>
           </section>
 
-          {/* Top Selling - clean table */}
           {todayStats.popularItems.length > 0 && (
-            <section className="mb-10">
-              <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Top selling today</h2>
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="mb-8">
+              <h2 className="text-xl font-brand font-black text-slate-900 mb-4">TOP SELLING TODAY</h2>
+              <div className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-slate-100">
-                        <th className="px-5 py-3.5 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">#</th>
-                        <th className="px-5 py-3.5 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Item</th>
-                        <th className="px-5 py-3.5 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Qty</th>
-                        <th className="px-5 py-3.5 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Revenue</th>
+                  <table className="w-full min-w-[500px]">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-3 lg:px-4 py-3 text-left text-xs font-bold text-slate-600">#</th>
+                        <th className="px-3 lg:px-4 py-3 text-left text-xs font-bold text-slate-600">ITEM</th>
+                        <th className="px-3 lg:px-4 py-3 text-right text-xs font-bold text-slate-600">QTY</th>
+                        <th className="px-3 lg:px-4 py-3 text-right text-xs font-bold text-slate-600">REVENUE</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-50">
+                    <tbody>
                       {todayStats.popularItems.slice(0, 5).map((item, index) => (
-                        <tr key={index} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-5 py-3.5 text-sm font-medium text-slate-400">{index + 1}</td>
-                          <td className="px-5 py-3.5">
-                            <div className="font-medium text-slate-900">{item.name}</div>
+                        <tr key={index} className="border-t border-slate-200">
+                          <td className="px-3 lg:px-4 py-3 text-emerald-600 font-bold">{index + 1}</td>
+                          <td className="px-3 lg:px-4 py-3">
+                            <div className="font-bold text-slate-900 text-sm">{item.name}</div>
                             {item.name_bangla && (
-                              <div className="text-xs text-slate-400 mt-0.5">{item.name_bangla}</div>
+                              <div className="text-xs text-slate-500">{item.name_bangla}</div>
                             )}
                           </td>
-                          <td className="px-5 py-3.5 text-right font-medium text-slate-700">×{item.quantity}</td>
-                          <td className="px-5 py-3.5 text-right font-semibold text-emerald-600">৳{item.revenue.toFixed(0)}</td>
+                          <td className="px-3 lg:px-4 py-3 text-right font-bold text-slate-900">×{item.quantity}</td>
+                          <td className="px-3 lg:px-4 py-3 text-right font-bold text-emerald-600">৳{item.revenue.toFixed(0)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               </div>
-            </section>
+            </div>
           )}
 
           {/* Tables Section */}
           <section>
             <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Tables</h2>
-            <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
+            <div className="flex gap-2 mb-4 overflow-x-auto pb-2 -mx-4 px-4 lg:mx-0 lg:px-0">
               {floors.map((floor) => (
                 <button
                   key={floor.id}
                   onClick={() => setSelectedFloor(floor)}
-                  className={`px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
+                  className={`px-5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap min-w-[120px] transition-all ${
                     selectedFloor?.id === floor.id
                       ? 'bg-slate-900 text-white shadow-sm'
                       : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-100'
@@ -296,31 +295,35 @@ export default function DashboardPage() {
                 <LoadingSpinner size="lg" />
               </div>
             ) : (
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-24">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3 mb-24">
                 {tables.map((table) => {
                   const colors = getStatusColors(table.status)
                   return (
-                    <button
+                    <div
                       key={table.id}
-                      type="button"
                       onClick={() => handleTableClick(table)}
-                      className={`${colors.bg} border ${colors.border} rounded-2xl p-4 lg:p-5 text-center hover:shadow-lg transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2`}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTableClick(table); } }}
+                      className={`${colors.bg} border-2 ${colors.border} rounded-2xl p-4 lg:p-5 cursor-pointer hover:shadow-xl transition-all active:scale-95 min-h-[140px] lg:min-h-[160px]`}
                     >
-                      <div className="text-xs font-medium text-slate-500 mb-1">Table</div>
-                      <div className={`text-3xl lg:text-4xl font-semibold ${colors.text} mb-2`}>
-                        {table.table_number}
+                      <div className="text-center">
+                        <div className="text-xs text-slate-500 font-semibold mb-1">TABLE</div>
+                        <div className={`text-4xl lg:text-5xl font-brand font-black ${colors.text} mb-2 lg:mb-3`}>
+                          {table.table_number}
+                        </div>
+                        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full ${colors.badge} text-white mb-2 lg:mb-3`}>
+                          <span className="w-2 h-2 rounded-full bg-white"></span>
+                          <span className="font-bold text-xs uppercase">{table.status}</span>
+                        </div>
+                        <div className="flex items-center justify-center gap-1 text-slate-600">
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                          </svg>
+                          <span className="text-sm font-semibold">{table.seats} Seats</span>
+                        </div>
                       </div>
-                      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${colors.badge} text-white text-xs font-medium`}>
-                        <span className="w-1.5 h-1.5 rounded-full bg-white/80" />
-                        {table.status.charAt(0).toUpperCase() + table.status.slice(1)}
-                      </div>
-                      <div className="flex items-center justify-center gap-1 mt-2 text-slate-500 text-sm">
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
-                        </svg>
-                        <span>{table.seats} seats</span>
-                      </div>
-                    </button>
+                    </div>
                   )
                 })}
               </div>
