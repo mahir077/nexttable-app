@@ -314,8 +314,8 @@ export default function DashboardPage() {
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTableClick(table); } }}
                         className={`${colors.bg} border ${colors.border} rounded-xl p-3 sm:p-4 cursor-pointer hover:shadow-md transition-all active:scale-[0.98] min-h-[100px] sm:min-h-[110px]`}
                       >
-                        <div className="text-[10px] text-slate-500 font-semibold mb-0.5">TABLE</div>
-                        <div className={`text-xl sm:text-2xl font-black ${colors.text} font-brand mb-1`}>{table.table_number}</div>
+                        <div className="text-[10px] text-slate-400 font-semibold mb-1 uppercase tracking-wider">Table</div>
+                        <div className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 font-brand mb-1.5 leading-none">{table.table_number}</div>
                         <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md ${colors.badge} text-white`}>
                           <span className="w-1.5 h-1.5 rounded-full bg-white/90" />
                           <span className="font-bold text-[10px] uppercase">{table.status}</span>
