@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase, getFloors, getTablesByFloor, Floor, Table } from '@/app/lib/api/tables'
@@ -15,10 +15,10 @@ const ORDER_TYPES = [
 
 type OrderTypeId = typeof ORDER_TYPES[number]['id']
 
-export default function POSPage() {
+function POSContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const typeFromUrl = (searchParams.get('type') as OrderTypeId) || 'dine-in'
+  const typeFromUrl = (searchParams?.get('type') as OrderTypeId) || 'dine-in'
 
   const [orderType, setOrderType] = useState<OrderTypeId>(typeFromUrl)
   const [customerName, setCustomerName] = useState('')
@@ -42,7 +42,7 @@ export default function POSPage() {
 
   // Sync URL -> state
   useEffect(() => {
-    const t = (searchParams.get('type') as OrderTypeId) || 'dine-in'
+    const t = (searchParams?.get('type') as OrderTypeId) || 'dine-in'
     if (ORDER_TYPES.some(o => o.id === t)) setOrderType(t)
   }, [searchParams])
 
@@ -535,5 +535,13 @@ export default function POSPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function POSPage() {
+  return (
+    <Suspense fallback={<div className="flex h-screen items-center justify-center bg-slate-50 p-6 text-slate-600">Loading...</div>}>
+      <POSContent />
+    </Suspense>
   )
 }
