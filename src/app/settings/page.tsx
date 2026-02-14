@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react'
 import { getFloors, getTablesByFloor, Floor, Table } from '@/app/lib/api/tables'
 import { supabase } from '@/app/lib/api/tables'
+import { getCashDrawerUrl, setCashDrawerUrl as saveCashDrawerUrl } from '@/app/lib/cashDrawer'
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<'restaurant' | 'tables'>('restaurant')
+  const [activeTab, setActiveTab] = useState<'restaurant' | 'tables' | 'printer'>('restaurant')
   
   // Restaurant info state
   const [restaurantInfo, setRestaurantInfo] = useState({
@@ -35,6 +36,9 @@ export default function SettingsPage() {
     location: ''
   })
 
+  // Printer & Cash Drawer (URL for open drawer)
+  const [cashDrawerUrl, setCashDrawerUrl] = useState('')
+
   // Fetch data
   useEffect(() => {
     fetchFloors()
@@ -45,6 +49,10 @@ export default function SettingsPage() {
       fetchTables()
     }
   }, [selectedFloor])
+
+  useEffect(() => {
+    setCashDrawerUrl(getCashDrawerUrl())
+  }, [activeTab])
 
   const fetchFloors = async () => {
     try {
@@ -229,6 +237,16 @@ export default function SettingsPage() {
         >
           🪑 Tables & Floors
         </button>
+        <button
+          onClick={() => setActiveTab('printer')}
+          className={`px-8 py-4 rounded-2xl font-bold transition-all ${
+            activeTab === 'printer'
+              ? 'bg-slate-900 text-white shadow-lg'
+              : 'bg-white text-slate-700 border-2 border-slate-200 hover:border-slate-300'
+          }`}
+        >
+          🖨️ Printer & Cash Drawer
+        </button>
       </div>
 
       {/* Restaurant Info Tab */}
@@ -285,6 +303,27 @@ export default function SettingsPage() {
             >
               💾 Save Restaurant Info
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Printer & Cash Drawer Tab */}
+      {activeTab === 'printer' && (
+        <div className="bg-white rounded-2xl p-8 border-2 border-slate-200">
+          <h2 className="text-2xl font-bold text-slate-900 mb-6">Printer & Cash Drawer</h2>
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">Cash drawer endpoint</label>
+              <input
+                type="text"
+                value={cashDrawerUrl}
+                onChange={(e) => setCashDrawerUrl(e.target.value)}
+                onBlur={() => saveCashDrawerUrl(cashDrawerUrl)}
+                placeholder="e.g. http://localhost:9100/open"
+                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none"
+              />
+              <p className="text-xs text-slate-500 mt-1">বিল প্রিন্ট করার সময় &quot;Print (open drawer)&quot; দিলে এই URL এ request যাবে। লোকাল সার্ভিস চালু থাকলে ক্যাশ ড্রয়ার খুলবে।</p>
+            </div>
           </div>
         </div>
       )}

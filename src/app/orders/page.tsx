@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/app/lib/api/tables'
+import { openCashDrawer } from '@/app/lib/cashDrawer'
 import BackButton from '@/components/BackButton'
 
 interface Order {
@@ -93,7 +94,7 @@ export default function OrdersPage() {
       const { data, error } = await supabase
         .from('orders')
         .select('*')
-        .eq('status', 'completed')
+        .eq('status', 'paid')
         .order('created_at', { ascending: false })
         .limit(100)
 
@@ -172,7 +173,8 @@ export default function OrdersPage() {
     return date.toLocaleDateString('en-US', options)
   }
 
-  const printReceipt = () => {
+  const printReceipt = async (openDrawer: boolean) => {
+    if (openDrawer) await openCashDrawer()
     window.print()
   }
 
@@ -474,16 +476,24 @@ export default function OrdersPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex gap-3">
-              <button
-                onClick={printReceipt}
-                className="flex-1 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors"
-              >
-                🖨️ Print Receipt
-              </button>
+            <div className="flex flex-col gap-3">
+              <div className="flex gap-3">
+                <button
+                  onClick={() => printReceipt(true)}
+                  className="flex-1 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors"
+                >
+                  🖨️ Print (open drawer)
+                </button>
+                <button
+                  onClick={() => printReceipt(false)}
+                  className="flex-1 py-3 rounded-xl bg-slate-500 hover:bg-slate-600 text-white font-bold transition-colors"
+                >
+                  🖨️ Print (no drawer)
+                </button>
+              </div>
               <button
                 onClick={() => setShowModal(false)}
-                className="flex-1 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition-colors"
+                className="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition-colors"
               >
                 Close
               </button>

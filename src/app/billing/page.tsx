@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getOrdersForBilling, getOrderWithItems, processPayment } from '@/app/lib/api/orders'
+import { openCashDrawer } from '@/app/lib/cashDrawer'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import EmptyState from '@/components/EmptyState'
 
@@ -83,8 +84,9 @@ export default function BillingPage() {
     }
   }
 
-  // Print bill
-  const handlePrint = () => {
+  // Print bill — choice at print time: open cash drawer or not
+  const handlePrint = async (openDrawer: boolean) => {
+    if (openDrawer) await openCashDrawer()
     window.print()
   }
 
@@ -227,10 +229,16 @@ export default function BillingPage() {
                   📱 Mobile
                 </button>
                 <button
-                  onClick={handlePrint}
+                  onClick={() => handlePrint(true)}
                   className="py-4 rounded-xl bg-slate-500 hover:bg-slate-600 text-white font-bold text-lg transition-colors"
                 >
-                  🖨️ Print
+                  🖨️ Print (open drawer)
+                </button>
+                <button
+                  onClick={() => handlePrint(false)}
+                  className="py-4 rounded-xl bg-slate-400 hover:bg-slate-500 text-white font-bold text-lg transition-colors"
+                >
+                  🖨️ Print (no drawer)
                 </button>
               </div>
             </div>
