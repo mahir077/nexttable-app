@@ -129,7 +129,7 @@ export default function ReportsPage() {
         <select
           value={dateFilter}
           onChange={(e) => setDateFilter(e.target.value)}
-          className="px-4 py-2 rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none font-bold"
+          className="px-4 py-2 rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none font-bold text-slate-900"
         >
           <option value="today">Today</option>
           <option value="week">Last 7 Days</option>

@@ -261,7 +261,7 @@ export default function SettingsPage() {
                 type="text"
                 value={restaurantInfo.name}
                 onChange={(e) => setRestaurantInfo({ ...restaurantInfo, name: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none"
+                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
             </div>
 
@@ -271,7 +271,7 @@ export default function SettingsPage() {
                 type="text"
                 value={restaurantInfo.address}
                 onChange={(e) => setRestaurantInfo({ ...restaurantInfo, address: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none"
+                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
             </div>
 
@@ -282,7 +282,7 @@ export default function SettingsPage() {
                   type="tel"
                   value={restaurantInfo.phone}
                   onChange={(e) => setRestaurantInfo({ ...restaurantInfo, phone: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
                 />
               </div>
 
@@ -292,7 +292,7 @@ export default function SettingsPage() {
                   type="email"
                   value={restaurantInfo.email}
                   onChange={(e) => setRestaurantInfo({ ...restaurantInfo, email: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
                 />
               </div>
             </div>
@@ -320,7 +320,7 @@ export default function SettingsPage() {
                 onChange={(e) => setCashDrawerUrl(e.target.value)}
                 onBlur={() => saveCashDrawerUrl(cashDrawerUrl)}
                 placeholder="e.g. http://localhost:9100/open"
-                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none"
+                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
               <p className="text-xs text-slate-500 mt-1">বিল প্রিন্ট করার সময় &quot;Print (open drawer)&quot; দিলে এই URL এ request যাবে। লোকাল সার্ভিস চালু থাকলে ক্যাশ ড্রয়ার খুলবে।</p>
             </div>
@@ -461,7 +461,7 @@ export default function SettingsPage() {
                 value={floorForm.name}
                 onChange={(e) => setFloorForm({ name: e.target.value })}
                 placeholder="e.g., Ground Floor"
-                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none"
+                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
             </div>
             <div className="flex gap-3">
@@ -497,7 +497,7 @@ export default function SettingsPage() {
                   value={tableForm.table_number}
                   onChange={(e) => setTableForm({ ...tableForm, table_number: e.target.value })}
                   placeholder="e.g., 1, A1, VIP-1"
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
                 />
               </div>
               <div>
@@ -507,7 +507,7 @@ export default function SettingsPage() {
                   min="1"
                   value={tableForm.seats}
                   onChange={(e) => setTableForm({ ...tableForm, seats: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
                 />
               </div>
               <div>
@@ -517,7 +517,7 @@ export default function SettingsPage() {
                   value={tableForm.location}
                   onChange={(e) => setTableForm({ ...tableForm, location: e.target.value })}
                   placeholder="e.g., By Window, Corner"
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
                 />
               </div>
             </div>

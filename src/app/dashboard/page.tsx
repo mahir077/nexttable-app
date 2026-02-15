@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Sidebar from '@/components/Sidebar'
-import { getFloors, getTablesByFloor, Floor, Table } from '@/app/lib/api/tables'
+import { getFloors, getTablesByFloor, getAllTables, Floor, Table } from '@/app/lib/api/tables'
 import { getTodayStats, getWeeklyStats } from '@/app/lib/api/orders'
+import type { Order } from '@/app/lib/api/orders'
 import TableModal from '@/components/TableModal'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import { supabase } from '@/app/lib/api/tables'
@@ -41,6 +42,21 @@ export default function DashboardPage() {
   const [weeklyRevenue, setWeeklyRevenue] = useState(0)
   // Per-table food status: 'kot' = in kitchen, 'table' = at table
   const [tableFoodStatus, setTableFoodStatus] = useState<Record<string, 'kot' | 'table'>>({})
+
+  // Merge Table modal
+  const [showMergeModal, setShowMergeModal] = useState(false)
+  const [allTables, setAllTables] = useState<Table[]>([])
+  const [mergeSelectedIds, setMergeSelectedIds] = useState<Set<string>>(new Set())
+  const [mergePrimaryId, setMergePrimaryId] = useState<string>('')
+  const [mergeLoading, setMergeLoading] = useState(false)
+
+  // Change Table modal
+  const [showChangeModal, setShowChangeModal] = useState(false)
+  const [activeDineInOrders, setActiveDineInOrders] = useState<Order[]>([])
+  const [availableTables, setAvailableTables] = useState<Table[]>([])
+  const [changeOrderId, setChangeOrderId] = useState<string>('')
+  const [changeNewTableId, setChangeNewTableId] = useState<string>('')
+  const [changeLoading, setChangeLoading] = useState(false)
 
   // Set current date
   useEffect(() => {
@@ -160,6 +176,130 @@ export default function DashboardPage() {
     } catch (error) {
       console.error('Error updating table status:', error)
       alert('Failed to update table status')
+    }
+  }
+
+  // Open Merge Table modal: load all tables
+  const openMergeModal = async () => {
+    setShowMergeModal(true)
+    setMergeSelectedIds(new Set())
+    setMergePrimaryId('')
+    try {
+      const tables = await getAllTables()
+      setAllTables(tables)
+    } catch (e) {
+      console.error(e)
+      alert('Failed to load tables')
+    }
+  }
+
+  const toggleMergeTable = (tableId: string) => {
+    setMergeSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(tableId)) next.delete(tableId)
+      else next.add(tableId)
+      return next
+    })
+  }
+
+  const handleMergeTables = async () => {
+    const selected = Array.from(mergeSelectedIds)
+    if (selected.length < 2) {
+      alert('Select at least 2 tables to merge.')
+      return
+    }
+    if (!mergePrimaryId || !selected.includes(mergePrimaryId)) {
+      alert('Choose which table is the primary (table to keep).')
+      return
+    }
+    setMergeLoading(true)
+    try {
+      const otherIds = selected.filter(id => id !== mergePrimaryId)
+      const { data: ordersToMove } = await supabase
+        .from('orders')
+        .select('id')
+        .in('table_id', otherIds)
+        .in('status', ['pending', 'preparing', 'ready', 'served'])
+      if (ordersToMove && ordersToMove.length > 0) {
+        await supabase
+          .from('orders')
+          .update({ table_id: mergePrimaryId, updated_at: new Date().toISOString() })
+          .in('id', ordersToMove.map(o => o.id))
+      }
+      for (const id of otherIds) {
+        await supabase.from('tables').update({ status: 'available' }).eq('id', id)
+      }
+      setShowMergeModal(false)
+      if (selectedFloor) {
+        const tablesData = await getTablesByFloor(selectedFloor.id)
+        setTables(tablesData)
+      }
+      alert('Tables merged successfully. All orders are now on the primary table.')
+    } catch (e) {
+      console.error(e)
+      alert('Failed to merge tables')
+    } finally {
+      setMergeLoading(false)
+    }
+  }
+
+  // Open Change Table modal: load active dine-in orders and available tables
+  const openChangeModal = async () => {
+    setShowChangeModal(true)
+    setChangeOrderId('')
+    setChangeNewTableId('')
+    try {
+      const [ordersRes, tablesRes] = await Promise.all([
+        supabase
+          .from('orders')
+          .select('*')
+          .eq('order_type', 'dine-in')
+          .not('table_id', 'is', null)
+          .in('status', ['pending', 'preparing', 'ready', 'served'])
+          .order('created_at', { ascending: false }),
+        getAllTables()
+      ])
+      const tablesList = tablesRes || []
+      setActiveDineInOrders((ordersRes.data as Order[]) || [])
+      setAvailableTables(tablesList.filter(t => t.status === 'available'))
+      setAllTables(tablesList)
+    } catch (e) {
+      console.error(e)
+      alert('Failed to load data')
+    }
+  }
+
+  const handleChangeTable = async () => {
+    if (!changeOrderId || !changeNewTableId) {
+      alert('Select an order and a new table.')
+      return
+    }
+    const order = activeDineInOrders.find(o => o.id === changeOrderId)
+    if (!order || !order.table_id) return
+    const oldTableId = order.table_id
+    if (oldTableId === changeNewTableId) {
+      alert('New table must be different from current table.')
+      return
+    }
+    setChangeLoading(true)
+    try {
+      await supabase
+        .from('orders')
+        .update({ table_id: changeNewTableId, updated_at: new Date().toISOString() })
+        .eq('id', changeOrderId)
+      await supabase.from('tables').update({ status: 'available' }).eq('id', oldTableId)
+      await supabase.from('tables').update({ status: 'occupied' }).eq('id', changeNewTableId)
+      setShowChangeModal(false)
+      if (selectedFloor) {
+        const tablesData = await getTablesByFloor(selectedFloor.id)
+        setTables(tablesData)
+      }
+      alert('Order moved to new table successfully.')
+    } catch (e) {
+      console.error(e)
+      alert('Failed to change table')
+    } finally {
+      setChangeLoading(false)
     }
   }
 
@@ -300,6 +440,14 @@ export default function DashboardPage() {
                   <svg className="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
                   <span className="text-xs sm:text-sm font-bold text-center leading-tight">Merge Token</span>
                 </button>
+                <button type="button" onClick={openMergeModal} className="flex flex-col items-center justify-center gap-2 p-4 sm:p-5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm transition-all min-h-[88px] sm:min-h-[96px]">
+                  <span className="text-2xl">🔀</span>
+                  <span className="text-xs sm:text-sm font-bold text-center leading-tight">Merge Table</span>
+                </button>
+                <button type="button" onClick={openChangeModal} className="flex flex-col items-center justify-center gap-2 p-4 sm:p-5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white shadow-sm transition-all min-h-[88px] sm:min-h-[96px]">
+                  <span className="text-2xl">↔️</span>
+                  <span className="text-xs sm:text-sm font-bold text-center leading-tight">Change Table</span>
+                </button>
                 <Link href="/stock" className="flex flex-col items-center justify-center gap-2 p-4 sm:p-5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm transition-all min-h-[88px] sm:min-h-[96px]">
                   <svg className="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
                   <span className="text-xs sm:text-sm font-bold text-center leading-tight">Stock</span>
@@ -422,6 +570,119 @@ export default function DashboardPage() {
           onClose={() => setIsModalOpen(false)}
           onStatusChange={handleStatusChange}
         />
+
+        {/* Merge Table Modal */}
+        {showMergeModal && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowMergeModal(false)}>
+            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-slate-900">🔀 Merge Table</h2>
+                <button type="button" onClick={() => setShowMergeModal(false)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-600">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+              <div className="p-4 overflow-y-auto space-y-4">
+                <p className="text-sm text-slate-600">Select 2+ tables, then choose the primary table (orders will move there).</p>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Tables</label>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {allTables.map(t => (
+                      <label key={t.id} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={mergeSelectedIds.has(t.id)}
+                          onChange={() => toggleMergeTable(t.id)}
+                          className="rounded border-slate-300 text-emerald-500 focus:ring-emerald-500"
+                        />
+                        <span className="font-medium text-slate-800">Table {t.table_number}</span>
+                        <span className="text-xs text-slate-500">({t.seats} seats · {t.status})</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                {mergeSelectedIds.size >= 2 && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Primary table (keep this one)</label>
+                    <select
+                      value={mergePrimaryId}
+                      onChange={e => setMergePrimaryId(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900"
+                    >
+                      <option value="">Select primary table</option>
+                      {Array.from(mergeSelectedIds).map(id => {
+                        const t = allTables.find(x => x.id === id)
+                        return t ? <option key={t.id} value={t.id}>Table {t.table_number}</option> : null
+                      })}
+                    </select>
+                  </div>
+                )}
+              </div>
+              <div className="p-4 border-t border-slate-200 flex gap-3">
+                <button type="button" onClick={() => setShowMergeModal(false)} className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200">
+                  Cancel
+                </button>
+                <button type="button" onClick={handleMergeTables} disabled={mergeLoading || mergeSelectedIds.size < 2 || !mergePrimaryId} className="flex-1 py-3 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                  {mergeLoading ? 'Merging...' : 'Merge'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Change Table Modal */}
+        {showChangeModal && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowChangeModal(false)}>
+            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-slate-900">↔️ Change Table</h2>
+                <button type="button" onClick={() => setShowChangeModal(false)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-600">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+              <div className="p-4 space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Order</label>
+                  <select
+                    value={changeOrderId}
+                    onChange={e => setChangeOrderId(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900"
+                  >
+                    <option value="">Select order</option>
+                    {activeDineInOrders.map(o => {
+                      const tbl = allTables.find(t => t.id === o.table_id) || { table_number: '?' }
+                      return (
+                        <option key={o.id} value={o.id}>
+                          {o.order_number} (Table {tbl.table_number})
+                        </option>
+                      )
+                    })}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">New table</label>
+                  <select
+                    value={changeNewTableId}
+                    onChange={e => setChangeNewTableId(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900"
+                  >
+                    <option value="">Select new table</option>
+                    {availableTables.map(t => (
+                      <option key={t.id} value={t.id}>Table {t.table_number} ({t.seats} seats)</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="p-4 border-t border-slate-200 flex gap-3">
+                <button type="button" onClick={() => setShowChangeModal(false)} className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200">
+                  Cancel
+                </button>
+                <button type="button" onClick={handleChangeTable} disabled={changeLoading || !changeOrderId || !changeNewTableId} className="flex-1 py-3 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                  {changeLoading ? 'Changing...' : 'Change'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

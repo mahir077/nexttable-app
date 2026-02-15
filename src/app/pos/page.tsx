@@ -27,6 +27,7 @@ function POSContent() {
   const [deliveryTime, setDeliveryTime] = useState('')
   const [guestCount, setGuestCount] = useState('')
   const [eventDate, setEventDate] = useState('')
+  const [buzzerNumber, setBuzzerNumber] = useState('')
 
   const [cart, setCart] = useState<CartItem[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -116,6 +117,44 @@ function POSContent() {
     setCart(prev => prev.filter(i => i.id !== itemId))
   }
 
+  const printKOT = (order: { order_number: string; total: number }, cartItems: CartItem[], tableLabel: string) => {
+    try {
+      const printWindow = window.open('', '', 'height=600,width=400')
+      if (!printWindow) return
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>KOT - ${order.order_number}</title>
+            <style>
+              body { font-family: monospace; padding: 20px; }
+              h1 { text-align: center; }
+              .item { margin: 10px 0; }
+            </style>
+          </head>
+          <body>
+            <h1>KOT</h1>
+            <h2>${order.order_number}</h2>
+            <p>Table: ${tableLabel}</p>
+            <p>Time: ${new Date().toLocaleTimeString()}</p>
+            <hr>
+            ${cartItems.map(item => `
+              <div class="item">
+                ${item.quantity}x ${item.name} - ৳${item.price * item.quantity}
+              </div>
+            `).join('')}
+            <hr>
+            <p>Total: ৳${order.total}</p>
+          </body>
+        </html>
+      `)
+      printWindow.document.close()
+      printWindow.print()
+      printWindow.onafterprint = () => printWindow.close()
+    } catch (e) {
+      console.error('KOT print failed:', e)
+    }
+  }
+
   const validateAndSendKOT = () => {
     if (cart.length === 0) {
       alert('Cart is empty. Add items first.')
@@ -195,6 +234,8 @@ function POSContent() {
         delivery_time: orderType === 'online' && deliveryTime ? deliveryTime : null,
         guest_count: orderType === 'event' && guestCount ? parseInt(guestCount, 10) : null,
         event_date: orderType === 'event' && eventDate ? eventDate : null,
+        buzzer_number: (() => { const n = parseInt(buzzerNumber, 10); return orderType === 'dine-in' && buzzerNumber.trim() && !isNaN(n) && n >= 1 && n <= 99 ? n : null })(),
+        buzzer_status: (() => { const n = parseInt(buzzerNumber, 10); return orderType === 'dine-in' && buzzerNumber.trim() && !isNaN(n) && n >= 1 && n <= 99 ? 'pending' : null })(),
       }
 
       const { data: order, error: orderError } = await supabase
@@ -219,6 +260,11 @@ function POSContent() {
       const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
       if (itemsError) throw itemsError
 
+      const tableLabel = orderType === 'dine-in' && selectedTable
+        ? `Table ${tables.find(t => t.id === selectedTable)?.table_number ?? '?'}`
+        : orderType.charAt(0).toUpperCase() + orderType.slice(1)
+      printKOT({ ...order, order_number: order.order_number, total: order.total }, cart, tableLabel)
+
       alert(`✅ KOT sent! Order: ${orderNumber}`)
       setCart([])
       setSelectedTable(null)
@@ -228,6 +274,7 @@ function POSContent() {
       setDeliveryTime('')
       setGuestCount('')
       setEventDate('')
+      setBuzzerNumber('')
     } catch (err) {
       console.error(err)
       alert('Failed to create order')
@@ -294,9 +341,9 @@ function POSContent() {
             ))}
           </div>
 
-          {/* Dine-in: table selection */}
+          {/* Dine-in: table selection + buzzer */}
           {orderType === 'dine-in' && (
-            <div className="mb-4">
+            <div className="mb-4 space-y-3">
               <button
                 type="button"
                 onClick={() => setShowTableModal(true)}
@@ -306,6 +353,18 @@ function POSContent() {
                   ? `Table ${tables.find(t => t.id === selectedTable)?.table_number ?? '?'}`
                   : 'Select Table *'}
               </button>
+              <div className="max-w-[120px]">
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Buzzer (optional)</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={99}
+                  value={buzzerNumber}
+                  onChange={e => setBuzzerNumber(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                  placeholder="1–99"
+                  className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                />
+              </div>
             </div>
           )}
 
@@ -317,14 +376,14 @@ function POSContent() {
                 value={customerName}
                 onChange={e => setCustomerName(e.target.value)}
                 placeholder="Customer Name *"
-                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none"
+                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
               <input
                 type="tel"
                 value={customerPhone}
                 onChange={e => setCustomerPhone(e.target.value)}
                 placeholder="Phone (optional)"
-                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none"
+                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
             </div>
           )}
@@ -337,27 +396,27 @@ function POSContent() {
                 value={customerName}
                 onChange={e => setCustomerName(e.target.value)}
                 placeholder="Customer Name *"
-                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none"
+                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
               <input
                 type="tel"
                 value={customerPhone}
                 onChange={e => setCustomerPhone(e.target.value)}
                 placeholder="Phone Number *"
-                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none"
+                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
               <textarea
                 value={deliveryAddress}
                 onChange={e => setDeliveryAddress(e.target.value)}
                 placeholder="Delivery Address *"
                 rows={3}
-                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none resize-none"
+                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none resize-none text-slate-900 placeholder:text-slate-400"
               />
               <input
                 type="time"
                 value={deliveryTime}
                 onChange={e => setDeliveryTime(e.target.value)}
-                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none"
+                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
             </div>
           )}
@@ -369,7 +428,7 @@ function POSContent() {
                 type="date"
                 value={eventDate}
                 onChange={e => setEventDate(e.target.value)}
-                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none"
+                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
               <input
                 type="number"
@@ -377,21 +436,21 @@ function POSContent() {
                 value={guestCount}
                 onChange={e => setGuestCount(e.target.value)}
                 placeholder="Number of Guests *"
-                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none"
+                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
               <input
                 type="text"
                 value={customerName}
                 onChange={e => setCustomerName(e.target.value)}
                 placeholder="Contact Person Name *"
-                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none"
+                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
               <input
                 type="tel"
                 value={customerPhone}
                 onChange={e => setCustomerPhone(e.target.value)}
                 placeholder="Phone Number *"
-                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none"
+                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
             </div>
           )}
