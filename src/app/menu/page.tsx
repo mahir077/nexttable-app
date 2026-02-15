@@ -9,6 +9,7 @@ import {
   updateMenuItem, 
   deleteMenuItem,
   toggleItemAvailability,
+  createCategory,
   Category, 
   MenuItem 
 } from '@/app/lib/api/menu'
@@ -33,6 +34,10 @@ export default function MenuManagementPage() {
   })
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [showCategoryModal, setShowCategoryModal] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [newCategoryIcon, setNewCategoryIcon] = useState('🍽️')
 
   // Fetch data
   const fetchData = async () => {
@@ -93,11 +98,12 @@ export default function MenuManagementPage() {
     }
 
     if (success) {
-      alert(editingItem ? '✅ Item updated!' : '✅ Item added!')
       setShowAddModal(false)
       setEditingItem(null)
       resetForm()
       fetchData()
+      setSuccessMessage(editingItem ? 'Item updated!' : 'Item added!')
+      setTimeout(() => setSuccessMessage(null), 3000)
     } else {
       alert('❌ Failed to save item')
     }
@@ -172,6 +178,29 @@ export default function MenuManagementPage() {
     setImagePreview(null)
   }
 
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newCategoryName.trim()) {
+      alert('Category name required')
+      return
+    }
+    const created = await createCategory({
+      name: newCategoryName.trim(),
+      icon: newCategoryIcon || undefined,
+      display_order: categories.length
+    })
+    if (created) {
+      setShowCategoryModal(false)
+      setNewCategoryName('')
+      setNewCategoryIcon('🍽️')
+      setSuccessMessage('Category added!')
+      setTimeout(() => setSuccessMessage(null), 3000)
+      fetchData()
+    } else {
+      alert('Failed to add category')
+    }
+  }
+
   // Open edit modal
   const openEditModal = (item: MenuItem) => {
     setEditingItem(item)
@@ -189,7 +218,13 @@ export default function MenuManagementPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 lg:p-6">
+    <div className="min-h-screen bg-slate-50 p-4 lg:p-6 relative">
+      {/* Success toast */}
+      {successMessage && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl bg-emerald-500 text-white font-bold shadow-lg animate-in fade-in duration-200">
+          ✅ {successMessage}
+        </div>
+      )}
       {/* Header */}
       <div className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -229,37 +264,88 @@ export default function MenuManagementPage() {
           </div>
         </div>
 
-      {/* Category Filter */}
+      {/* Category Filter + Add Category */}
       <div className="mb-6">
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          <button
-            onClick={() => setSelectedCategory('all')}
-            className={`px-6 py-3 rounded-xl font-bold text-sm whitespace-nowrap transition-colors ${
-              selectedCategory === 'all'
-                ? 'bg-slate-900 text-white'
-                : 'bg-white text-slate-700 border-2 border-slate-200 hover:border-slate-300'
-            }`}
-          >
-            ALL ITEMS ({menuItems.length})
-          </button>
-          {categories.map(category => {
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex gap-2 overflow-x-auto pb-2 flex-1 min-w-0">
+            <button
+              type="button"
+              onClick={() => setSelectedCategory('all')}
+              className={`px-4 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-colors ${
+                selectedCategory === 'all'
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-white text-slate-700 border-2 border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              ALL ({menuItems.length})
+            </button>
+            {categories.map(category => {
             const count = menuItems.filter(i => i.category_id === category.id).length
             return (
               <button
                 key={category.id}
+                type="button"
                 onClick={() => setSelectedCategory(category.id)}
-                className={`px-6 py-3 rounded-xl font-bold text-sm whitespace-nowrap transition-colors ${
+                className={`px-4 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-colors ${
                   selectedCategory === category.id
                     ? 'bg-emerald-500 text-white'
                     : 'bg-white text-slate-700 border-2 border-slate-200 hover:border-slate-300'
                 }`}
               >
-                {category.icon} {category.name.toUpperCase()} ({count})
+                {category.icon} {category.name} ({count})
               </button>
             )
           })}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowCategoryModal(true)}
+            className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold text-sm whitespace-nowrap"
+          >
+            + Add Category
+          </button>
         </div>
       </div>
+
+      {/* Add Category Modal */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowCategoryModal(false)}>
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Add Category</h3>
+            <form onSubmit={handleAddCategory} className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Name *</label>
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={e => setNewCategoryName(e.target.value)}
+                  placeholder="e.g. Drinks"
+                  className="w-full px-4 py-3 rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Icon (emoji)</label>
+                <input
+                  type="text"
+                  value={newCategoryIcon}
+                  onChange={e => setNewCategoryIcon(e.target.value)}
+                  placeholder="🍽️"
+                  className="w-full px-4 py-3 rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setShowCategoryModal(false)} className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold">
+                  Cancel
+                </button>
+                <button type="submit" className="flex-1 py-2.5 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600">
+                  Add
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Items Grid */}
       {loading ? (
@@ -272,14 +358,14 @@ export default function MenuManagementPage() {
           <p className="text-2xl font-bold">No items in this category</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {filteredItems.map(item => (
             <div
               key={item.id}
-              className="bg-white rounded-xl border-2 border-slate-200 overflow-hidden hover:shadow-lg transition-all"
+              className="bg-white rounded-lg border border-slate-200 overflow-hidden hover:shadow-md hover:border-emerald-200 transition-all"
             >
-              {/* Image */}
-              <div className="aspect-square bg-slate-100 flex items-center justify-center text-6xl overflow-hidden">
+              {/* Image - compact */}
+              <div className="aspect-[4/3] max-h-28 bg-slate-100 flex items-center justify-center text-3xl overflow-hidden">
                 {item.image_url ? (
                   <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
                 ) : (
@@ -287,44 +373,38 @@ export default function MenuManagementPage() {
                 )}
               </div>
 
-              {/* Content */}
-              <div className="p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1">
-                    <h3 className="font-bold text-slate-900 line-clamp-1">{item.name}</h3>
-                    {item.name_bangla && (
-                      <p className="text-xs text-slate-500 line-clamp-1">{item.name_bangla}</p>
-                    )}
-                  </div>
+              {/* Content - compact */}
+              <div className="p-2.5">
+                <div className="flex items-start justify-between gap-1 mb-1">
+                  <h3 className="font-semibold text-slate-900 text-sm line-clamp-1 flex-1 min-w-0">{item.name}</h3>
                   <button
+                    type="button"
                     onClick={() => handleToggleAvailability(item)}
-                    className={`ml-2 px-3 py-1 rounded-full text-xs font-bold ${
-                      item.is_available
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : 'bg-rose-100 text-rose-700'
+                    className={`flex-shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      item.is_available ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
                     }`}
                   >
-                    {item.is_available ? 'IN STOCK' : 'OUT'}
+                    {item.is_available ? '✓' : 'OUT'}
                   </button>
                 </div>
-
-                <div className="text-2xl font-brand font-black text-emerald-600 mb-4">
-                  ৳{item.price.toFixed(2)}
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-2">
+                {item.name_bangla && (
+                  <p className="text-[10px] text-slate-500 line-clamp-1 mb-0.5">{item.name_bangla}</p>
+                )}
+                <div className="text-base font-bold text-emerald-600 mb-2">৳{item.price.toFixed(0)}</div>
+                <div className="flex gap-1">
                   <button
+                    type="button"
                     onClick={() => openEditModal(item)}
-                    className="flex-1 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold text-sm transition-colors"
+                    className="flex-1 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs transition-colors"
                   >
-                    ✏️ Edit
+                    Edit
                   </button>
                   <button
+                    type="button"
                     onClick={() => handleDelete(item.id, item.name)}
-                    className="flex-1 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-sm transition-colors"
+                    className="flex-1 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs transition-colors"
                   >
-                    🗑️ Delete
+                    Del
                   </button>
                 </div>
               </div>

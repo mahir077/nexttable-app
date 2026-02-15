@@ -39,6 +39,7 @@ function POSContent() {
   const [selectedTable, setSelectedTable] = useState<string | null>(null)
   const [showTableModal, setShowTableModal] = useState(false)
   const [cartOpen, setCartOpen] = useState(false)
+  const [kotSuccess, setKotSuccess] = useState<{ orderNumber: string; total: number } | null>(null)
   const [loadingCategories, setLoadingCategories] = useState(true)
   const [loadingItems, setLoadingItems] = useState(false)
 
@@ -266,8 +267,9 @@ function POSContent() {
         : orderType.charAt(0).toUpperCase() + orderType.slice(1)
       printKOT({ ...order, order_number: order.order_number, total: order.total }, cart, tableLabel)
 
-      alert(`✅ KOT sent! Order: ${orderNumber}`)
+      setKotSuccess({ orderNumber, total: order.total })
       setCart([])
+      setCartOpen(false)
       setSelectedTable(null)
       setCustomerName('')
       setCustomerPhone('')
@@ -757,6 +759,31 @@ function POSContent() {
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* KOT Success Modal */}
+      {kotSuccess && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setKotSuccess(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center" onClick={e => e.stopPropagation()}>
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-100 flex items-center justify-center">
+              <span className="text-4xl">✅</span>
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-1">KOT Sent!</h3>
+            <p className="text-slate-600 text-sm mb-4">Order sent to kitchen</p>
+            <div className="bg-slate-50 rounded-xl py-3 px-4 mb-6">
+              <div className="text-xs text-slate-500 uppercase font-semibold">Order</div>
+              <div className="text-2xl font-black text-emerald-600 font-brand">{kotSuccess.orderNumber}</div>
+              <div className="text-lg font-bold text-slate-800 mt-1">৳{kotSuccess.total.toFixed(2)}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setKotSuccess(null)}
+              className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold"
+            >
+              OK
+            </button>
           </div>
         </div>
       )}

@@ -58,6 +58,21 @@ export default function DashboardPage() {
   const [changeNewTableId, setChangeNewTableId] = useState<string>('')
   const [changeLoading, setChangeLoading] = useState(false)
 
+  // Restaurant name from settings (localStorage)
+  const [restaurantName, setRestaurantName] = useState<string>('NextTable')
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('restaurantInfo')
+      if (saved) {
+        const info = JSON.parse(saved) as { name?: string }
+        if (info.name && typeof info.name === 'string') setRestaurantName(info.name)
+      }
+    } catch {
+      // keep default
+    }
+  }, [])
+
   // Set current date
   useEffect(() => {
     const today = new Date()
@@ -361,7 +376,7 @@ export default function DashboardPage() {
               </svg>
             </button>
             <div className="min-w-0">
-              <h1 className="text-base sm:text-lg md:text-xl font-semibold text-slate-800 truncate">NextTable</h1>
+              <h1 className="text-base sm:text-lg md:text-xl font-semibold text-slate-800 truncate">{restaurantName}</h1>
               <p className="text-xs text-slate-400 hidden sm:block">{currentDate}</p>
             </div>
           </div>

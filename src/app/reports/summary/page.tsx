@@ -12,12 +12,15 @@ interface Order {
 }
 
 interface OrderWithItems extends Order {
-  order_items: Array<{
+  order_items?: Array<{
     quantity: number
-    price: number
-    menu_item: {
-      name: string
-      category: string
+    unit_price?: number
+    price?: number
+    item_name?: string
+    menu_item_id?: string
+    menu_item?: {
+      name?: string
+      category?: string | { name?: string }
     }
   }>
 }
@@ -40,14 +43,16 @@ export default function ReportsPage() {
           *,
           order_items (
             quantity,
-            price,
+            unit_price,
+            item_name,
+            menu_item_id,
             menu_item:menu_items (
               name,
-              category
+              category:categories(name)
             )
           )
         `)
-        .eq('status', 'completed')
+        .eq('status', 'paid')
         .order('created_at', { ascending: false })
 
       if (dateFilter === 'today') {
@@ -82,26 +87,30 @@ export default function ReportsPage() {
   const cardSales = orders.filter(o => o.payment_method === 'card').reduce((sum, o) => sum + o.total, 0)
   const mobileSales = orders.filter(o => o.payment_method === 'mobile').reduce((sum, o) => sum + o.total, 0)
 
-  // Item-wise sales
-  const itemSales = orders.flatMap(o => o.order_items).reduce((acc: any, item: any) => {
-    const name = item.menu_item.name
+  // Item-wise sales (use item_name from order_items or menu_item.name; use unit_price)
+  const itemSales = orders.flatMap(o => (o.order_items || []).filter(Boolean)).reduce((acc: any, item: any) => {
+    const name = item.item_name || item.menu_item?.name || 'Unknown'
+    const qty = item.quantity || 0
+    const price = item.unit_price ?? item.price ?? 0
     if (!acc[name]) {
       acc[name] = { name, quantity: 0, revenue: 0 }
     }
-    acc[name].quantity += item.quantity
-    acc[name].revenue += item.price * item.quantity
+    acc[name].quantity += qty
+    acc[name].revenue += price * qty
     return acc
   }, {})
   const topItems = Object.values(itemSales).sort((a: any, b: any) => b.revenue - a.revenue).slice(0, 10)
 
-  // Category-wise sales
-  const categorySales = orders.flatMap(o => o.order_items).reduce((acc: any, item: any) => {
-    const cat = item.menu_item.category
+  // Category-wise sales (category from menu_item.category.name)
+  const categorySales = orders.flatMap(o => (o.order_items || []).filter(Boolean)).reduce((acc: any, item: any) => {
+    const cat = item.menu_item?.category?.name ?? item.menu_item?.category ?? 'Uncategorized'
+    const qty = item.quantity || 0
+    const price = item.unit_price ?? item.price ?? 0
     if (!acc[cat]) {
       acc[cat] = { category: cat, quantity: 0, revenue: 0 }
     }
-    acc[cat].quantity += item.quantity
-    acc[cat].revenue += item.price * item.quantity
+    acc[cat].quantity += qty
+    acc[cat].revenue += price * qty
     return acc
   }, {})
   const categoryData = Object.values(categorySales)
@@ -217,7 +226,7 @@ export default function ReportsPage() {
                   <td className="px-4 py-3">{idx + 1}</td>
                   <td className="px-4 py-3 font-semibold">{item.name}</td>
                   <td className="px-4 py-3 text-right">×{item.quantity}</td>
-                  <td className="px-4 py-3 text-right text-emerald-600 font-bold">৳{item.revenue.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-right text-emerald-600 font-bold">৳{(item.revenue || 0).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>

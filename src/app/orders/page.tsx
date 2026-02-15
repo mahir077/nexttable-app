@@ -170,41 +170,37 @@ export default function OrdersPage() {
   const totalOrders = filteredOrders.length
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      {/* Header with Back Button */}
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <BackButton />
-          <div>
-            <h1 className="text-4xl font-brand font-black text-slate-900">📋 ORDER HISTORY</h1>
-            <p className="text-slate-600">View and manage past orders</p>
-          </div>
+    <div className="min-h-screen bg-slate-50 p-4 lg:p-6">
+      {/* Header */}
+      <div className="mb-4 flex items-center gap-3">
+        <BackButton />
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-brand font-black text-slate-900">📋 Order History</h1>
+          <p className="text-slate-600 text-sm">Paid orders · view & reprint</p>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-2xl p-6 border-2 border-slate-200">
-          <div className="text-sm text-slate-500 mb-1">TOTAL ORDERS</div>
-          <div className="text-3xl font-brand font-black text-slate-900">{totalOrders}</div>
+      {/* Stats - compact */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="bg-white rounded-xl p-4 border border-slate-200">
+          <div className="text-xs text-slate-500 font-semibold uppercase">Orders</div>
+          <div className="text-xl font-bold text-slate-900">{totalOrders}</div>
         </div>
-        <div className="bg-white rounded-2xl p-6 border-2 border-slate-200">
-          <div className="text-sm text-slate-500 mb-1">TOTAL REVENUE</div>
-          <div className="text-3xl font-brand font-black text-emerald-600">৳{totalRevenue.toFixed(2)}</div>
+        <div className="bg-white rounded-xl p-4 border border-slate-200">
+          <div className="text-xs text-slate-500 font-semibold uppercase">Revenue</div>
+          <div className="text-xl font-bold text-emerald-600">৳{totalRevenue.toFixed(0)}</div>
         </div>
-        <div className="bg-white rounded-2xl p-6 border-2 border-slate-200">
-          <div className="text-sm text-slate-500 mb-1">AVERAGE ORDER</div>
-          <div className="text-3xl font-brand font-black text-blue-600">
-            ৳{totalOrders > 0 ? (totalRevenue / totalOrders).toFixed(2) : '0'}
-          </div>
+        <div className="bg-white rounded-xl p-4 border border-slate-200">
+          <div className="text-xs text-slate-500 font-semibold uppercase">Avg</div>
+          <div className="text-xl font-bold text-blue-600">৳{totalOrders > 0 ? (totalRevenue / totalOrders).toFixed(0) : '0'}</div>
         </div>
       </div>
 
       {/* Search and Filters */}
-      <div className="bg-white rounded-2xl p-6 border-2 border-slate-200 mb-6">
-        <h2 className="text-lg font-bold text-slate-900 mb-4">🔍 Search & Filter</h2>
+      <div className="bg-white rounded-xl p-4 border border-slate-200 mb-4">
+        <h2 className="text-sm font-bold text-slate-700 mb-3">Search & filter</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Search */}
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-2">Search Order #</label>
@@ -289,10 +285,10 @@ export default function OrdersPage() {
       </div>
 
       {/* Orders Table */}
-      <div className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-100">
+          <table className="w-full min-w-[640px]">
+            <thead className="bg-slate-50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-bold text-slate-600">ORDER #</th>
                 <th className="px-4 py-3 text-left text-xs font-bold text-slate-600">DATE & TIME</th>

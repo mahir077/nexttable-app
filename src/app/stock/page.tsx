@@ -66,28 +66,28 @@ export default function StockPage() {
   const outOfStock = items.filter(i => (i.stock_quantity || 0) === 0).length
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="mb-6 flex items-center gap-4">
+    <div className="min-h-screen bg-slate-50 p-4 lg:p-6">
+      <div className="mb-4 flex items-center gap-3">
         <BackButton />
         <div>
-          <h1 className="text-4xl font-brand font-black text-slate-900">📦 STOCK MANAGEMENT</h1>
-          <p className="text-slate-600">Track and manage inventory</p>
+          <h1 className="text-2xl lg:text-3xl font-brand font-black text-slate-900">📦 Stock</h1>
+          <p className="text-slate-600 text-sm">Track and update inventory</p>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-xl p-4 border-2 border-slate-200">
-          <div className="text-sm text-slate-500 mb-1">Total Items</div>
-          <div className="text-2xl font-bold text-slate-900">{items.length}</div>
+      {/* Stats - compact and clear */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
+          <div className="text-xs text-slate-500 font-semibold uppercase">Items</div>
+          <div className="text-xl font-bold text-slate-900">{items.length}</div>
         </div>
-        <div className="bg-white rounded-xl p-4 border-2 border-orange-200">
-          <div className="text-sm text-orange-600 mb-1">Low Stock</div>
-          <div className="text-2xl font-bold text-orange-600">{lowStock}</div>
+        <div className="bg-amber-50 rounded-lg p-3 border border-amber-200 text-center">
+          <div className="text-xs text-amber-700 font-semibold uppercase">Low (&lt;10)</div>
+          <div className="text-xl font-bold text-amber-700">{lowStock}</div>
         </div>
-        <div className="bg-white rounded-xl p-4 border-2 border-red-200">
-          <div className="text-sm text-red-600 mb-1">Out of Stock</div>
-          <div className="text-2xl font-bold text-red-600">{outOfStock}</div>
+        <div className="bg-red-50 rounded-lg p-3 border border-red-200 text-center">
+          <div className="text-xs text-red-700 font-semibold uppercase">Out</div>
+          <div className="text-xl font-bold text-red-700">{outOfStock}</div>
         </div>
       </div>
 
