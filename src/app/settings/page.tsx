@@ -208,111 +208,115 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
+    <div className="min-h-screen bg-slate-50 p-4 lg:p-6">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-brand font-black text-slate-900 mb-2">⚙️ SETTINGS</h1>
-        <p className="text-slate-600">Manage your restaurant configuration</p>
+      <div className="mb-6">
+        <h1 className="text-3xl lg:text-4xl font-brand font-black text-slate-900 mb-2">⚙️ SETTINGS</h1>
+        <p className="text-slate-600 text-sm">Manage your restaurant configuration</p>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-8">
-        <button
-          onClick={() => setActiveTab('restaurant')}
-          className={`px-8 py-4 rounded-2xl font-bold transition-all ${
-            activeTab === 'restaurant'
-              ? 'bg-slate-900 text-white shadow-lg'
-              : 'bg-white text-slate-700 border-2 border-slate-200 hover:border-slate-300'
-          }`}
-        >
-          🏪 Restaurant Info
-        </button>
-        <button
-          onClick={() => setActiveTab('tables')}
-          className={`px-8 py-4 rounded-2xl font-bold transition-all ${
-            activeTab === 'tables'
-              ? 'bg-slate-900 text-white shadow-lg'
-              : 'bg-white text-slate-700 border-2 border-slate-200 hover:border-slate-300'
-          }`}
-        >
-          🪑 Tables & Floors
-        </button>
-        <button
-          onClick={() => setActiveTab('printer')}
-          className={`px-8 py-4 rounded-2xl font-bold transition-all ${
-            activeTab === 'printer'
-              ? 'bg-slate-900 text-white shadow-lg'
-              : 'bg-white text-slate-700 border-2 border-slate-200 hover:border-slate-300'
-          }`}
-        >
-          🖨️ Printer & Cash Drawer
-        </button>
+      <div className="bg-white rounded-xl border-2 border-slate-200 mb-6 overflow-x-auto">
+        <div className="flex min-w-max p-1">
+          <button
+            type="button"
+            onClick={() => setActiveTab('restaurant')}
+            className={`px-6 py-4 whitespace-nowrap rounded-xl font-bold transition-all ${
+              activeTab === 'restaurant'
+                ? 'bg-slate-900 text-white shadow-lg'
+                : 'bg-white text-slate-700 border-2 border-slate-200 hover:border-slate-300'
+            }`}
+          >
+            🏪 Restaurant Info
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('tables')}
+            className={`px-6 py-4 whitespace-nowrap rounded-xl font-bold transition-all ml-1 ${
+              activeTab === 'tables'
+                ? 'bg-slate-900 text-white shadow-lg'
+                : 'bg-white text-slate-700 border-2 border-slate-200 hover:border-slate-300'
+            }`}
+          >
+            🪑 Tables & Floors
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('printer')}
+            className={`px-6 py-4 whitespace-nowrap rounded-xl font-bold transition-all ml-1 ${
+              activeTab === 'printer'
+                ? 'bg-slate-900 text-white shadow-lg'
+                : 'bg-white text-slate-700 border-2 border-slate-200 hover:border-slate-300'
+            }`}
+          >
+            🖨️ Printer & Cash Drawer
+          </button>
+        </div>
       </div>
 
       {/* Restaurant Info Tab */}
       {activeTab === 'restaurant' && (
-        <div className="bg-white rounded-2xl p-8 border-2 border-slate-200">
-          <h2 className="text-2xl font-bold text-slate-900 mb-6">Restaurant Information</h2>
-          
-          <div className="space-y-6">
-            <div>
+        <div className="bg-white rounded-xl lg:rounded-2xl p-4 lg:p-8 border-2 border-slate-200">
+          <h2 className="text-xl lg:text-2xl font-bold text-slate-900 mb-6">Restaurant Information</h2>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="lg:col-span-2">
               <label className="block text-sm font-bold text-slate-700 mb-2">Restaurant Name</label>
               <input
                 type="text"
                 value={restaurantInfo.name}
                 onChange={(e) => setRestaurantInfo({ ...restaurantInfo, name: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                className="w-full px-4 py-3 text-base rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
             </div>
 
-            <div>
+            <div className="lg:col-span-2">
               <label className="block text-sm font-bold text-slate-700 mb-2">Address</label>
               <input
                 type="text"
                 value={restaurantInfo.address}
                 onChange={(e) => setRestaurantInfo({ ...restaurantInfo, address: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                className="w-full px-4 py-3 text-base rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Phone</label>
-                <input
-                  type="tel"
-                  value={restaurantInfo.phone}
-                  onChange={(e) => setRestaurantInfo({ ...restaurantInfo, phone: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Email</label>
-                <input
-                  type="email"
-                  value={restaurantInfo.email}
-                  onChange={(e) => setRestaurantInfo({ ...restaurantInfo, email: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">Phone</label>
+              <input
+                type="tel"
+                value={restaurantInfo.phone}
+                onChange={(e) => setRestaurantInfo({ ...restaurantInfo, phone: e.target.value })}
+                className="w-full px-4 py-3 text-base rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+              />
             </div>
 
-            <button
-              onClick={handleSaveRestaurantInfo}
-              className="px-8 py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors"
-            >
-              💾 Save Restaurant Info
-            </button>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">Email</label>
+              <input
+                type="email"
+                value={restaurantInfo.email}
+                onChange={(e) => setRestaurantInfo({ ...restaurantInfo, email: e.target.value })}
+                className="w-full px-4 py-3 text-base rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+              />
+            </div>
           </div>
+
+          <button
+            type="button"
+            onClick={handleSaveRestaurantInfo}
+            className="mt-6 px-8 py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors"
+          >
+            💾 Save Restaurant Info
+          </button>
         </div>
       )}
 
       {/* Printer & Cash Drawer Tab */}
       {activeTab === 'printer' && (
-        <div className="bg-white rounded-2xl p-8 border-2 border-slate-200">
-          <h2 className="text-2xl font-bold text-slate-900 mb-6">Printer & Cash Drawer</h2>
-          <div className="space-y-6">
-            <div>
+        <div className="bg-white rounded-xl lg:rounded-2xl p-4 lg:p-8 border-2 border-slate-200">
+          <h2 className="text-xl lg:text-2xl font-bold text-slate-900 mb-6">Printer & Cash Drawer</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="lg:col-span-2">
               <label className="block text-sm font-bold text-slate-700 mb-2">Cash drawer endpoint</label>
               <input
                 type="text"
@@ -320,7 +324,7 @@ export default function SettingsPage() {
                 onChange={(e) => setCashDrawerUrl(e.target.value)}
                 onBlur={() => saveCashDrawerUrl(cashDrawerUrl)}
                 placeholder="e.g. http://localhost:9100/open"
-                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                className="w-full px-4 py-3 text-base rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
               <p className="text-xs text-slate-500 mt-1">বিল প্রিন্ট করার সময় &quot;Print (open drawer)&quot; দিলে এই URL এ request যাবে। লোকাল সার্ভিস চালু থাকলে ক্যাশ ড্রয়ার খুলবে।</p>
             </div>
@@ -332,22 +336,24 @@ export default function SettingsPage() {
       {activeTab === 'tables' && (
         <div className="space-y-6">
           {/* Floors Section */}
-          <div className="bg-white rounded-2xl p-8 border-2 border-slate-200">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-slate-900">Floors ({floors.length})</h2>
+          <div className="bg-white rounded-xl lg:rounded-2xl p-4 lg:p-8 border-2 border-slate-200">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <h2 className="text-xl lg:text-2xl font-bold text-slate-900">Floors ({floors.length})</h2>
               <button
+                type="button"
                 onClick={() => {
                   setEditingFloor(null)
                   setFloorForm({ name: '' })
                   setShowFloorModal(true)
                 }}
-                className="px-6 py-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold transition-colors"
+                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold transition-colors"
               >
                 ➕ Add Floor
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="overflow-x-auto">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 min-w-0">
               {floors.map(floor => (
                 <div key={floor.id} className="bg-slate-50 rounded-xl p-4 border-2 border-slate-200">
                   <div className="flex items-center justify-between mb-2">
@@ -383,29 +389,32 @@ export default function SettingsPage() {
                   </button>
                 </div>
               ))}
+              </div>
             </div>
           </div>
 
           {/* Tables Section */}
           {selectedFloor && (
-            <div className="bg-white rounded-2xl p-8 border-2 border-slate-200">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-slate-900">
+            <div className="bg-white rounded-xl lg:rounded-2xl p-4 lg:p-8 border-2 border-slate-200">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                <h2 className="text-xl lg:text-2xl font-bold text-slate-900">
                   Tables on {selectedFloor.name} ({tables.length})
                 </h2>
                 <button
+                  type="button"
                   onClick={() => {
                     setEditingTable(null)
                     setTableForm({ table_number: '', seats: '4', location: '' })
                     setShowTableModal(true)
                   }}
-                  className="px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors"
+                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors"
                 >
                   ➕ Add Table
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="overflow-x-auto">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 min-w-0">
                 {tables.map(table => (
                   <div key={table.id} className="bg-slate-50 rounded-xl p-4 border-2 border-slate-200">
                     <div className="text-center mb-3">
@@ -441,6 +450,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 ))}
+                </div>
               </div>
             </div>
           )}
@@ -450,8 +460,8 @@ export default function SettingsPage() {
       {/* Floor Modal */}
       {showFloorModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowFloorModal(false)}>
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-bold mb-6">
+          <div className="bg-white rounded-2xl lg:rounded-3xl p-4 lg:p-8 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-xl lg:text-2xl font-bold text-slate-900 mb-6">
               {editingFloor ? '✏️ Edit Floor' : '➕ Add Floor'}
             </h2>
             <div className="mb-6">
@@ -461,17 +471,19 @@ export default function SettingsPage() {
                 value={floorForm.name}
                 onChange={(e) => setFloorForm({ name: e.target.value })}
                 placeholder="e.g., Ground Floor"
-                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                className="w-full px-4 py-3 text-base rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
+                type="button"
                 onClick={() => setShowFloorModal(false)}
                 className="flex-1 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleSaveFloor}
                 className="flex-1 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold"
               >
@@ -485,29 +497,29 @@ export default function SettingsPage() {
       {/* Table Modal */}
       {showTableModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowTableModal(false)}>
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-bold mb-6">
+          <div className="bg-white rounded-2xl lg:rounded-3xl p-4 lg:p-8 max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-xl lg:text-2xl font-bold text-slate-900 mb-6">
               {editingTable ? '✏️ Edit Table' : '➕ Add Table'}
             </h2>
-            <div className="space-y-4 mb-6">
-              <div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+              <div className="lg:col-span-2">
                 <label className="block text-sm font-bold text-slate-700 mb-2">Table Number*</label>
                 <input
                   type="text"
                   value={tableForm.table_number}
                   onChange={(e) => setTableForm({ ...tableForm, table_number: e.target.value })}
                   placeholder="e.g., 1, A1, VIP-1"
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                  className="w-full px-4 py-3 text-base rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
                 />
               </div>
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2">Number of Seats*</label>
                 <input
                   type="number"
-                  min="1"
+                  min={1}
                   value={tableForm.seats}
                   onChange={(e) => setTableForm({ ...tableForm, seats: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                  className="w-full px-4 py-3 text-base rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
                 />
               </div>
               <div>
@@ -517,18 +529,20 @@ export default function SettingsPage() {
                   value={tableForm.location}
                   onChange={(e) => setTableForm({ ...tableForm, location: e.target.value })}
                   placeholder="e.g., By Window, Corner"
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                  className="w-full px-4 py-3 text-base rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
                 />
               </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
+                type="button"
                 onClick={() => setShowTableModal(false)}
                 className="flex-1 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleSaveTable}
                 className="flex-1 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold"
               >

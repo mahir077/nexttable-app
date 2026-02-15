@@ -76,7 +76,7 @@ export default function StockPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-xl p-4 border-2 border-slate-200">
           <div className="text-sm text-slate-500 mb-1">Total Items</div>
           <div className="text-2xl font-bold text-slate-900">{items.length}</div>
@@ -98,13 +98,13 @@ export default function StockPage() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search items..."
-          className="w-full px-4 py-3 rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+          className="w-full px-4 py-3 text-base rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
         />
       </div>
 
       {/* Items Table */}
-      <div className="bg-white rounded-xl border-2 border-slate-200 overflow-hidden">
-        <table className="w-full">
+      <div className="bg-white rounded-xl border-2 border-slate-200 overflow-x-auto">
+        <table className="w-full min-w-[600px]">
           <thead className="bg-slate-50">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-bold text-slate-600">ITEM</th>
@@ -140,28 +140,32 @@ export default function StockPage() {
                       <span className={`text-2xl font-bold ${stockColor}`}>{stock}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center justify-center gap-2">
+                      <div className="flex flex-wrap items-center justify-center gap-1 lg:gap-2">
                         <button
+                          type="button"
                           onClick={() => updateStock(item.id, -10)}
-                          className="px-3 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold text-sm"
+                          className="px-2 py-1 lg:px-3 lg:py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold text-xs lg:text-sm"
                         >
                           -10
                         </button>
                         <button
+                          type="button"
                           onClick={() => updateStock(item.id, -1)}
-                          className="px-3 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm"
+                          className="px-2 py-1 lg:px-3 lg:py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs lg:text-sm"
                         >
                           -1
                         </button>
                         <button
+                          type="button"
                           onClick={() => updateStock(item.id, 1)}
-                          className="px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-sm"
+                          className="px-2 py-1 lg:px-3 lg:py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs lg:text-sm"
                         >
                           +1
                         </button>
                         <button
+                          type="button"
                           onClick={() => updateStock(item.id, 10)}
-                          className="px-3 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-bold text-sm"
+                          className="px-2 py-1 lg:px-3 lg:py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs lg:text-sm"
                         >
                           +10
                         </button>

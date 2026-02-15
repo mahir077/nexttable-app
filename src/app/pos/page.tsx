@@ -38,6 +38,7 @@ function POSContent() {
   const [selectedFloor, setSelectedFloor] = useState<Floor | null>(null)
   const [selectedTable, setSelectedTable] = useState<string | null>(null)
   const [showTableModal, setShowTableModal] = useState(false)
+  const [cartOpen, setCartOpen] = useState(false)
   const [loadingCategories, setLoadingCategories] = useState(true)
   const [loadingItems, setLoadingItems] = useState(false)
 
@@ -285,9 +286,9 @@ function POSContent() {
   const cartTotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0)
 
   return (
-    <div className="flex h-screen bg-slate-50">
-      {/* Categories */}
-      <div className="w-48 flex-shrink-0 bg-white border-r border-slate-200 overflow-y-auto">
+    <div className="flex flex-col lg:flex-row h-screen bg-slate-50">
+      {/* Categories - desktop sidebar */}
+      <div className="hidden lg:block lg:w-48 flex-shrink-0 bg-white border-r border-slate-200 overflow-y-auto">
         <div className="p-2 sticky top-0 bg-white border-b border-slate-100">
           <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Categories</h2>
         </div>
@@ -300,7 +301,7 @@ function POSContent() {
                 <button
                   type="button"
                   onClick={() => setSelectedCategory(cat)}
-                  className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+                  className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors min-h-[44px] flex items-center ${
                     selectedCategory?.id === cat.id ? 'bg-emerald-500 text-white' : 'text-slate-700 hover:bg-slate-100'
                   }`}
                 >
@@ -312,33 +313,116 @@ function POSContent() {
         )}
       </div>
 
-      {/* Main: order type + form + items */}
+      {/* Main: top bar + mobile tabs + order type + form + items */}
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex-shrink-0 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-4 flex-wrap">
-          <Link href="/dashboard" className="text-slate-600 hover:text-slate-900 text-sm font-medium">← Dashboard</Link>
+          <Link href="/dashboard" className="text-slate-600 hover:text-slate-900 text-sm font-medium min-h-[44px] flex items-center">← Dashboard</Link>
           <span className="text-slate-300">|</span>
           <span className={`text-lg font-black font-brand text-slate-900 ${currentTypeMeta.bg} px-3 py-1 rounded-lg border-2 ${currentTypeMeta.border}`}>
             {currentTypeMeta.emoji} {currentTypeMeta.label.toUpperCase()}
           </span>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
-          {/* Order type selector */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            {ORDER_TYPES.map(t => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => handleOrderTypeChange(t.id)}
-                className={`px-4 py-2.5 rounded-xl font-bold text-sm border-2 transition-all ${
-                  orderType === t.id
-                    ? 'bg-emerald-500 text-white border-emerald-500'
-                    : `bg-white text-slate-700 border-slate-200 hover:border-slate-300 ${t.bg}`
+        {/* Mobile category tabs */}
+        <div className="lg:hidden flex-shrink-0 bg-white border-b border-slate-200 overflow-x-auto">
+          <div className="flex gap-2 p-4">
+            {loadingCategories ? (
+              <span className="text-slate-400 text-sm">Loading...</span>
+            ) : (
+              categories.map(cat => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`flex-shrink-0 px-4 py-2 rounded-lg whitespace-nowrap font-semibold text-sm min-h-[44px] flex items-center transition-colors ${
+                    selectedCategory?.id === cat.id ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-700'
+                  }`}
+                >
+                  {cat.name}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 lg:p-6 pb-24 lg:pb-6">
+          {/* Order type selector - cards */}
+          <div className="mb-4">
+            <h3 className="text-sm font-bold text-slate-500 mb-3 uppercase">Order Type</h3>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => handleOrderTypeChange('dine-in')}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOrderTypeChange('dine-in'); } }}
+                className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all min-h-[44px] ${
+                  orderType === 'dine-in'
+                    ? 'bg-emerald-50 border-emerald-500 shadow-lg'
+                    : 'bg-white border-slate-200 hover:border-emerald-300'
                 }`}
               >
-                {t.emoji} {t.label}
-              </button>
-            ))}
+                <div className="text-3xl mb-2">🍽️</div>
+                <div className="font-bold text-lg text-slate-900">Dine-in</div>
+                <div className="text-xs text-slate-500 mb-2">Eat at restaurant</div>
+                <Link href="/kitchen" className="text-xs text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                  <span>→ Go to KOT</span>
+                </Link>
+              </div>
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => handleOrderTypeChange('takeaway')}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOrderTypeChange('takeaway'); } }}
+                className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all min-h-[44px] ${
+                  orderType === 'takeaway'
+                    ? 'bg-emerald-50 border-emerald-500 shadow-lg'
+                    : 'bg-white border-slate-200 hover:border-emerald-300'
+                }`}
+              >
+                <div className="text-3xl mb-2">🥡</div>
+                <div className="font-bold text-lg text-slate-900">Takeaway</div>
+                <div className="text-xs text-slate-500 mb-2">Pack and go</div>
+                <Link href="/kitchen" className="text-xs text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                  <span>→ Go to KOT</span>
+                </Link>
+              </div>
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => handleOrderTypeChange('online')}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOrderTypeChange('online'); } }}
+                className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all min-h-[44px] ${
+                  orderType === 'online'
+                    ? 'bg-emerald-50 border-emerald-500 shadow-lg'
+                    : 'bg-white border-slate-200 hover:border-emerald-300'
+                }`}
+              >
+                <div className="text-3xl mb-2">🛵</div>
+                <div className="font-bold text-lg text-slate-900">Online</div>
+                <div className="text-xs text-slate-500 mb-2">Home delivery</div>
+                <Link href="/kitchen" className="text-xs text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                  <span>→ Go to KOT</span>
+                </Link>
+              </div>
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => handleOrderTypeChange('event')}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOrderTypeChange('event'); } }}
+                className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all min-h-[44px] ${
+                  orderType === 'event'
+                    ? 'bg-emerald-50 border-emerald-500 shadow-lg'
+                    : 'bg-white border-slate-200 hover:border-emerald-300'
+                }`}
+              >
+                <div className="text-3xl mb-2">🎉</div>
+                <div className="font-bold text-lg text-slate-900">Event</div>
+                <div className="text-xs text-slate-500 mb-2">Party booking</div>
+                <Link href="/kitchen" className="text-xs text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                  <span>→ Go to KOT</span>
+                </Link>
+              </div>
+            </div>
           </div>
 
           {/* Dine-in: table selection + buzzer */}
@@ -347,13 +431,13 @@ function POSContent() {
               <button
                 type="button"
                 onClick={() => setShowTableModal(true)}
-                className="px-6 py-3 bg-white border-2 border-slate-200 rounded-xl font-bold text-slate-800 hover:border-emerald-400 hover:bg-emerald-50 transition-colors"
+                className="min-h-[44px] px-6 py-3 bg-white border-2 border-slate-200 rounded-xl font-bold text-slate-800 hover:border-emerald-400 hover:bg-emerald-50 transition-colors"
               >
                 {selectedTable
                   ? `Table ${tables.find(t => t.id === selectedTable)?.table_number ?? '?'}`
                   : 'Select Table *'}
               </button>
-              <div className="max-w-[120px]">
+              <div className="max-w-[140px]">
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Buzzer (optional)</label>
                 <input
                   type="number"
@@ -362,7 +446,7 @@ function POSContent() {
                   value={buzzerNumber}
                   onChange={e => setBuzzerNumber(e.target.value.replace(/\D/g, '').slice(0, 2))}
                   placeholder="1–99"
-                  className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                  className="w-full px-4 py-3 text-base lg:text-sm lg:py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
                 />
               </div>
             </div>
@@ -376,14 +460,14 @@ function POSContent() {
                 value={customerName}
                 onChange={e => setCustomerName(e.target.value)}
                 placeholder="Customer Name *"
-                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                className="w-full px-4 py-3 text-base lg:text-sm lg:py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
               <input
                 type="tel"
                 value={customerPhone}
                 onChange={e => setCustomerPhone(e.target.value)}
                 placeholder="Phone (optional)"
-                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                className="w-full px-4 py-3 text-base lg:text-sm lg:py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
             </div>
           )}
@@ -396,27 +480,27 @@ function POSContent() {
                 value={customerName}
                 onChange={e => setCustomerName(e.target.value)}
                 placeholder="Customer Name *"
-                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                className="w-full px-4 py-3 text-base lg:text-sm lg:py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
               <input
                 type="tel"
                 value={customerPhone}
                 onChange={e => setCustomerPhone(e.target.value)}
                 placeholder="Phone Number *"
-                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                className="w-full px-4 py-3 text-base lg:text-sm lg:py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
               <textarea
                 value={deliveryAddress}
                 onChange={e => setDeliveryAddress(e.target.value)}
                 placeholder="Delivery Address *"
                 rows={3}
-                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none resize-none text-slate-900 placeholder:text-slate-400"
+                className="w-full px-4 py-3 text-base lg:text-sm lg:py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none resize-none text-slate-900 placeholder:text-slate-400"
               />
               <input
                 type="time"
                 value={deliveryTime}
                 onChange={e => setDeliveryTime(e.target.value)}
-                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                className="w-full px-4 py-3 text-base lg:text-sm lg:py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
             </div>
           )}
@@ -428,7 +512,7 @@ function POSContent() {
                 type="date"
                 value={eventDate}
                 onChange={e => setEventDate(e.target.value)}
-                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                className="w-full px-4 py-3 text-base lg:text-sm lg:py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
               <input
                 type="number"
@@ -436,21 +520,21 @@ function POSContent() {
                 value={guestCount}
                 onChange={e => setGuestCount(e.target.value)}
                 placeholder="Number of Guests *"
-                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                className="w-full px-4 py-3 text-base lg:text-sm lg:py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
               <input
                 type="text"
                 value={customerName}
                 onChange={e => setCustomerName(e.target.value)}
                 placeholder="Contact Person Name *"
-                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                className="w-full px-4 py-3 text-base lg:text-sm lg:py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
               <input
                 type="tel"
                 value={customerPhone}
                 onChange={e => setCustomerPhone(e.target.value)}
                 placeholder="Phone Number *"
-                className="w-full px-4 py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                className="w-full px-4 py-3 text-base lg:text-sm lg:py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
             </div>
           )}
@@ -461,17 +545,30 @@ function POSContent() {
             {loadingItems ? (
               <div className="text-slate-400 text-sm">Loading items...</div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {menuItems.map(item => (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => addToCart(item)}
-                    className="bg-white border-2 border-slate-200 rounded-xl p-3 text-left hover:border-emerald-400 hover:bg-emerald-50/50 transition-all active:scale-[0.98]"
+                    className="min-h-[44px] bg-white rounded-xl border-2 border-slate-200 p-3 text-left hover:border-emerald-500 hover:bg-emerald-50/50 transition-all active:scale-[0.98] cursor-pointer"
                   >
+                    <div className="w-full h-32 bg-slate-100 rounded-lg mb-2 overflow-hidden flex-shrink-0">
+                      {item.image_url ? (
+                        <img
+                          src={item.image_url}
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-4xl">
+                          🍽️
+                        </div>
+                      )}
+                    </div>
                     <div className="font-bold text-slate-900 text-sm truncate">{item.name}</div>
                     {item.name_bangla && <div className="text-xs text-slate-500 truncate">{item.name_bangla}</div>}
-                    <div className="mt-1 font-bold text-emerald-600">৳{item.price}</div>
+                    <div className="text-emerald-600 font-bold mt-0.5">৳{item.price}</div>
                   </button>
                 ))}
               </div>
@@ -480,59 +577,129 @@ function POSContent() {
         </div>
       </div>
 
-      {/* Cart */}
-      <div className="w-80 flex-shrink-0 bg-white border-l border-slate-200 flex flex-col">
-        <div className="p-3 border-b border-slate-100 font-bold text-slate-800">Cart ({cart.length})</div>
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
-          {cart.length === 0 ? (
-            <p className="text-slate-400 text-sm">Cart is empty</p>
-          ) : (
-            cart.map(item => (
-              <div key={item.id} className="flex items-center gap-2 bg-slate-50 rounded-lg p-2">
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-slate-800 text-sm truncate">{item.name}</div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <button
-                      type="button"
-                      onClick={() => updateCartQty(item.id, -1)}
-                      className="w-6 h-6 rounded bg-slate-200 text-slate-700 font-bold text-sm flex items-center justify-center"
-                    >
-                      −
-                    </button>
-                    <span className="font-bold text-slate-900 w-6 text-center">{item.quantity}</span>
-                    <button
-                      type="button"
-                      onClick={() => updateCartQty(item.id, 1)}
-                      className="w-6 h-6 rounded bg-emerald-500 text-white font-bold text-sm flex items-center justify-center"
-                    >
-                      +
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeFromCart(item.id)}
-                      className="text-red-600 text-xs font-semibold ml-1"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-                <div className="text-right font-bold text-slate-800">৳{item.price * item.quantity}</div>
-              </div>
-            ))
-          )}
-        </div>
-        <div className="p-3 border-t border-slate-200">
-          <div className="flex justify-between text-lg font-black text-slate-900 mb-3">
-            <span>Total</span>
-            <span>৳{cartTotal}</span>
-          </div>
+      {/* Cart - bottom sheet on mobile, sidebar on desktop */}
+      <div className="fixed lg:relative bottom-0 left-0 right-0 z-40 lg:w-80 flex-shrink-0 bg-white border-t lg:border-t-0 lg:border-l-2 border-slate-200 flex flex-col shadow-[0_-4px_20px_rgba(0,0,0,0.08)] lg:shadow-none">
+        {/* Mobile: collapsed bar + expandable content */}
+        <div className="lg:hidden">
           <button
             type="button"
-            onClick={validateAndSendKOT}
-            className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors"
+            onClick={() => setCartOpen(!cartOpen)}
+            className="w-full p-4 bg-emerald-500 text-white font-bold flex justify-between items-center min-h-[44px]"
           >
-            Send KOT
+            <span>Cart ({cart.length})</span>
+            <span>৳{cartTotal.toFixed(2)}</span>
           </button>
+          {cartOpen && (
+            <div className="max-h-[70vh] overflow-y-auto p-4 border-t-2 border-slate-100 bg-white">
+              {cart.length === 0 ? (
+                <p className="text-slate-400 text-sm">Cart is empty</p>
+              ) : (
+                <div className="space-y-2 mb-4">
+                  {cart.map(item => (
+                    <div key={item.id} className="flex items-center gap-2 bg-slate-50 rounded-lg p-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-slate-800 text-sm truncate">{item.name}</div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <button
+                            type="button"
+                            onClick={() => updateCartQty(item.id, -1)}
+                            className="min-w-[44px] min-h-[44px] w-10 h-10 rounded-lg bg-slate-200 text-slate-700 font-bold flex items-center justify-center"
+                          >
+                            −
+                          </button>
+                          <span className="font-bold text-slate-900 w-8 text-center">{item.quantity}</span>
+                          <button
+                            type="button"
+                            onClick={() => updateCartQty(item.id, 1)}
+                            className="min-w-[44px] min-h-[44px] w-10 h-10 rounded-lg bg-emerald-500 text-white font-bold flex items-center justify-center"
+                          >
+                            +
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeFromCart(item.id)}
+                            className="text-red-600 text-sm font-semibold ml-1 min-h-[44px] flex items-center"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                      <div className="text-right font-bold text-slate-800">৳{item.price * item.quantity}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="border-t border-slate-200 pt-3">
+                <div className="flex justify-between text-lg font-black text-slate-900 mb-3">
+                  <span>Total</span>
+                  <span>৳{cartTotal.toFixed(2)}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { validateAndSendKOT(); setCartOpen(false); }}
+                  className="w-full min-h-[44px] py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors"
+                >
+                  Send KOT
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Desktop: always visible */}
+        <div className="hidden lg:flex flex-col flex-1 min-h-0">
+          <div className="p-3 border-b border-slate-100 font-bold text-slate-800">Cart ({cart.length})</div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {cart.length === 0 ? (
+              <p className="text-slate-400 text-sm">Cart is empty</p>
+            ) : (
+              cart.map(item => (
+                <div key={item.id} className="flex items-center gap-2 bg-slate-50 rounded-lg p-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-slate-800 text-sm truncate">{item.name}</div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => updateCartQty(item.id, -1)}
+                        className="min-w-[44px] min-h-[44px] w-8 h-8 rounded bg-slate-200 text-slate-700 font-bold text-sm flex items-center justify-center"
+                      >
+                        −
+                      </button>
+                      <span className="font-bold text-slate-900 w-6 text-center">{item.quantity}</span>
+                      <button
+                        type="button"
+                        onClick={() => updateCartQty(item.id, 1)}
+                        className="min-w-[44px] min-h-[44px] w-8 h-8 rounded bg-emerald-500 text-white font-bold text-sm flex items-center justify-center"
+                      >
+                        +
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeFromCart(item.id)}
+                        className="text-red-600 text-xs font-semibold ml-1 min-h-[44px] flex items-center"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                  <div className="text-right font-bold text-slate-800">৳{item.price * item.quantity}</div>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="p-3 border-t border-slate-200">
+            <div className="flex justify-between text-lg font-black text-slate-900 mb-3">
+              <span>Total</span>
+              <span>৳{cartTotal.toFixed(2)}</span>
+            </div>
+            <button
+              type="button"
+              onClick={validateAndSendKOT}
+              className="w-full min-h-[44px] py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors"
+            >
+              Send KOT
+            </button>
+          </div>
         </div>
       </div>
 
@@ -562,7 +729,7 @@ function POSContent() {
                   key={f.id}
                   type="button"
                   onClick={() => setSelectedFloor(f)}
-                  className={`flex-shrink-0 px-4 py-2 rounded-lg font-semibold text-sm ${
+                  className={`flex-shrink-0 px-4 py-2 rounded-lg font-semibold text-sm min-h-[44px] flex items-center ${
                     selectedFloor?.id === f.id ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-700'
                   }`}
                 >
@@ -580,7 +747,7 @@ function POSContent() {
                       setSelectedTable(t.id)
                       setShowTableModal(false)
                     }}
-                    className={`py-4 rounded-xl font-bold text-slate-900 border-2 transition-all flex flex-col items-center justify-center text-center ${
+                    className={`min-h-[44px] py-4 rounded-xl font-bold text-slate-900 border-2 transition-all flex flex-col items-center justify-center text-center ${
                       selectedTable === t.id ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white border-slate-200 hover:border-emerald-400'
                     }`}
                   >

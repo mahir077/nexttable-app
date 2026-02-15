@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { 
+  supabase,
   getCategories, 
   getAllMenuItems, 
   createMenuItem, 
@@ -11,6 +12,7 @@ import {
   Category, 
   MenuItem 
 } from '@/app/lib/api/menu'
+import BackButton from '@/components/BackButton'
 
 export default function MenuManagementPage() {
   const [categories, setCategories] = useState<Category[]>([])
@@ -29,6 +31,8 @@ export default function MenuManagementPage() {
     category_id: '',
     image_url: ''
   })
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
 
   // Fetch data
   const fetchData = async () => {
@@ -61,18 +65,30 @@ export default function MenuManagementPage() {
   // Handle add/edit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
+    let imageUrl: string | null = formData.image_url || null
+    if (imageFile) {
+      try {
+        imageUrl = await uploadImage(imageFile)
+      } catch (err) {
+        console.error('Image upload failed:', err)
+        alert('❌ Image upload failed. Try again.')
+        return
+      }
+    }
+
     const itemData = {
       ...formData,
-      price: parseFloat(formData.price)
+      price: parseFloat(formData.price),
+      image_url: imageUrl || undefined
     }
 
     let success = false
     if (editingItem) {
-      const result = await updateMenuItem(editingItem.id, itemData)
+      const result = await updateMenuItem(editingItem.id, { ...itemData, image_url: imageUrl ?? undefined })
       success = !!result
     } else {
-      const result = await createMenuItem(itemData)
+      const result = await createMenuItem({ ...itemData, image_url: imageUrl ?? undefined })
       success = !!result
     }
 
@@ -112,6 +128,36 @@ export default function MenuManagementPage() {
     }
   }
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setImageFile(file)
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const uploadImage = async (file: File): Promise<string> => {
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${Math.random().toString(36).slice(2)}.${fileExt}`
+    const filePath = `menu-images/${fileName}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('menu-images')
+      .upload(filePath, file)
+
+    if (uploadError) throw uploadError
+
+    const { data } = supabase.storage
+      .from('menu-images')
+      .getPublicUrl(filePath)
+
+    return data.publicUrl
+  }
+
   // Reset form
   const resetForm = () => {
     setFormData({
@@ -122,6 +168,8 @@ export default function MenuManagementPage() {
       category_id: categories[0]?.id || '',
       image_url: ''
     })
+    setImageFile(null)
+    setImagePreview(null)
   }
 
   // Open edit modal
@@ -135,29 +183,34 @@ export default function MenuManagementPage() {
       category_id: item.category_id,
       image_url: item.image_url || ''
     })
+    setImageFile(null)
+    setImagePreview(item.image_url || null)
     setShowAddModal(true)
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
+    <div className="min-h-screen bg-slate-50 p-4 lg:p-6">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-4xl font-brand font-black text-slate-900">🍽️ MENU MANAGEMENT</h1>
-          <button
-            onClick={() => {
-              resetForm()
-              setEditingItem(null)
-              setShowAddModal(true)
-            }}
-            className="px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors"
-          >
-            ➕ Add New Item
-          </button>
+      <div className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <BackButton />
+          <h1 className="text-3xl lg:text-4xl font-brand font-black text-slate-900">🍽️ MENU</h1>
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            resetForm()
+            setEditingItem(null)
+            setShowAddModal(true)
+          }}
+          className="w-full lg:w-auto px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-bold transition-colors"
+        >
+          + Add Item
+        </button>
+      </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-white rounded-2xl p-6 border-2 border-slate-200">
             <div className="text-sm text-slate-500 mb-1">TOTAL ITEMS</div>
             <div className="text-3xl font-brand font-black text-slate-900">{menuItems.length}</div>
@@ -175,7 +228,6 @@ export default function MenuManagementPage() {
             </div>
           </div>
         </div>
-      </div>
 
       {/* Category Filter */}
       <div className="mb-6">
@@ -220,15 +272,19 @@ export default function MenuManagementPage() {
           <p className="text-2xl font-bold">No items in this category</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredItems.map(item => (
             <div
               key={item.id}
-              className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden hover:shadow-lg transition-all"
+              className="bg-white rounded-xl border-2 border-slate-200 overflow-hidden hover:shadow-lg transition-all"
             >
               {/* Image */}
-              <div className="aspect-square bg-slate-100 flex items-center justify-center text-6xl">
-                {item.category?.icon || '🍽️'}
+              <div className="aspect-square bg-slate-100 flex items-center justify-center text-6xl overflow-hidden">
+                {item.image_url ? (
+                  <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                ) : (
+                  item.category?.icon || '🍽️'
+                )}
               </div>
 
               {/* Content */}
@@ -280,83 +336,105 @@ export default function MenuManagementPage() {
       {/* Add/Edit Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowAddModal(false)}>
-          <div className="bg-white rounded-3xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-3xl font-brand font-black text-slate-900 mb-6">
+          <div className="bg-white rounded-2xl lg:rounded-3xl p-4 lg:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-2xl lg:text-3xl font-brand font-black text-slate-900 mb-6">
               {editingItem ? '✏️ Edit Item' : '➕ Add New Item'}
             </h2>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Item Name */}
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Item Name (English)*</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
-                  placeholder="e.g., Classic Burger"
-                />
-              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Item Name */}
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Item Name (English)*</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-4 py-3 text-base rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                    placeholder="e.g., Classic Burger"
+                  />
+                </div>
 
-              {/* Item Name Bangla */}
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Item Name (Bangla)</label>
-                <input
-                  type="text"
-                  value={formData.name_bangla}
-                  onChange={(e) => setFormData({ ...formData, name_bangla: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
-                  placeholder="e.g., ক্লাসিক বার্গার"
-                />
-              </div>
+                {/* Item Name Bangla */}
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Item Name (Bangla)</label>
+                  <input
+                    type="text"
+                    value={formData.name_bangla}
+                    onChange={(e) => setFormData({ ...formData, name_bangla: e.target.value })}
+                    className="w-full px-4 py-3 text-base rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                    placeholder="e.g., ক্লাসিক বার্গার"
+                  />
+                </div>
 
-              {/* Category */}
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Category*</label>
-                <select
-                  required
-                  value={formData.category_id}
-                  onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
-                >
-                  {categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.icon} {cat.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                {/* Item Image - full width */}
+                <div className="lg:col-span-2">
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Item Image</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="w-full px-4 py-3 text-base border-2 border-slate-200 rounded-lg text-slate-900"
+                  />
+                  {imagePreview && (
+                    <div className="mt-2">
+                      <img
+                        src={imagePreview}
+                        alt="Preview"
+                        className="h-32 w-32 object-cover rounded-lg border-2 border-slate-200"
+                      />
+                    </div>
+                  )}
+                </div>
 
-              {/* Price */}
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Price (৳)*</label>
-                <input
-                  type="number"
-                  required
-                  step="0.01"
-                  min="0"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
-                  placeholder="e.g., 250.00"
-                />
-              </div>
+                {/* Category */}
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Category*</label>
+                  <select
+                    required
+                    value={formData.category_id}
+                    onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                    className="w-full px-4 py-3 text-base rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900"
+                  >
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.icon} {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              {/* Description */}
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={3}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
-                  placeholder="Optional description..."
-                />
+                {/* Price */}
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Price (৳)*</label>
+                  <input
+                    type="number"
+                    required
+                    step="0.01"
+                    min="0"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    className="w-full px-4 py-3 text-base rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                    placeholder="e.g., 250.00"
+                  />
+                </div>
+
+                {/* Description - full width */}
+                <div className="lg:col-span-2">
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Description</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    rows={3}
+                    className="w-full px-4 py-3 text-base rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400 resize-none"
+                    placeholder="Optional description..."
+                  />
+                </div>
               </div>
 
               {/* Actions */}
-              <div className="flex gap-3 pt-4">
+              <div className="flex flex-col sm:flex-row gap-3 pt-4">
                 <button
                   type="button"
                   onClick={() => {
