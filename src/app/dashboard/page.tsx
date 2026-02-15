@@ -58,24 +58,26 @@ export default function DashboardPage() {
   const [changeNewTableId, setChangeNewTableId] = useState<string>('')
   const [changeLoading, setChangeLoading] = useState(false)
 
-  // Restaurant name from settings (DB first, then localStorage fallback)
+  // Restaurant name + logo from settings (DB first, then localStorage fallback)
   const [restaurantName, setRestaurantName] = useState<string>('NextTable')
+  const [restaurantLogoUrl, setRestaurantLogoUrl] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchRestaurantName = async () => {
+    const fetchRestaurantInfo = async () => {
       try {
         const { data, error } = await supabase
           .from('restaurant_settings')
-          .select('display_name')
+          .select('display_name, logo_url')
           .limit(1)
           .maybeSingle()
 
-        if (!error && data?.display_name) {
-          setRestaurantName(String(data.display_name))
+        if (!error && data) {
+          if (data.display_name) setRestaurantName(String(data.display_name))
+          if (data.logo_url) setRestaurantLogoUrl(String(data.logo_url))
           return
         }
       } catch (e) {
-        console.error('Error fetching restaurant name:', e)
+        console.error('Error fetching restaurant info:', e)
       }
       try {
         const saved = localStorage.getItem('restaurantInfo')
@@ -87,7 +89,7 @@ export default function DashboardPage() {
         // keep default
       }
     }
-    fetchRestaurantName()
+    fetchRestaurantInfo()
   }, [])
 
   // Set current date
@@ -392,9 +394,14 @@ export default function DashboardPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <div className="min-w-0">
-              <h1 className="text-base sm:text-lg md:text-xl font-semibold text-slate-800 truncate">{restaurantName}</h1>
-              <p className="text-xs text-slate-400 hidden sm:block">{currentDate}</p>
+            <div className="min-w-0 flex items-center gap-2 sm:gap-3">
+              {restaurantLogoUrl && (
+                <img src={restaurantLogoUrl} alt="" className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg object-contain flex-shrink-0 bg-slate-100" />
+              )}
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-lg md:text-xl font-semibold text-slate-800 truncate">{restaurantName}</h1>
+                <p className="text-xs text-slate-400 hidden sm:block">{currentDate}</p>
+              </div>
             </div>
           </div>
           <div className="text-right flex-shrink-0">
@@ -450,7 +457,7 @@ export default function DashboardPage() {
                   <svg className="w-5 h-5 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
                   Event
                 </Link>
-                <Link href="/reservation/table" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-emerald-50 hover:border-emerald-200 text-slate-700 text-sm font-semibold transition-colors cursor-pointer">
+                <Link href="/reservations" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-emerald-50 hover:border-emerald-200 text-slate-700 text-sm font-semibold transition-colors cursor-pointer">
                   <svg className="w-5 h-5 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                   Reservation
                 </Link>

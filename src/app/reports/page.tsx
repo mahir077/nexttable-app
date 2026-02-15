@@ -102,11 +102,11 @@ export default function ReportsPage() {
           setOrders([])
           return
         }
-        setOrders((fallbackData || []) as OrderWithItems[])
+        setOrders((fallbackData || []) as unknown as OrderWithItems[])
         return
       }
 
-      setOrders((data || []) as OrderWithItems[])
+      setOrders((data || []) as unknown as OrderWithItems[])
     } catch (error) {
       console.error('Error:', error)
       setOrders([])
