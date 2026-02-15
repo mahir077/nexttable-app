@@ -8,13 +8,15 @@ import { getCashDrawerUrl, setCashDrawerUrl as saveCashDrawerUrl } from '@/app/l
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'restaurant' | 'tables' | 'printer'>('restaurant')
   
-  // Restaurant info state
+  // Restaurant info state (synced with restaurant_settings in DB)
   const [restaurantInfo, setRestaurantInfo] = useState({
     name: 'NextTable Restaurant',
     address: 'Dhaka, Bangladesh',
     phone: '+880 1234-567890',
     email: 'info@nexttable.com'
   })
+  const [restaurantSettingsId, setRestaurantSettingsId] = useState<string | null>(null)
+  const [restaurantInfoLoading, setRestaurantInfoLoading] = useState(false)
 
   // Tables state
   const [floors, setFloors] = useState<Floor[]>([])
@@ -54,6 +56,52 @@ export default function SettingsPage() {
     setCashDrawerUrl(getCashDrawerUrl())
   }, [activeTab])
 
+  // Load restaurant settings from DB
+  useEffect(() => {
+    const loadRestaurantSettings = async () => {
+      setRestaurantInfoLoading(true)
+      try {
+        const { data, error } = await supabase
+          .from('restaurant_settings')
+          .select('id, display_name, address, phone, email')
+          .limit(1)
+          .maybeSingle()
+
+        if (!error && data) {
+          setRestaurantSettingsId(data.id)
+          setRestaurantInfo({
+            name: data.display_name ?? 'NextTable Restaurant',
+            address: (data.address as string) ?? '',
+            phone: (data.phone as string) ?? '',
+            email: (data.email as string) ?? ''
+          })
+        }
+        // Fallback: try localStorage for backward compatibility
+        if (error || !data) {
+          try {
+            const saved = localStorage.getItem('restaurantInfo')
+            if (saved) {
+              const info = JSON.parse(saved) as { name?: string; address?: string; phone?: string; email?: string }
+              setRestaurantInfo(prev => ({
+                name: info.name ?? prev.name,
+                address: info.address ?? prev.address,
+                phone: info.phone ?? prev.phone,
+                email: info.email ?? prev.email
+              }))
+            }
+          } catch {
+            // keep defaults
+          }
+        }
+      } catch (e) {
+        console.error('Error loading restaurant settings:', e)
+      } finally {
+        setRestaurantInfoLoading(false)
+      }
+    }
+    loadRestaurantSettings()
+  }, [])
+
   const fetchFloors = async () => {
     try {
       const data = await getFloors()
@@ -78,11 +126,48 @@ export default function SettingsPage() {
     }
   }
 
-  // Save restaurant info
-  const handleSaveRestaurantInfo = () => {
-    // In production, this would save to database
-    localStorage.setItem('restaurantInfo', JSON.stringify(restaurantInfo))
-    alert('✅ Restaurant information saved!')
+  // Save restaurant info to DB (restaurant_settings) and localStorage
+  const handleSaveRestaurantInfo = async () => {
+    if (!restaurantInfo.name?.trim()) {
+      alert('❌ Please enter restaurant name')
+      return
+    }
+    setRestaurantInfoLoading(true)
+    try {
+      const payload = {
+        display_name: restaurantInfo.name.trim(),
+        address: restaurantInfo.address?.trim() ?? null,
+        phone: restaurantInfo.phone?.trim() ?? null,
+        email: restaurantInfo.email?.trim() ?? null
+      }
+
+      if (restaurantSettingsId) {
+        const { error } = await supabase
+          .from('restaurant_settings')
+          .update(payload)
+          .eq('id', restaurantSettingsId)
+
+        if (error) throw error
+      } else {
+        const tenantId = typeof process.env.NEXT_PUBLIC_DEMO_TENANT_ID !== 'undefined' ? process.env.NEXT_PUBLIC_DEMO_TENANT_ID : null
+        const { data, error } = await supabase
+          .from('restaurant_settings')
+          .insert(tenantId ? { ...payload, tenant_id: tenantId } : payload)
+          .select('id')
+          .single()
+
+        if (error) throw error
+        if (data?.id) setRestaurantSettingsId(data.id)
+      }
+
+      localStorage.setItem('restaurantInfo', JSON.stringify(restaurantInfo))
+      alert('✅ Restaurant information saved!')
+    } catch (error) {
+      console.error('Error saving restaurant info:', error)
+      alert('❌ Failed to save. Check console. If table is missing, create restaurant_settings with columns: id (uuid), display_name, address, phone, email.')
+    } finally {
+      setRestaurantInfoLoading(false)
+    }
   }
 
   // Add/Edit Floor
@@ -304,9 +389,10 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={handleSaveRestaurantInfo}
-            className="mt-6 px-8 py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors"
+            disabled={restaurantInfoLoading}
+            className="mt-6 px-8 py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors disabled:opacity-60"
           >
-            💾 Save Restaurant Info
+            {restaurantInfoLoading ? 'Saving…' : '💾 Save Restaurant Info'}
           </button>
         </div>
       )}

@@ -66,117 +66,124 @@ export default function StockPage() {
   const outOfStock = items.filter(i => (i.stock_quantity || 0) === 0).length
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 lg:p-6">
-      <div className="mb-4 flex items-center gap-3">
+    <div className="min-h-screen bg-slate-50 p-6">
+      {/* Header */}
+      <div className="mb-6 flex items-center gap-4">
         <BackButton />
         <div>
-          <h1 className="text-2xl lg:text-3xl font-brand font-black text-slate-900">📦 Stock</h1>
-          <p className="text-slate-600 text-sm">Track and update inventory</p>
+          <h1 className="text-3xl font-brand font-black text-slate-900">📦 STOCK</h1>
+          <p className="text-slate-600">Inventory management</p>
         </div>
       </div>
 
-      {/* Stats - compact and clear */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
-          <div className="text-xs text-slate-500 font-semibold uppercase">Items</div>
+      {/* Stats - compact */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="bg-white rounded-lg p-3 border border-slate-200">
+          <div className="text-xs text-slate-500">Total Items</div>
           <div className="text-xl font-bold text-slate-900">{items.length}</div>
         </div>
-        <div className="bg-amber-50 rounded-lg p-3 border border-amber-200 text-center">
-          <div className="text-xs text-amber-700 font-semibold uppercase">Low (&lt;10)</div>
-          <div className="text-xl font-bold text-amber-700">{lowStock}</div>
+        <div className="bg-white rounded-lg p-3 border border-orange-200">
+          <div className="text-xs text-orange-600">Low Stock</div>
+          <div className="text-xl font-bold text-orange-600">{lowStock}</div>
         </div>
-        <div className="bg-red-50 rounded-lg p-3 border border-red-200 text-center">
-          <div className="text-xs text-red-700 font-semibold uppercase">Out</div>
-          <div className="text-xl font-bold text-red-700">{outOfStock}</div>
+        <div className="bg-white rounded-lg p-3 border border-red-200">
+          <div className="text-xs text-red-600">Out of Stock</div>
+          <div className="text-xl font-bold text-red-600">{outOfStock}</div>
         </div>
       </div>
 
-      {/* Search */}
-      <div className="bg-white rounded-xl p-4 border-2 border-slate-200 mb-6">
+      {/* Search - compact */}
+      <div className="mb-4">
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search items..."
-          className="w-full px-4 py-3 text-base rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+          className="w-full px-4 py-2 rounded-lg border border-slate-200 text-slate-900 focus:border-emerald-500 focus:outline-none placeholder:text-slate-400"
         />
       </div>
 
-      {/* Items Table */}
-      <div className="bg-white rounded-xl border-2 border-slate-200 overflow-x-auto">
-        <table className="w-full min-w-[600px]">
-          <thead className="bg-slate-50">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-bold text-slate-600">ITEM</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-slate-600">CATEGORY</th>
-              <th className="px-4 py-3 text-center text-xs font-bold text-slate-600">STOCK</th>
-              <th className="px-4 py-3 text-center text-xs font-bold text-slate-600">ACTIONS</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+      {/* Table - cleaner */}
+      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[500px]">
+            <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-slate-500">Loading...</td>
+                <th className="px-3 py-2 text-left text-xs font-bold text-slate-600">ITEM</th>
+                <th className="px-3 py-2 text-left text-xs font-bold text-slate-600">CATEGORY</th>
+                <th className="px-3 py-2 text-center text-xs font-bold text-slate-600">STOCK</th>
+                <th className="px-3 py-2 text-center text-xs font-bold text-slate-600">ACTIONS</th>
               </tr>
-            ) : filteredItems.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-slate-500">No items found</td>
-              </tr>
-            ) : (
-              filteredItems.map((item) => {
-                const stock = item.stock_quantity || 0
-                const stockColor = stock === 0 ? 'text-red-600' : stock < 10 ? 'text-orange-600' : 'text-emerald-600'
-                
-                return (
-                  <tr key={item.id} className="border-t border-slate-200">
-                    <td className="px-4 py-3">
-                      <div className="font-bold text-slate-900">{item.name}</div>
-                      {item.name_bangla && (
-                        <div className="text-sm text-slate-500">{item.name_bangla}</div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{item.category}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`text-2xl font-bold ${stockColor}`}>{stock}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap items-center justify-center gap-1 lg:gap-2">
-                        <button
-                          type="button"
-                          onClick={() => updateStock(item.id, -10)}
-                          className="px-2 py-1 lg:px-3 lg:py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold text-xs lg:text-sm"
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={4} className="px-3 py-8 text-center text-slate-500">Loading...</td>
+                </tr>
+              ) : filteredItems.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-3 py-8 text-center text-slate-500">No items found</td>
+                </tr>
+              ) : (
+                filteredItems.map((item) => {
+                  const stock = item.stock_quantity || 0
+                  return (
+                    <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="px-3 py-2">
+                        <div className="font-medium text-slate-900">{item.name}</div>
+                        {item.name_bangla && (
+                          <div className="text-xs text-slate-500">{item.name_bangla}</div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-slate-600">{item.category}</td>
+                      <td className="px-3 py-2 text-center">
+                        <span
+                          className={`text-lg font-bold ${
+                            stock === 0 ? 'text-red-600' : stock < 10 ? 'text-orange-600' : 'text-emerald-600'
+                          }`}
                         >
-                          -10
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => updateStock(item.id, -1)}
-                          className="px-2 py-1 lg:px-3 lg:py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs lg:text-sm"
-                        >
-                          -1
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => updateStock(item.id, 1)}
-                          className="px-2 py-1 lg:px-3 lg:py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs lg:text-sm"
-                        >
-                          +1
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => updateStock(item.id, 10)}
-                          className="px-2 py-1 lg:px-3 lg:py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs lg:text-sm"
-                        >
-                          +10
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })
-            )}
-          </tbody>
-        </table>
+                          {stock}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex justify-center gap-1 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => updateStock(item.id, -10)}
+                            className="px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-bold"
+                          >
+                            -10
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateStock(item.id, -1)}
+                            className="px-2 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded text-xs font-bold"
+                          >
+                            -1
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateStock(item.id, 1)}
+                            className="px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs font-bold"
+                          >
+                            +1
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateStock(item.id, 10)}
+                            className="px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-bold"
+                          >
+                            +10
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )

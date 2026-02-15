@@ -38,6 +38,8 @@ export default function MenuManagementPage() {
   const [showCategoryModal, setShowCategoryModal] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
   const [newCategoryIcon, setNewCategoryIcon] = useState('🍽️')
+  const [newCategory, setNewCategory] = useState('')
+  const [showCategoryForm, setShowCategoryForm] = useState(false)
 
   // Fetch data
   const fetchData = async () => {
@@ -58,8 +60,14 @@ export default function MenuManagementPage() {
     }
   }
 
+  const fetchCategories = async () => {
+    const { data } = await supabase.from('categories').select('*').order('name')
+    setCategories((data as Category[]) || [])
+  }
+
   useEffect(() => {
     fetchData()
+    fetchCategories()
   }, [])
 
   // Filter items
@@ -196,6 +204,28 @@ export default function MenuManagementPage() {
       setSuccessMessage('Category added!')
       setTimeout(() => setSuccessMessage(null), 3000)
       fetchData()
+      fetchCategories()
+    } else {
+      alert('Failed to add category')
+    }
+  }
+
+  const handleAddCategoryInline = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const name = newCategory.trim()
+    if (!name) return
+    const { error } = await supabase.from('categories').insert({
+      name,
+      display_order: categories.length,
+      is_active: true
+    })
+    if (!error) {
+      setNewCategory('')
+      setShowCategoryForm(false)
+      fetchCategories()
+      fetchData()
+      setSuccessMessage('Category added!')
+      setTimeout(() => setSuccessMessage(null), 3000)
     } else {
       alert('Failed to add category')
     }
@@ -347,6 +377,45 @@ export default function MenuManagementPage() {
         </div>
       )}
 
+      {/* Category management - before items */}
+      <div className="bg-white rounded-xl p-4 border-2 border-slate-200 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-bold text-lg text-slate-900">Categories</h2>
+          <button
+            type="button"
+            onClick={() => setShowCategoryForm(!showCategoryForm)}
+            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-bold transition-colors"
+          >
+            + Add Category
+          </button>
+        </div>
+
+        {showCategoryForm && (
+          <form onSubmit={handleAddCategoryInline} className="flex gap-2 mb-3">
+            <input
+              type="text"
+              value={newCategory}
+              onChange={e => setNewCategory(e.target.value)}
+              placeholder="Category name"
+              required
+              className="flex-1 px-3 py-2 border-2 border-slate-200 rounded-lg text-slate-900 focus:border-emerald-500 focus:outline-none"
+            />
+            <button type="submit" className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-bold transition-colors">
+              Add
+            </button>
+          </form>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          {categories.map(cat => (
+            <div key={cat.id} className="px-3 py-1 bg-slate-100 rounded-full text-sm text-slate-800">
+              {cat.icon && <span className="mr-1">{cat.icon}</span>}
+              {cat.name}
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Items Grid */}
       {loading ? (
         <div className="flex items-center justify-center h-64">
@@ -358,55 +427,58 @@ export default function MenuManagementPage() {
           <p className="text-2xl font-bold">No items in this category</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {filteredItems.map(item => (
             <div
               key={item.id}
-              className="bg-white rounded-lg border border-slate-200 overflow-hidden hover:shadow-md hover:border-emerald-200 transition-all"
+              className="bg-white rounded-lg border border-slate-200 p-3 hover:shadow-md transition-shadow"
             >
-              {/* Image - compact */}
-              <div className="aspect-[4/3] max-h-28 bg-slate-100 flex items-center justify-center text-3xl overflow-hidden">
-                {item.image_url ? (
-                  <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
-                ) : (
-                  item.category?.icon || '🍽️'
-                )}
-              </div>
+              {/* Image - smaller */}
+              {item.image_url ? (
+                <img src={item.image_url} alt={item.name} className="w-full h-24 object-cover rounded-md mb-2" />
+              ) : (
+                <div className="w-full h-24 bg-slate-100 rounded-md mb-2 flex items-center justify-center text-2xl">
+                  {item.category?.icon || '🍽️'}
+                </div>
+              )}
 
-              {/* Content - compact */}
-              <div className="p-2.5">
-                <div className="flex items-start justify-between gap-1 mb-1">
-                  <h3 className="font-semibold text-slate-900 text-sm line-clamp-1 flex-1 min-w-0">{item.name}</h3>
-                  <button
-                    type="button"
-                    onClick={() => handleToggleAvailability(item)}
-                    className={`flex-shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                      item.is_available ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-                    }`}
-                  >
-                    {item.is_available ? '✓' : 'OUT'}
-                  </button>
+              {/* Compact info */}
+              <div className="flex items-start justify-between gap-1">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-bold text-slate-900 line-clamp-1">{item.name}</div>
+                  {item.name_bangla && (
+                    <div className="text-xs text-slate-500 line-clamp-1">{item.name_bangla}</div>
+                  )}
                 </div>
-                {item.name_bangla && (
-                  <p className="text-[10px] text-slate-500 line-clamp-1 mb-0.5">{item.name_bangla}</p>
-                )}
-                <div className="text-base font-bold text-emerald-600 mb-2">৳{item.price.toFixed(0)}</div>
-                <div className="flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => openEditModal(item)}
-                    className="flex-1 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs transition-colors"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(item.id, item.name)}
-                    className="flex-1 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs transition-colors"
-                  >
-                    Del
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => handleToggleAvailability(item)}
+                  className={`flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                    item.is_available ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                  }`}
+                  title={item.is_available ? 'In stock' : 'Out of stock'}
+                >
+                  {item.is_available ? '✓' : 'OUT'}
+                </button>
+              </div>
+              <div className="text-emerald-600 font-bold text-sm mt-1">৳{item.price.toFixed(0)}</div>
+
+              {/* Action buttons - horizontal */}
+              <div className="flex gap-1 mt-2">
+                <button
+                  type="button"
+                  onClick={() => openEditModal(item)}
+                  className="flex-1 px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-bold transition-colors"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(item.id, item.name)}
+                  className="flex-1 px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-bold transition-colors"
+                >
+                  Delete
+                </button>
               </div>
             </div>
           ))}

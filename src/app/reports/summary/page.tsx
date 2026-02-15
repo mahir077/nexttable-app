@@ -37,6 +37,7 @@ export default function ReportsPage() {
 
   const fetchOrders = async () => {
     try {
+      setLoading(true)
       let query = supabase
         .from('orders')
         .select(`
@@ -68,24 +69,51 @@ export default function ReportsPage() {
 
       const { data, error } = await query
 
-      if (error) throw error
+      if (error) {
+        console.warn('Reports query with joins failed, trying simple query:', error.message)
+        // Fallback without menu_items/categories join
+        let fallback = supabase
+          .from('orders')
+          .select('*, order_items (quantity, unit_price, item_name, menu_item_id)')
+          .eq('status', 'paid')
+          .order('created_at', { ascending: false })
+        if (dateFilter === 'today') {
+          fallback = fallback.gte('created_at', new Date().toISOString().split('T')[0])
+        } else if (dateFilter === 'week') {
+          fallback = fallback.gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+        } else if (dateFilter === 'month') {
+          fallback = fallback.gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+        }
+        const { data: fallbackData, error: fallbackError } = await fallback
+        if (fallbackError) {
+          console.error('Error fetching orders:', fallbackError)
+          alert('Error loading reports: ' + fallbackError.message)
+          setOrders([])
+          return
+        }
+        setOrders(fallbackData || [])
+        return
+      }
+
       setOrders(data || [])
-    } catch (error) {
-      console.error('Error:', error)
+    } catch (err) {
+      console.error('Fetch error:', err)
+      alert('Error loading reports. Check console for details.')
+      setOrders([])
     } finally {
       setLoading(false)
     }
   }
 
-  // Calculate stats
-  const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0)
+  // Calculate stats (with null checks)
+  const totalRevenue = orders.reduce((sum, o) => sum + (o.total ?? 0), 0)
   const totalOrders = orders.length
   const avgOrder = totalOrders > 0 ? totalRevenue / totalOrders : 0
 
   // Payment breakdown
-  const cashSales = orders.filter(o => o.payment_method === 'cash').reduce((sum, o) => sum + o.total, 0)
-  const cardSales = orders.filter(o => o.payment_method === 'card').reduce((sum, o) => sum + o.total, 0)
-  const mobileSales = orders.filter(o => o.payment_method === 'mobile').reduce((sum, o) => sum + o.total, 0)
+  const cashSales = orders.filter(o => o.payment_method === 'cash').reduce((sum, o) => sum + (o.total ?? 0), 0)
+  const cardSales = orders.filter(o => o.payment_method === 'card').reduce((sum, o) => sum + (o.total ?? 0), 0)
+  const mobileSales = orders.filter(o => o.payment_method === 'mobile').reduce((sum, o) => sum + (o.total ?? 0), 0)
 
   // Item-wise sales (use item_name from order_items or menu_item.name; use unit_price)
   const itemSales = orders.flatMap(o => (o.order_items || []).filter(Boolean)).reduce((acc: any, item: any) => {
@@ -147,12 +175,20 @@ export default function ReportsPage() {
         </select>
       </div>
 
+      {/* Loading / Empty / Content */}
+      {loading ? (
+        <div className="p-8 text-center text-slate-500">Loading...</div>
+      ) : orders.length === 0 ? (
+        <div className="p-8 text-center text-slate-500">No orders found for the selected period.</div>
+      ) : (
+        <>
       {/* Tabs */}
       <div className="bg-white rounded-2xl border-2 border-slate-200 mb-6 overflow-hidden">
         <div className="flex overflow-x-auto">
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              type="button"
               onClick={() => setActiveTab(tab.id)}
               className={`flex-1 min-w-[150px] px-4 py-4 font-bold text-sm transition-colors ${
                 activeTab === tab.id
@@ -252,7 +288,7 @@ export default function ReportsPage() {
                 <tr key={idx} className="border-t">
                   <td className="px-4 py-3 font-semibold">{cat.category}</td>
                   <td className="px-4 py-3 text-right">×{cat.quantity}</td>
-                  <td className="px-4 py-3 text-right text-emerald-600 font-bold">৳{cat.revenue.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-right text-emerald-600 font-bold">৳{(cat.revenue ?? 0).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
@@ -275,6 +311,8 @@ export default function ReportsPage() {
             <div className="text-3xl font-bold text-purple-700">৳{mobileSales.toFixed(2)}</div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   )

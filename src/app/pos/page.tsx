@@ -267,7 +267,19 @@ function POSContent() {
         : orderType.charAt(0).toUpperCase() + orderType.slice(1)
       printKOT({ ...order, order_number: order.order_number, total: order.total }, cart, tableLabel)
 
-      setKotSuccess({ orderNumber, total: order.total })
+      const orderTotal = order.total
+      const orderSummary = [
+        '✅ ORDER SENT TO KITCHEN!',
+        '',
+        `Order: ${orderNumber}`,
+        orderType === 'dine-in' && selectedTable ? `Table: ${tableLabel}` : null,
+        `Items: ${cart.length}`,
+        `Total: ৳${orderTotal.toFixed(2)}`,
+        '',
+        'KOT has been sent to kitchen!'
+      ].filter(Boolean).join('\n')
+      alert(orderSummary)
+
       setCart([])
       setCartOpen(false)
       setSelectedTable(null)

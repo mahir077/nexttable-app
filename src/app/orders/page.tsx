@@ -168,160 +168,137 @@ export default function OrdersPage() {
   // Calculate totals
   const totalRevenue = filteredOrders.reduce((sum, order) => sum + order.total, 0)
   const totalOrders = filteredOrders.length
+  const avgOrder = totalOrders > 0 ? totalRevenue / totalOrders : 0
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 lg:p-6">
+    <div className="min-h-screen bg-slate-50 p-6">
       {/* Header */}
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-6 flex items-center gap-4">
         <BackButton />
         <div>
-          <h1 className="text-2xl lg:text-3xl font-brand font-black text-slate-900">📋 Order History</h1>
-          <p className="text-slate-600 text-sm">Paid orders · view & reprint</p>
+          <h1 className="text-3xl font-brand font-black text-slate-900">📋 ORDERS</h1>
+          <p className="text-slate-600">Order history & management</p>
         </div>
       </div>
 
-      {/* Stats - compact */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <div className="bg-white rounded-xl p-4 border border-slate-200">
-          <div className="text-xs text-slate-500 font-semibold uppercase">Orders</div>
-          <div className="text-xl font-bold text-slate-900">{totalOrders}</div>
+      {/* Filters - compact in one row */}
+      <div className="bg-white rounded-lg p-4 border border-slate-200 mb-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+            className="px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 focus:border-emerald-500 focus:outline-none"
+          >
+            <option value="all">All Years</option>
+            {years.filter(y => y !== 'all').map(year => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 focus:border-emerald-500 focus:outline-none"
+          >
+            <option value="all">All Months</option>
+            <option value="01">Jan</option>
+            <option value="02">Feb</option>
+            <option value="03">Mar</option>
+            <option value="04">Apr</option>
+            <option value="05">May</option>
+            <option value="06">Jun</option>
+            <option value="07">Jul</option>
+            <option value="08">Aug</option>
+            <option value="09">Sep</option>
+            <option value="10">Oct</option>
+            <option value="11">Nov</option>
+            <option value="12">Dec</option>
+          </select>
+          <select
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 focus:border-emerald-500 focus:outline-none"
+          >
+            <option value="all">All Dates</option>
+            {dates.filter(d => d !== 'all').map(date => (
+              <option key={date} value={date}>{date}</option>
+            ))}
+          </select>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search order #"
+            className="px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 focus:border-emerald-500 focus:outline-none placeholder:text-slate-400"
+          />
         </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200">
-          <div className="text-xs text-slate-500 font-semibold uppercase">Revenue</div>
-          <div className="text-xl font-bold text-emerald-600">৳{totalRevenue.toFixed(0)}</div>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200">
-          <div className="text-xs text-slate-500 font-semibold uppercase">Avg</div>
-          <div className="text-xl font-bold text-blue-600">৳{totalOrders > 0 ? (totalRevenue / totalOrders).toFixed(0) : '0'}</div>
-        </div>
-      </div>
-
-      {/* Search and Filters */}
-      <div className="bg-white rounded-xl p-4 border border-slate-200 mb-4">
-        <h2 className="text-sm font-bold text-slate-700 mb-3">Search & filter</h2>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Search */}
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">Search Order #</label>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="ORD-001"
-              className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
-            />
-          </div>
-
-          {/* Year Filter */}
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">Year</label>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
-            >
-              <option value="all">All Years</option>
-              {years.filter(y => y !== 'all').map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Month Filter */}
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">Month</label>
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
-            >
-              <option value="all">All Months</option>
-              <option value="01">January</option>
-              <option value="02">February</option>
-              <option value="03">March</option>
-              <option value="04">April</option>
-              <option value="05">May</option>
-              <option value="06">June</option>
-              <option value="07">July</option>
-              <option value="08">August</option>
-              <option value="09">September</option>
-              <option value="10">October</option>
-              <option value="11">November</option>
-              <option value="12">December</option>
-            </select>
-          </div>
-
-          {/* Date Filter */}
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">Date</label>
-            <select
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
-            >
-              <option value="all">All Dates</option>
-              {dates.filter(d => d !== 'all').map(date => (
-                <option key={date} value={date}>{date}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Clear Filters */}
         {(searchQuery || selectedYear !== 'all' || selectedMonth !== 'all' || selectedDate !== 'all') && (
           <button
+            type="button"
             onClick={() => {
               setSearchQuery('')
               setSelectedYear('all')
               setSelectedMonth('all')
               setSelectedDate('all')
             }}
-            className="mt-4 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition-colors"
+            className="mt-3 text-sm font-semibold text-slate-600 hover:text-slate-900"
           >
-            Clear All Filters
+            Clear filters
           </button>
         )}
       </div>
 
-      {/* Orders Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      {/* Stats - compact */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-200">
+          <div className="text-xs text-emerald-600 font-semibold">Total Orders</div>
+          <div className="text-2xl font-bold text-emerald-700">{totalOrders}</div>
+        </div>
+        <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+          <div className="text-xs text-blue-600 font-semibold">Total Revenue</div>
+          <div className="text-2xl font-bold text-blue-700">৳{totalRevenue.toFixed(2)}</div>
+        </div>
+        <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
+          <div className="text-xs text-purple-600 font-semibold">Avg Order</div>
+          <div className="text-2xl font-bold text-purple-700">৳{avgOrder.toFixed(2)}</div>
+        </div>
+      </div>
+
+      {/* Table - cleaner */}
+      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px]">
-            <thead className="bg-slate-50">
+          <table className="w-full text-sm min-w-[640px]">
+            <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-bold text-slate-600">ORDER #</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-slate-600">DATE & TIME</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-slate-600">TYPE</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-slate-600">PAYMENT</th>
-                <th className="px-4 py-3 text-right text-xs font-bold text-slate-600">AMOUNT</th>
-                <th className="px-4 py-3 text-right text-xs font-bold text-slate-600">ACTIONS</th>
+                <th className="px-3 py-2 text-left text-xs font-bold text-slate-600">ORDER #</th>
+                <th className="px-3 py-2 text-left text-xs font-bold text-slate-600">DATE & TIME</th>
+                <th className="px-3 py-2 text-left text-xs font-bold text-slate-600">TYPE</th>
+                <th className="px-3 py-2 text-left text-xs font-bold text-slate-600">PAYMENT</th>
+                <th className="px-3 py-2 text-right text-xs font-bold text-slate-600">AMOUNT</th>
+                <th className="px-3 py-2 text-center text-xs font-bold text-slate-600">ACTIONS</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={6} className="px-3 py-8 text-center text-slate-500">
                     Loading orders...
                   </td>
                 </tr>
               ) : filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={6} className="px-3 py-8 text-center text-slate-500">
                     No orders found
                   </td>
                 </tr>
               ) : (
                 filteredOrders.map((order) => (
-                  <tr key={order.id} className="border-t border-slate-200 hover:bg-slate-50">
-                    <td className="px-4 py-3">
-                      <span className="font-bold text-slate-900">{order.order_number}</span>
+                  <tr key={order.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <td className="px-3 py-2">
+                      <span className="font-semibold text-slate-900">{order.order_number}</span>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className="text-sm text-slate-600">{formatDate(order.created_at)}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-block px-2 py-1 rounded-full text-xs font-bold ${
+                    <td className="px-3 py-2 text-slate-600">{formatDate(order.created_at)}</td>
+                    <td className="px-3 py-2">
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${
                         order.order_type === 'dine-in' ? 'bg-blue-100 text-blue-700' :
                         order.order_type === 'takeaway' ? 'bg-orange-100 text-orange-700' :
                         order.order_type === 'online' ? 'bg-violet-100 text-violet-700' :
@@ -330,8 +307,8 @@ export default function OrdersPage() {
                         {order.order_type?.toUpperCase() || 'DINE-IN'}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-block px-2 py-1 rounded-full text-xs font-bold ${
+                    <td className="px-3 py-2">
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${
                         order.payment_method === 'cash' ? 'bg-emerald-100 text-emerald-700' :
                         order.payment_method === 'card' ? 'bg-blue-100 text-blue-700' :
                         order.payment_method === 'mobile' ? 'bg-purple-100 text-purple-700' :
@@ -340,26 +317,29 @@ export default function OrdersPage() {
                         {order.payment_method?.toUpperCase() || 'CASH'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-3 py-2 text-right">
                       <span className="font-bold text-emerald-600">৳{order.total.toFixed(2)}</span>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="px-3 py-2">
+                      <div className="flex items-center justify-center gap-1">
                         <button
+                          type="button"
                           onClick={() => fetchOrderDetails(order.id)}
-                          className="px-3 py-1 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold transition-colors"
+                          className="px-2 py-1 rounded bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold"
                         >
                           View
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleEdit(order.id)}
-                          className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-colors"
+                          className="px-2 py-1 rounded bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold"
                         >
                           Edit
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleDelete(order.id, order.order_number)}
-                          className="px-3 py-1 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition-colors"
+                          className="px-2 py-1 rounded bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold"
                         >
                           Delete
                         </button>
@@ -369,15 +349,14 @@ export default function OrdersPage() {
                 ))
               )}
             </tbody>
-            {/* Total Row */}
             {filteredOrders.length > 0 && (
-              <tfoot className="bg-emerald-100 border-t-4 border-emerald-400">
+              <tfoot className="bg-slate-50 border-t border-slate-200">
                 <tr>
-                  <td colSpan={4} className="px-4 py-4 text-right">
-                    <span className="text-lg font-bold text-slate-800">TOTAL ({totalOrders} orders):</span>
+                  <td colSpan={4} className="px-3 py-2 text-right font-semibold text-slate-700">
+                    Total ({totalOrders} orders)
                   </td>
-                  <td className="px-4 py-4 text-right" colSpan={2}>
-                    <span className="text-2xl font-brand font-black text-emerald-700">৳{totalRevenue.toFixed(2)}</span>
+                  <td className="px-3 py-2 text-right font-bold text-emerald-700" colSpan={2}>
+                    ৳{totalRevenue.toFixed(2)}
                   </td>
                 </tr>
               </tfoot>

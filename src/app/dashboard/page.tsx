@@ -58,19 +58,36 @@ export default function DashboardPage() {
   const [changeNewTableId, setChangeNewTableId] = useState<string>('')
   const [changeLoading, setChangeLoading] = useState(false)
 
-  // Restaurant name from settings (localStorage)
+  // Restaurant name from settings (DB first, then localStorage fallback)
   const [restaurantName, setRestaurantName] = useState<string>('NextTable')
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('restaurantInfo')
-      if (saved) {
-        const info = JSON.parse(saved) as { name?: string }
-        if (info.name && typeof info.name === 'string') setRestaurantName(info.name)
+    const fetchRestaurantName = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('restaurant_settings')
+          .select('display_name')
+          .limit(1)
+          .maybeSingle()
+
+        if (!error && data?.display_name) {
+          setRestaurantName(String(data.display_name))
+          return
+        }
+      } catch (e) {
+        console.error('Error fetching restaurant name:', e)
       }
-    } catch {
-      // keep default
+      try {
+        const saved = localStorage.getItem('restaurantInfo')
+        if (saved) {
+          const info = JSON.parse(saved) as { name?: string }
+          if (info.name && typeof info.name === 'string') setRestaurantName(info.name)
+        }
+      } catch {
+        // keep default
+      }
     }
+    fetchRestaurantName()
   }, [])
 
   // Set current date
