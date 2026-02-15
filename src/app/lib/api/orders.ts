@@ -28,8 +28,6 @@ export interface Order {
   updated_at: string
   payment_method?: string
   paid_at?: string
-  buzzer_number?: number | null
-  buzzer_status?: 'pending' | 'ready' | 'called' | 'returned' | null
 }
 
 export interface OrderItem {

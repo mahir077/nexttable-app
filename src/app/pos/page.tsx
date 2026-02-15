@@ -27,7 +27,6 @@ function POSContent() {
   const [deliveryTime, setDeliveryTime] = useState('')
   const [guestCount, setGuestCount] = useState('')
   const [eventDate, setEventDate] = useState('')
-  const [buzzerNumber, setBuzzerNumber] = useState('')
 
   const [cart, setCart] = useState<CartItem[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -236,8 +235,6 @@ function POSContent() {
         delivery_time: orderType === 'online' && deliveryTime ? deliveryTime : null,
         guest_count: orderType === 'event' && guestCount ? parseInt(guestCount, 10) : null,
         event_date: orderType === 'event' && eventDate ? eventDate : null,
-        buzzer_number: (() => { const n = parseInt(buzzerNumber, 10); return orderType === 'dine-in' && buzzerNumber.trim() && !isNaN(n) && n >= 1 && n <= 99 ? n : null })(),
-        buzzer_status: (() => { const n = parseInt(buzzerNumber, 10); return orderType === 'dine-in' && buzzerNumber.trim() && !isNaN(n) && n >= 1 && n <= 99 ? 'pending' : null })(),
       }
 
       const { data: order, error: orderError } = await supabase
@@ -289,7 +286,6 @@ function POSContent() {
       setDeliveryTime('')
       setGuestCount('')
       setEventDate('')
-      setBuzzerNumber('')
     } catch (err) {
       console.error(err)
       alert('Failed to create order')
@@ -439,9 +435,9 @@ function POSContent() {
             </div>
           </div>
 
-          {/* Dine-in: table selection + buzzer */}
+          {/* Dine-in: table selection */}
           {orderType === 'dine-in' && (
-            <div className="mb-4 space-y-3">
+            <div className="mb-4">
               <button
                 type="button"
                 onClick={() => setShowTableModal(true)}
@@ -451,18 +447,6 @@ function POSContent() {
                   ? `Table ${tables.find(t => t.id === selectedTable)?.table_number ?? '?'}`
                   : 'Select Table *'}
               </button>
-              <div className="max-w-[140px]">
-                <label className="block text-xs font-semibold text-slate-500 mb-1">Buzzer (optional)</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={99}
-                  value={buzzerNumber}
-                  onChange={e => setBuzzerNumber(e.target.value.replace(/\D/g, '').slice(0, 2))}
-                  placeholder="1–99"
-                  className="w-full px-4 py-3 text-base lg:text-sm lg:py-2.5 bg-white border-2 border-slate-200 rounded-lg focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
-                />
-              </div>
             </div>
           )}
 

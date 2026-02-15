@@ -17,8 +17,6 @@ interface Order {
   created_at: string
   table_id?: string | null
   order_type?: string
-  buzzer_number?: number | null
-  buzzer_status?: 'pending' | 'ready' | 'called' | 'returned' | null
 }
 
 interface OrderItem {
@@ -78,7 +76,7 @@ export default function KitchenPage() {
       const activeOrders = data.filter(order =>
         order.status === 'pending' ||
         order.status === 'preparing' ||
-        (order.status === 'ready' && order.buzzer_number != null && order.buzzer_status !== 'returned')
+        order.status === 'ready'
       )
       setOrders(activeOrders)
     } catch (error) {
@@ -106,18 +104,9 @@ export default function KitchenPage() {
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
     const success = await updateOrderStatus(orderId, newStatus)
     if (success) {
-      const order = orders.find(o => o.id === orderId)
-      if (newStatus === 'ready' && order?.buzzer_number != null) {
-        await supabase.from('orders').update({ buzzer_status: 'ready', updated_at: new Date().toISOString() }).eq('id', orderId)
-      }
       fetchOrders()
       setSelectedOrder(null)
     }
-  }
-
-  const handleCallBuzzer = async (orderId: string) => {
-    const { error } = await supabase.from('orders').update({ buzzer_status: 'called', updated_at: new Date().toISOString() }).eq('id', orderId)
-    if (!error) fetchOrders()
   }
 
   const getStatusColor = (status: string) => {
@@ -126,16 +115,6 @@ export default function KitchenPage() {
       case 'preparing': return 'bg-blue-500'
       case 'ready': return 'bg-emerald-500'
       default: return 'bg-slate-500'
-    }
-  }
-
-  const getBuzzerBadgeClass = (buzzerStatus: string | null | undefined) => {
-    switch (buzzerStatus) {
-      case 'pending': return 'bg-orange-500 text-white'
-      case 'ready': return 'bg-emerald-500 text-white'
-      case 'called': return 'bg-blue-500 text-white animate-pulse'
-      case 'returned': return 'bg-slate-500 text-white'
-      default: return 'bg-slate-600 text-slate-300'
     }
   }
 
@@ -406,17 +385,6 @@ export default function KitchenPage() {
               key={order.id}
               className="bg-white rounded-lg border border-slate-200 p-3 hover:shadow-md transition-all text-left"
             >
-              {/* Buzzer - compact */}
-              {order.buzzer_number != null && (
-                <div className="text-center mb-2 p-2 bg-blue-50 rounded">
-                  <div className="text-xs text-blue-600 font-bold">BUZZER</div>
-                  <div className="text-2xl font-black text-blue-600">#{order.buzzer_number}</div>
-                  <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${getBuzzerBadgeClass(order.buzzer_status)}`}>
-                    {order.buzzer_status || 'pending'}
-                  </span>
-                </div>
-              )}
-
               {/* Order info - compact */}
               <div
                 className="cursor-pointer"
@@ -462,15 +430,6 @@ export default function KitchenPage() {
                     className="flex-1 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs font-bold"
                   >
                     Ready
-                  </button>
-                )}
-                {order.status === 'ready' && order.buzzer_number != null && order.buzzer_status !== 'called' && order.buzzer_status !== 'returned' && (
-                  <button
-                    type="button"
-                    onClick={e => { e.stopPropagation(); handleCallBuzzer(order.id) }}
-                    className="flex-1 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-bold"
-                  >
-                    Call
                   </button>
                 )}
                 {(order.status === 'pending' || order.status === 'preparing') && (
@@ -540,11 +499,6 @@ export default function KitchenPage() {
               {selectedOrder.order.status === 'preparing' && (
                 <button onClick={() => handleStatusUpdate(selectedOrder.order.id, 'ready')} className="w-full sm:flex-1 min-h-[44px] py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-base lg:text-lg transition-colors">
                   ✅ Mark as Ready
-                </button>
-              )}
-              {selectedOrder.order.status === 'ready' && selectedOrder.order.buzzer_number != null && selectedOrder.order.buzzer_status !== 'called' && selectedOrder.order.buzzer_status !== 'returned' && (
-                <button onClick={() => handleCallBuzzer(selectedOrder.order.id)} className="w-full sm:flex-1 min-h-[44px] py-4 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold text-base lg:text-lg transition-colors">
-                  📢 Call Buzzer #{selectedOrder.order.buzzer_number}
                 </button>
               )}
             </div>
