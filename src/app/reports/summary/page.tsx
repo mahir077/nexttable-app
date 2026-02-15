@@ -9,20 +9,22 @@ interface Order {
   total: number
   created_at: string
   payment_method: string | null
+  order_type: string | null
+}
+
+interface OrderItem {
+  quantity: number
+  price?: number
+  unit_price?: number
+  item_name?: string
+  menu_item?: {
+    name: string
+    category: string | { name?: string }
+  }
 }
 
 interface OrderWithItems extends Order {
-  order_items?: Array<{
-    quantity: number
-    unit_price?: number
-    price?: number
-    item_name?: string
-    menu_item_id?: string
-    menu_item?: {
-      name?: string
-      category?: string | { name?: string }
-    }
-  }>
+  order_items: OrderItem[]
 }
 
 export default function ReportsPage() {
@@ -38,51 +40,64 @@ export default function ReportsPage() {
   const fetchOrders = async () => {
     try {
       setLoading(true)
+
       let query = supabase
         .from('orders')
         .select(`
-          *,
+          id,
+          total,
+          created_at,
+          payment_method,
+          order_type,
           order_items (
             quantity,
             unit_price,
             item_name,
-            menu_item_id,
             menu_item:menu_items (
               name,
               category:categories(name)
             )
           )
         `)
-        .eq('status', 'paid')
         .order('created_at', { ascending: false })
 
+      // Apply date filter
       if (dateFilter === 'today') {
-        const today = new Date().toISOString().split('T')[0]
-        query = query.gte('created_at', today)
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        query = query.gte('created_at', today.toISOString())
       } else if (dateFilter === 'week') {
-        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-        query = query.gte('created_at', weekAgo)
+        const weekAgo = new Date()
+        weekAgo.setDate(weekAgo.getDate() - 7)
+        query = query.gte('created_at', weekAgo.toISOString())
       } else if (dateFilter === 'month') {
-        const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-        query = query.gte('created_at', monthAgo)
+        const monthAgo = new Date()
+        monthAgo.setDate(monthAgo.getDate() - 30)
+        query = query.gte('created_at', monthAgo.toISOString())
       }
+      // 'all' = no date filter
 
       const { data, error } = await query
 
       if (error) {
         console.warn('Reports query with joins failed, trying simple query:', error.message)
-        // Fallback without menu_items/categories join
+        // Fallback: no menu_items join (use order_items.unit_price, item_name)
         let fallback = supabase
           .from('orders')
-          .select('*, order_items (quantity, unit_price, item_name, menu_item_id)')
-          .eq('status', 'paid')
+          .select('id, total, created_at, payment_method, order_type, order_items (quantity, unit_price, item_name)')
           .order('created_at', { ascending: false })
         if (dateFilter === 'today') {
-          fallback = fallback.gte('created_at', new Date().toISOString().split('T')[0])
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          fallback = fallback.gte('created_at', today.toISOString())
         } else if (dateFilter === 'week') {
-          fallback = fallback.gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+          const weekAgo = new Date()
+          weekAgo.setDate(weekAgo.getDate() - 7)
+          fallback = fallback.gte('created_at', weekAgo.toISOString())
         } else if (dateFilter === 'month') {
-          fallback = fallback.gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+          const monthAgo = new Date()
+          monthAgo.setDate(monthAgo.getDate() - 30)
+          fallback = fallback.gte('created_at', monthAgo.toISOString())
         }
         const { data: fallbackData, error: fallbackError } = await fallback
         if (fallbackError) {
@@ -91,74 +106,101 @@ export default function ReportsPage() {
           setOrders([])
           return
         }
-        setOrders(fallbackData || [])
+        setOrders((fallbackData || []) as unknown as OrderWithItems[])
         return
       }
 
-      setOrders(data || [])
-    } catch (err) {
-      console.error('Fetch error:', err)
-      alert('Error loading reports. Check console for details.')
+      setOrders((data || []) as unknown as OrderWithItems[])
+    } catch (error) {
+      console.error('Fetch error:', error)
       setOrders([])
     } finally {
       setLoading(false)
     }
   }
 
-  // Calculate stats (with null checks)
-  const totalRevenue = orders.reduce((sum, o) => sum + (o.total ?? 0), 0)
+  // Calculate stats with null checks
+  const totalRevenue = orders.reduce((sum, o) => sum + (o.total || 0), 0)
   const totalOrders = orders.length
   const avgOrder = totalOrders > 0 ? totalRevenue / totalOrders : 0
 
-  // Payment breakdown
-  const cashSales = orders.filter(o => o.payment_method === 'cash').reduce((sum, o) => sum + (o.total ?? 0), 0)
-  const cardSales = orders.filter(o => o.payment_method === 'card').reduce((sum, o) => sum + (o.total ?? 0), 0)
-  const mobileSales = orders.filter(o => o.payment_method === 'mobile').reduce((sum, o) => sum + (o.total ?? 0), 0)
+  // Payment breakdown with null checks
+  const cashSales = orders
+    .filter(o => o.payment_method === 'cash')
+    .reduce((sum, o) => sum + (o.total || 0), 0)
 
-  // Item-wise sales (use item_name from order_items or menu_item.name; use unit_price)
-  const itemSales = orders.flatMap(o => (o.order_items || []).filter(Boolean)).reduce((acc: any, item: any) => {
-    const name = item.item_name || item.menu_item?.name || 'Unknown'
-    const qty = item.quantity || 0
-    const price = item.unit_price ?? item.price ?? 0
-    if (!acc[name]) {
-      acc[name] = { name, quantity: 0, revenue: 0 }
-    }
-    acc[name].quantity += qty
-    acc[name].revenue += price * qty
-    return acc
-  }, {})
-  const topItems = Object.values(itemSales).sort((a: any, b: any) => b.revenue - a.revenue).slice(0, 10)
+  const cardSales = orders
+    .filter(o => o.payment_method === 'card')
+    .reduce((sum, o) => sum + (o.total || 0), 0)
 
-  // Category-wise sales (category from menu_item.category.name)
-  const categorySales = orders.flatMap(o => (o.order_items || []).filter(Boolean)).reduce((acc: any, item: any) => {
-    const cat = item.menu_item?.category?.name ?? item.menu_item?.category ?? 'Uncategorized'
-    const qty = item.quantity || 0
-    const price = item.unit_price ?? item.price ?? 0
-    if (!acc[cat]) {
-      acc[cat] = { category: cat, quantity: 0, revenue: 0 }
+  const mobileSales = orders
+    .filter(o => o.payment_method === 'mobile')
+    .reduce((sum, o) => sum + (o.total || 0), 0)
+
+  // Item-wise sales with null checks (support price, unit_price, menu_item.name, item_name)
+  const itemSales: Record<string, { name: string; quantity: number; revenue: number }> = {}
+
+  orders.forEach(order => {
+    if (order.order_items && Array.isArray(order.order_items)) {
+      order.order_items.forEach(item => {
+        const name = item.menu_item?.name ?? item.item_name ?? null
+        if (name) {
+          const price = (item.price ?? item.unit_price ?? 0) as number
+          if (!itemSales[name]) {
+            itemSales[name] = { name, quantity: 0, revenue: 0 }
+          }
+          itemSales[name].quantity += item.quantity || 0
+          itemSales[name].revenue += price * (item.quantity || 0)
+        }
+      })
     }
-    acc[cat].quantity += qty
-    acc[cat].revenue += price * qty
-    return acc
-  }, {})
+  })
+
+  const topItems = Object.values(itemSales)
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 10)
+
+  // Category-wise sales with null checks (category can be string or { name } from join)
+  const categorySales: Record<string, { category: string; quantity: number; revenue: number }> = {}
+
+  orders.forEach(order => {
+    if (order.order_items && Array.isArray(order.order_items)) {
+      order.order_items.forEach(item => {
+        const rawCat = item.menu_item?.category
+        const cat = typeof rawCat === 'object' && rawCat !== null && 'name' in rawCat
+          ? (rawCat as { name?: string }).name ?? 'Uncategorized'
+          : (typeof rawCat === 'string' ? rawCat : 'Uncategorized')
+        if (cat) {
+          const price = (item.price ?? item.unit_price ?? 0) as number
+          if (!categorySales[cat]) {
+            categorySales[cat] = { category: cat, quantity: 0, revenue: 0 }
+          }
+          categorySales[cat].quantity += item.quantity || 0
+          categorySales[cat].revenue += price * (item.quantity || 0)
+        }
+      })
+    }
+  })
+
   const categoryData = Object.values(categorySales)
 
   const tabs = [
     { id: 'daily-sales', name: 'Daily Sales', icon: '📊' },
     { id: 'profit-loss', name: 'Profit & Loss', icon: '💰' },
     { id: 'item-wise', name: 'Item-wise', icon: '🍽️' },
-    { id: 'category-wise', name: 'Category-wise', icon: '📁' },
-    { id: 'payment-methods', name: 'Payment Methods', icon: '💳' },
+    { id: 'category-wise', name: 'Category', icon: '📁' },
+    { id: 'payment-methods', name: 'Payment', icon: '💳' },
   ]
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-slate-50 p-3 lg:p-6">
+      {/* Header */}
+      <div className="mb-4 lg:mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        <div className="flex items-center gap-3 lg:gap-4">
           <BackButton />
           <div>
-            <h1 className="text-4xl font-brand font-black text-slate-900">📊 REPORTS</h1>
-            <p className="text-slate-600">Business analytics and insights</p>
+            <h1 className="text-2xl lg:text-4xl font-brand font-black text-slate-900">📊 REPORTS</h1>
+            <p className="text-xs lg:text-sm text-slate-600">Business analytics</p>
           </div>
         </div>
 
@@ -175,143 +217,173 @@ export default function ReportsPage() {
         </select>
       </div>
 
-      {/* Loading / Empty / Content */}
-      {loading ? (
-        <div className="p-8 text-center text-slate-500">Loading...</div>
-      ) : orders.length === 0 ? (
-        <div className="p-8 text-center text-slate-500">No orders found for the selected period.</div>
-      ) : (
-        <>
       {/* Tabs */}
-      <div className="bg-white rounded-2xl border-2 border-slate-200 mb-6 overflow-hidden">
-        <div className="flex overflow-x-auto">
+      <div className="bg-white rounded-xl border-2 border-slate-200 mb-4 lg:mb-6 overflow-x-auto">
+        <div className="flex">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 min-w-[150px] px-4 py-4 font-bold text-sm transition-colors ${
+              className={`flex-1 min-w-[120px] px-4 py-3 lg:py-4 font-bold text-xs lg:text-sm transition-colors ${
                 activeTab === tab.id
                   ? 'bg-emerald-500 text-white'
                   : 'bg-white text-slate-600 hover:bg-slate-50'
               }`}
             >
-              {tab.icon} {tab.name}
+              <span className="mr-1">{tab.icon}</span>
+              {tab.name}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Content */}
-      {activeTab === 'daily-sales' && (
-        <div>
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="bg-emerald-50 rounded-xl p-6 border-2 border-emerald-200">
-              <div className="text-sm text-emerald-600 mb-1">Total Revenue</div>
-              <div className="text-3xl font-bold text-emerald-700">৳{totalRevenue.toFixed(2)}</div>
-            </div>
-            <div className="bg-blue-50 rounded-xl p-6 border-2 border-blue-200">
-              <div className="text-sm text-blue-600 mb-1">Total Orders</div>
-              <div className="text-3xl font-bold text-blue-700">{totalOrders}</div>
-            </div>
-            <div className="bg-purple-50 rounded-xl p-6 border-2 border-purple-200">
-              <div className="text-sm text-purple-600 mb-1">Avg Order</div>
-              <div className="text-3xl font-bold text-purple-700">৳{avgOrder.toFixed(2)}</div>
-            </div>
-          </div>
+      {/* Loading State */}
+      {loading ? (
+        <div className="bg-white rounded-xl p-8 text-center">
+          <div className="text-4xl mb-3">⏳</div>
+          <div className="text-slate-500">Loading reports...</div>
         </div>
-      )}
+      ) : (
+        <>
+          {/* Daily Sales Tab */}
+          {activeTab === 'daily-sales' && (
+            <div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4 mb-6">
+                <div className="bg-emerald-50 rounded-xl p-4 lg:p-6 border-2 border-emerald-200">
+                  <div className="text-xs lg:text-sm text-emerald-600 mb-1">Total Revenue</div>
+                  <div className="text-2xl lg:text-3xl font-bold text-emerald-700">
+                    ৳{totalRevenue.toFixed(2)}
+                  </div>
+                </div>
+                <div className="bg-blue-50 rounded-xl p-4 lg:p-6 border-2 border-blue-200">
+                  <div className="text-xs lg:text-sm text-blue-600 mb-1">Total Orders</div>
+                  <div className="text-2xl lg:text-3xl font-bold text-blue-700">
+                    {totalOrders}
+                  </div>
+                </div>
+                <div className="bg-purple-50 rounded-xl p-4 lg:p-6 border-2 border-purple-200">
+                  <div className="text-xs lg:text-sm text-purple-600 mb-1">Avg Order</div>
+                  <div className="text-2xl lg:text-3xl font-bold text-purple-700">
+                    ৳{avgOrder.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
-      {activeTab === 'profit-loss' && (
-        <div className="bg-white rounded-xl p-6 border-2 border-slate-200">
-          <h2 className="text-2xl font-bold mb-4">💰 Profit & Loss</h2>
-          <div className="space-y-4">
-            <div className="flex justify-between py-3 border-b">
-              <span className="font-semibold">Total Revenue</span>
-              <span className="text-emerald-600 font-bold">৳{totalRevenue.toFixed(2)}</span>
+          {/* Profit & Loss Tab */}
+          {activeTab === 'profit-loss' && (
+            <div className="bg-white rounded-xl p-4 lg:p-6 border-2 border-slate-200">
+              <h2 className="text-xl lg:text-2xl font-bold mb-4">💰 Profit & Loss</h2>
+              <div className="space-y-4">
+                <div className="flex justify-between py-3 border-b">
+                  <span className="font-semibold">Total Revenue</span>
+                  <span className="text-emerald-600 font-bold">৳{totalRevenue.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between py-3 border-b">
+                  <span className="font-semibold">Cost (Not tracked yet)</span>
+                  <span className="text-slate-400">৳0.00</span>
+                </div>
+                <div className="flex justify-between py-3 bg-emerald-50 px-4 rounded-lg">
+                  <span className="font-bold text-lg">Gross Profit</span>
+                  <span className="text-emerald-600 font-bold text-lg">৳{totalRevenue.toFixed(2)}</span>
+                </div>
+              </div>
             </div>
-            <div className="flex justify-between py-3 border-b">
-              <span className="font-semibold">Cost (Not tracked yet)</span>
-              <span className="text-slate-400">৳0.00</span>
+          )}
+
+          {/* Item-wise Tab */}
+          {activeTab === 'item-wise' && (
+            <div className="bg-white rounded-xl border-2 border-slate-200 overflow-x-auto">
+              <div className="p-4 lg:p-6 border-b">
+                <h2 className="text-xl lg:text-2xl font-bold">🍽️ Top Selling Items</h2>
+              </div>
+              {topItems.length === 0 ? (
+                <div className="p-8 text-center text-slate-500">No items sold yet</div>
+              ) : (
+                <table className="w-full min-w-[600px]">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-bold">#</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold">ITEM</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold">QTY</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold">REVENUE</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topItems.map((item, idx) => (
+                      <tr key={idx} className="border-t hover:bg-slate-50">
+                        <td className="px-4 py-3">{idx + 1}</td>
+                        <td className="px-4 py-3 font-semibold">{item.name}</td>
+                        <td className="px-4 py-3 text-right">×{item.quantity}</td>
+                        <td className="px-4 py-3 text-right text-emerald-600 font-bold">
+                          ৳{item.revenue.toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
-            <div className="flex justify-between py-3 bg-emerald-50 px-4 rounded-lg">
-              <span className="font-bold text-lg">Gross Profit</span>
-              <span className="text-emerald-600 font-bold text-lg">৳{totalRevenue.toFixed(2)}</span>
+          )}
+
+          {/* Category-wise Tab */}
+          {activeTab === 'category-wise' && (
+            <div className="bg-white rounded-xl border-2 border-slate-200 overflow-x-auto">
+              <div className="p-4 lg:p-6 border-b">
+                <h2 className="text-xl lg:text-2xl font-bold">📁 Category-wise Sales</h2>
+              </div>
+              {categoryData.length === 0 ? (
+                <div className="p-8 text-center text-slate-500">No sales data yet</div>
+              ) : (
+                <table className="w-full min-w-[600px]">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-bold">CATEGORY</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold">QTY</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold">REVENUE</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categoryData.map((cat, idx) => (
+                      <tr key={idx} className="border-t hover:bg-slate-50">
+                        <td className="px-4 py-3 font-semibold">{cat.category}</td>
+                        <td className="px-4 py-3 text-right">×{cat.quantity}</td>
+                        <td className="px-4 py-3 text-right text-emerald-600 font-bold">
+                          ৳{cat.revenue.toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {activeTab === 'item-wise' && (
-        <div className="bg-white rounded-xl border-2 border-slate-200 overflow-hidden">
-          <div className="p-6 border-b">
-            <h2 className="text-2xl font-bold">🍽️ Top Selling Items</h2>
-          </div>
-          <table className="w-full">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-bold">#</th>
-                <th className="px-4 py-3 text-left text-xs font-bold">ITEM</th>
-                <th className="px-4 py-3 text-right text-xs font-bold">QTY</th>
-                <th className="px-4 py-3 text-right text-xs font-bold">REVENUE</th>
-              </tr>
-            </thead>
-            <tbody>
-              {topItems.map((item: any, idx) => (
-                <tr key={idx} className="border-t">
-                  <td className="px-4 py-3">{idx + 1}</td>
-                  <td className="px-4 py-3 font-semibold">{item.name}</td>
-                  <td className="px-4 py-3 text-right">×{item.quantity}</td>
-                  <td className="px-4 py-3 text-right text-emerald-600 font-bold">৳{(item.revenue || 0).toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {activeTab === 'category-wise' && (
-        <div className="bg-white rounded-xl border-2 border-slate-200 overflow-hidden">
-          <div className="p-6 border-b">
-            <h2 className="text-2xl font-bold">📁 Category-wise Sales</h2>
-          </div>
-          <table className="w-full">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-bold">CATEGORY</th>
-                <th className="px-4 py-3 text-right text-xs font-bold">QTY</th>
-                <th className="px-4 py-3 text-right text-xs font-bold">REVENUE</th>
-              </tr>
-            </thead>
-            <tbody>
-              {categoryData.map((cat: any, idx) => (
-                <tr key={idx} className="border-t">
-                  <td className="px-4 py-3 font-semibold">{cat.category}</td>
-                  <td className="px-4 py-3 text-right">×{cat.quantity}</td>
-                  <td className="px-4 py-3 text-right text-emerald-600 font-bold">৳{(cat.revenue ?? 0).toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {activeTab === 'payment-methods' && (
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white rounded-xl p-6 border-2 border-emerald-200">
-            <div className="text-sm text-emerald-600 mb-2">💵 Cash</div>
-            <div className="text-3xl font-bold text-emerald-700">৳{cashSales.toFixed(2)}</div>
-          </div>
-          <div className="bg-white rounded-xl p-6 border-2 border-blue-200">
-            <div className="text-sm text-blue-600 mb-2">💳 Card</div>
-            <div className="text-3xl font-bold text-blue-700">৳{cardSales.toFixed(2)}</div>
-          </div>
-          <div className="bg-white rounded-xl p-6 border-2 border-purple-200">
-            <div className="text-sm text-purple-600 mb-2">📱 Mobile</div>
-            <div className="text-3xl font-bold text-purple-700">৳{mobileSales.toFixed(2)}</div>
-          </div>
-        </div>
-      )}
+          {/* Payment Methods Tab */}
+          {activeTab === 'payment-methods' && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4">
+              <div className="bg-white rounded-xl p-4 lg:p-6 border-2 border-emerald-200">
+                <div className="text-sm text-emerald-600 mb-2">💵 Cash</div>
+                <div className="text-2xl lg:text-3xl font-bold text-emerald-700">
+                  ৳{cashSales.toFixed(2)}
+                </div>
+              </div>
+              <div className="bg-white rounded-xl p-4 lg:p-6 border-2 border-blue-200">
+                <div className="text-sm text-blue-600 mb-2">💳 Card</div>
+                <div className="text-2xl lg:text-3xl font-bold text-blue-700">
+                  ৳{cardSales.toFixed(2)}
+                </div>
+              </div>
+              <div className="bg-white rounded-xl p-4 lg:p-6 border-2 border-purple-200">
+                <div className="text-sm text-purple-600 mb-2">📱 Mobile</div>
+                <div className="text-2xl lg:text-3xl font-bold text-purple-700">
+                  ৳{mobileSales.toFixed(2)}
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
