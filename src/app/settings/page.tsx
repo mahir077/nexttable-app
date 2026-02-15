@@ -17,8 +17,6 @@ export default function SettingsPage() {
   })
   const [restaurantSettingsId, setRestaurantSettingsId] = useState<string | null>(null)
   const [restaurantInfoLoading, setRestaurantInfoLoading] = useState(false)
-  const [restaurantLogoUrl, setRestaurantLogoUrl] = useState<string | null>(null)
-  const [logoFile, setLogoFile] = useState<File | null>(null)
 
   // Tables state
   const [floors, setFloors] = useState<Floor[]>([])
@@ -62,11 +60,11 @@ export default function SettingsPage() {
   const fetchRestaurantSettings = async () => {
     setRestaurantInfoLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('restaurant_settings')
-        .select('*')
-        .limit(1)
-        .maybeSingle()
+        const { data, error } = await supabase
+          .from('restaurant_settings')
+          .select('*')
+          .limit(1)
+          .maybeSingle()
 
       if (!error && data) {
         setRestaurantSettingsId(data.id)
@@ -76,7 +74,6 @@ export default function SettingsPage() {
           phone: (data.phone as string) ?? '',
           email: (data.email as string) ?? ''
         })
-        setRestaurantLogoUrl(data.logo_url ? String(data.logo_url) : null)
       }
       if (error || !data) {
         try {
@@ -129,16 +126,6 @@ export default function SettingsPage() {
     }
   }
 
-  // Upload logo to storage and return public URL
-  const uploadLogo = async (file: File): Promise<string> => {
-    const ext = file.name.split('.').pop() || 'png'
-    const path = `logos/${Math.random().toString(36).slice(2)}.${ext}`
-    const { error } = await supabase.storage.from('menu-images').upload(path, file, { upsert: false })
-    if (error) throw error
-    const { data } = supabase.storage.from('menu-images').getPublicUrl(path)
-    return data.publicUrl
-  }
-
   // Save restaurant info – update existing row or insert (handles existing restaurant_settings row)
   const handleSaveRestaurantInfo = async () => {
     if (!restaurantInfo.name?.trim()) {
@@ -147,16 +134,6 @@ export default function SettingsPage() {
     }
     setRestaurantInfoLoading(true)
     try {
-      let logoUrlToSave: string | null = restaurantLogoUrl
-      if (logoFile) {
-        const uploaded = await uploadLogo(logoFile)
-        if (uploaded) {
-          logoUrlToSave = uploaded
-          setRestaurantLogoUrl(uploaded)
-        }
-        setLogoFile(null)
-      }
-
       // Get any existing settings row (first/only row)
       const { data: existing } = await supabase
         .from('restaurant_settings')
@@ -172,7 +149,6 @@ export default function SettingsPage() {
             address: restaurantInfo.address?.trim() ?? null,
             phone: restaurantInfo.phone?.trim() ?? null,
             email: restaurantInfo.email?.trim() ?? null,
-            logo_url: logoUrlToSave,
             updated_at: new Date().toISOString()
           })
           .eq('id', existing.id)
@@ -188,8 +164,7 @@ export default function SettingsPage() {
             display_name: restaurantInfo.name.trim(),
             address: restaurantInfo.address?.trim() ?? null,
             phone: restaurantInfo.phone?.trim() ?? null,
-            email: restaurantInfo.email?.trim() ?? null,
-            logo_url: logoUrlToSave
+            email: restaurantInfo.email?.trim() ?? null
           })
 
         if (error) {
@@ -382,41 +357,6 @@ export default function SettingsPage() {
       {activeTab === 'restaurant' && (
         <div className="bg-white rounded-xl lg:rounded-2xl p-4 lg:p-8 border-2 border-slate-200">
           <h2 className="text-xl lg:text-2xl font-bold text-slate-900 mb-6">Restaurant Information</h2>
-
-          {/* Logo (optional) */}
-          <div className="lg:col-span-2 mb-4">
-            <label className="block text-sm font-bold text-slate-700 mb-2">Logo (optional)</label>
-            <div className="flex flex-wrap items-center gap-4">
-              {(restaurantLogoUrl || logoFile) && (
-                <div className="relative">
-                  <img
-                    src={logoFile ? URL.createObjectURL(logoFile) : restaurantLogoUrl!}
-                    alt="Logo preview"
-                    className="h-20 w-20 rounded-xl border-2 border-slate-200 object-contain bg-slate-50"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => { setRestaurantLogoUrl(null); setLogoFile(null) }}
-                    className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-red-500 text-white text-xs font-bold hover:bg-red-600"
-                    title="Remove logo"
-                  >
-                    ×
-                  </button>
-                </div>
-              )}
-              <label className="cursor-pointer">
-                <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm">
-                  {restaurantLogoUrl || logoFile ? 'Change logo' : 'Upload logo'}
-                </span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) setLogoFile(f); e.target.value = '' }}
-                />
-              </label>
-            </div>
-          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="lg:col-span-2">

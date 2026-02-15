@@ -58,22 +58,20 @@ export default function DashboardPage() {
   const [changeNewTableId, setChangeNewTableId] = useState<string>('')
   const [changeLoading, setChangeLoading] = useState(false)
 
-  // Restaurant name + logo from settings (DB first, then localStorage fallback)
+  // Restaurant name from settings (DB first, then localStorage fallback)
   const [restaurantName, setRestaurantName] = useState<string>('NextTable')
-  const [restaurantLogoUrl, setRestaurantLogoUrl] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchRestaurantInfo = async () => {
       try {
         const { data, error } = await supabase
           .from('restaurant_settings')
-          .select('display_name, logo_url')
+          .select('display_name')
           .limit(1)
           .maybeSingle()
 
-        if (!error && data) {
-          if (data.display_name) setRestaurantName(String(data.display_name))
-          if (data.logo_url) setRestaurantLogoUrl(String(data.logo_url))
+        if (!error && data?.display_name) {
+          setRestaurantName(String(data.display_name))
           return
         }
       } catch (e) {
@@ -394,14 +392,9 @@ export default function DashboardPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <div className="min-w-0 flex items-center gap-2 sm:gap-3">
-              {restaurantLogoUrl && (
-                <img src={restaurantLogoUrl} alt="" className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg object-contain flex-shrink-0 bg-slate-100" />
-              )}
-              <div className="min-w-0">
-                <h1 className="text-base sm:text-lg md:text-xl font-semibold text-slate-800 truncate">{restaurantName}</h1>
-                <p className="text-xs text-slate-400 hidden sm:block">{currentDate}</p>
-              </div>
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-lg md:text-xl font-semibold text-slate-800 truncate">{restaurantName}</h1>
+              <p className="text-xs text-slate-400 hidden sm:block">{currentDate}</p>
             </div>
           </div>
           <div className="text-right flex-shrink-0">
