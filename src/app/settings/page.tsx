@@ -58,51 +58,51 @@ export default function SettingsPage() {
     setCashDrawerUrl(getCashDrawerUrl())
   }, [activeTab])
 
-  // Load restaurant settings from DB
-  useEffect(() => {
-    const loadRestaurantSettings = async () => {
-      setRestaurantInfoLoading(true)
-      try {
-        const { data, error } = await supabase
-          .from('restaurant_settings')
-          .select('id, display_name, address, phone, email, logo_url')
-          .limit(1)
-          .maybeSingle()
+  // Fetch restaurant settings (first row – single restaurant mode)
+  const fetchRestaurantSettings = async () => {
+    setRestaurantInfoLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('restaurant_settings')
+        .select('*')
+        .limit(1)
+        .maybeSingle()
 
-        if (!error && data) {
-          setRestaurantSettingsId(data.id)
-          setRestaurantInfo({
-            name: data.display_name ?? 'NextTable Restaurant',
-            address: (data.address as string) ?? '',
-            phone: (data.phone as string) ?? '',
-            email: (data.email as string) ?? ''
-          })
-          setRestaurantLogoUrl(data.logo_url ? String(data.logo_url) : null)
-        }
-        // Fallback: try localStorage for backward compatibility
-        if (error || !data) {
-          try {
-            const saved = localStorage.getItem('restaurantInfo')
-            if (saved) {
-              const info = JSON.parse(saved) as { name?: string; address?: string; phone?: string; email?: string }
-              setRestaurantInfo(prev => ({
-                name: info.name ?? prev.name,
-                address: info.address ?? prev.address,
-                phone: info.phone ?? prev.phone,
-                email: info.email ?? prev.email
-              }))
-            }
-          } catch {
-            // keep defaults
-          }
-        }
-      } catch (e) {
-        console.error('Error loading restaurant settings:', e)
-      } finally {
-        setRestaurantInfoLoading(false)
+      if (!error && data) {
+        setRestaurantSettingsId(data.id)
+        setRestaurantInfo({
+          name: (data.display_name as string) ?? 'NextTable Restaurant',
+          address: (data.address as string) ?? '',
+          phone: (data.phone as string) ?? '',
+          email: (data.email as string) ?? ''
+        })
+        setRestaurantLogoUrl(data.logo_url ? String(data.logo_url) : null)
       }
+      if (error || !data) {
+        try {
+          const saved = localStorage.getItem('restaurantInfo')
+          if (saved) {
+            const info = JSON.parse(saved) as { name?: string; address?: string; phone?: string; email?: string }
+            setRestaurantInfo(prev => ({
+              name: info.name ?? prev.name,
+              address: info.address ?? prev.address,
+              phone: info.phone ?? prev.phone,
+              email: info.email ?? prev.email
+            }))
+          }
+        } catch {
+          // keep defaults
+        }
+      }
+    } catch (e) {
+      console.error('Fetch restaurant settings error:', e)
+    } finally {
+      setRestaurantInfoLoading(false)
     }
-    loadRestaurantSettings()
+  }
+
+  useEffect(() => {
+    fetchRestaurantSettings()
   }, [])
 
   const fetchFloors = async () => {
@@ -139,7 +139,7 @@ export default function SettingsPage() {
     return data.publicUrl
   }
 
-  // Save restaurant info to DB (restaurant_settings) and localStorage
+  // Save restaurant info – update existing row or insert (handles existing restaurant_settings row)
   const handleSaveRestaurantInfo = async () => {
     if (!restaurantInfo.name?.trim()) {
       alert('❌ Please enter restaurant name')
@@ -149,43 +149,61 @@ export default function SettingsPage() {
     try {
       let logoUrlToSave: string | null = restaurantLogoUrl
       if (logoFile) {
-        logoUrlToSave = await uploadLogo(logoFile)
-        setRestaurantLogoUrl(logoUrlToSave)
+        const uploaded = await uploadLogo(logoFile)
+        if (uploaded) {
+          logoUrlToSave = uploaded
+          setRestaurantLogoUrl(uploaded)
+        }
         setLogoFile(null)
       }
 
-      const payload = {
-        display_name: restaurantInfo.name.trim(),
-        address: restaurantInfo.address?.trim() ?? null,
-        phone: restaurantInfo.phone?.trim() ?? null,
-        email: restaurantInfo.email?.trim() ?? null,
-        logo_url: logoUrlToSave
-      }
+      // Get any existing settings row (first/only row)
+      const { data: existing } = await supabase
+        .from('restaurant_settings')
+        .select('id')
+        .limit(1)
+        .maybeSingle()
 
-      if (restaurantSettingsId) {
+      if (existing) {
         const { error } = await supabase
           .from('restaurant_settings')
-          .update(payload)
-          .eq('id', restaurantSettingsId)
+          .update({
+            display_name: restaurantInfo.name.trim(),
+            address: restaurantInfo.address?.trim() ?? null,
+            phone: restaurantInfo.phone?.trim() ?? null,
+            email: restaurantInfo.email?.trim() ?? null,
+            logo_url: logoUrlToSave,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existing.id)
 
-        if (error) throw error
+        if (error) {
+          console.error('Update error:', error)
+          throw error
+        }
       } else {
-        const tenantId = typeof process.env.NEXT_PUBLIC_DEMO_TENANT_ID !== 'undefined' ? process.env.NEXT_PUBLIC_DEMO_TENANT_ID : null
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('restaurant_settings')
-          .insert(tenantId ? { ...payload, tenant_id: tenantId } : payload)
-          .select('id')
-          .single()
+          .insert({
+            display_name: restaurantInfo.name.trim(),
+            address: restaurantInfo.address?.trim() ?? null,
+            phone: restaurantInfo.phone?.trim() ?? null,
+            email: restaurantInfo.email?.trim() ?? null,
+            logo_url: logoUrlToSave
+          })
 
-        if (error) throw error
-        if (data?.id) setRestaurantSettingsId(data.id)
+        if (error) {
+          console.error('Insert error:', error)
+          throw error
+        }
       }
 
       localStorage.setItem('restaurantInfo', JSON.stringify(restaurantInfo))
-      alert('✅ Restaurant information saved!')
+      alert('✅ Settings saved!')
+      fetchRestaurantSettings()
     } catch (error) {
-      console.error('Error saving restaurant info:', error)
-      alert('❌ Failed to save. Check console. If table is missing, create restaurant_settings with columns: id (uuid), display_name, address, phone, email.')
+      console.error('Save error:', error)
+      alert('❌ Failed: ' + (error as Error).message)
     } finally {
       setRestaurantInfoLoading(false)
     }
