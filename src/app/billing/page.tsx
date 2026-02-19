@@ -24,6 +24,8 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true)
   const [processingPayment, setProcessingPayment] = useState(false)
   const [isPrinting, setIsPrinting] = useState(false)
+  const [discountType, setDiscountType] = useState<'none' | 'percentage' | 'fixed'>('none')
+  const [discountValue, setDiscountValue] = useState<number>(0)
 
   const { toast, showToast, hideToast } = useToast()
 
@@ -83,6 +85,36 @@ export default function BillingPage() {
     }
   }
 
+  const calculateDiscount = () => {
+    if (!selectedOrder || discountType === 'none') {
+      const baseTotal = selectedOrder?.order.total || 0
+      return {
+        subtotal: baseTotal,
+        discountAmount: 0,
+        finalTotal: baseTotal
+      }
+    }
+
+    const subtotal = selectedOrder.order.total || 0
+    let discountAmount = 0
+
+    if (discountType === 'percentage') {
+      discountAmount = (subtotal * discountValue) / 100
+    } else if (discountType === 'fixed') {
+      discountAmount = discountValue
+    }
+
+    if (discountAmount > subtotal) {
+      discountAmount = subtotal
+    }
+
+    const finalTotal = subtotal - discountAmount
+
+    return { subtotal, discountAmount, finalTotal }
+  }
+
+  const { subtotal, discountAmount, finalTotal } = calculateDiscount()
+
   // Print bill — choice at print time: open cash drawer or not
   const handlePrint = async (openDrawer: boolean) => {
     if (!selectedOrder) return
@@ -99,12 +131,210 @@ export default function BillingPage() {
         await openCashDrawer()
       }
 
-      window.print()
+      const printWindow = window.open('', '_blank', 'width=400,height=600')
 
-      // Reset printing state after print dialog shows
+      if (!printWindow) {
+        throw new Error('Unable to open print window')
+      }
+
+      const order = selectedOrder.order
+      const items = selectedOrder.items
+
+      const paymentMethodLabel = 'Not specified'
+
+      printWindow.document.write(`<!DOCTYPE html>
+<html>
+  <head>
+    <meta charSet="utf-8" />
+    <title>Invoice #${order.order_number}</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        margin: 0;
+        padding: 10px;
+        font-size: 12px;
+      }
+      .invoice-wrapper {
+        width: 100%;
+        max-width: 75mm;
+        margin: 0 auto;
+      }
+      .invoice-header {
+        text-align: center;
+        margin-bottom: 10px;
+      }
+      .invoice-header h1 {
+        font-size: 18px;
+        margin: 0;
+      }
+      .invoice-header p {
+        margin: 2px 0;
+      }
+      .invoice-meta {
+        font-size: 11px;
+        margin-bottom: 8px;
+      }
+      .invoice-meta div {
+        display: flex;
+        justify-content: space-between;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8px;
+      }
+      th, td {
+        padding: 4px 2px;
+        text-align: left;
+      }
+      th {
+        border-bottom: 1px solid #000;
+        font-size: 11px;
+      }
+      td {
+        font-size: 11px;
+      }
+      td:last-child,
+      th:last-child {
+        text-align: right;
+      }
+      .invoice-totals {
+        margin-top: 8px;
+        font-size: 12px;
+      }
+      .total-row {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 2px;
+      }
+      .discount-row {
+        color: #dc2626;
+        font-weight: 600;
+      }
+      .grand-total {
+        border-top: 2px solid #000;
+        padding-top: 6px;
+        margin-top: 6px;
+        font-size: 14px;
+        font-weight: bold;
+      }
+      .thank-you {
+        text-align: center;
+        margin-top: 10px;
+        font-size: 11px;
+      }
+      @media print {
+        body {
+          margin: 0;
+          padding: 0;
+        }
+        .invoice-wrapper {
+          margin: 0 auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="invoice-wrapper">
+      <div class="invoice-header">
+        <h1>NextTable</h1>
+        <p>Restaurant Control Hub</p>
+      </div>
+      <div class="invoice-meta">
+        <div>
+          <span>Order:</span>
+          <span>#${order.order_number.replace('ORD', '')}</span>
+        </div>
+        <div>
+          <span>Date:</span>
+          <span>${new Date(order.created_at).toLocaleString()}</span>
+        </div>
+        <div>
+          <span>Table:</span>
+          <span>${order.table?.table_number ?? '-'}</span>
+        </div>
+      </div>
+      <div class="invoice-body">
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Qty</th>
+              <th>Price</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items
+              .map(
+                (item) => `
+              <tr>
+                <td>${item.item_name}</td>
+                <td>${item.quantity}</td>
+                <td>৳${item.unit_price.toFixed(2)}</td>
+                <td>৳${item.subtotal.toFixed(2)}</td>
+              </tr>
+            `
+              )
+              .join('')}
+          </tbody>
+        </table>
+
+        <div class="invoice-totals">
+          <div class="total-row">
+            <span>Subtotal:</span>
+            <span>৳${subtotal.toFixed(2)}</span>
+          </div>
+
+          ${
+            discountAmount > 0
+              ? `
+          <div class="total-row discount-row">
+            <span>
+              Discount${
+                discountType === 'percentage'
+                  ? ` (${discountValue}%)`
+                  : discountType === 'fixed'
+                  ? ` (৳${discountValue})`
+                  : ''
+              }:
+            </span>
+            <span>-৳${discountAmount.toFixed(2)}</span>
+          </div>`
+              : ''
+          }
+
+          <div class="total-row grand-total">
+            <span>Total:</span>
+            <span>৳${finalTotal.toFixed(2)}</span>
+          </div>
+
+          <div class="total-row">
+            <span>Payment Method:</span>
+            <span>${paymentMethodLabel}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="thank-you">
+        <div>Thank you for your visit!</div>
+        <div>Please visit again</div>
+      </div>
+    </div>
+  </body>
+</html>`)
+
+      printWindow.document.close()
+      printWindow.focus()
+      printWindow.print()
+
       setTimeout(() => {
+        printWindow.close()
         setIsPrinting(false)
-      }, 1500)
+      }, 1000)
     } catch (error) {
       console.error('Error printing invoice:', error)
       showToast('Failed to print invoice', 'error')
@@ -263,22 +493,142 @@ export default function BillingPage() {
               </div>
             </div>
 
-            {/* Totals */}
-            <div className="border-t-2 border-slate-300 pt-4 mb-6 space-y-2">
-              <div className="flex justify-between text-slate-600">
-                <span>Subtotal:</span>
-                <span className="font-semibold">৳{selectedOrder.order.subtotal.toFixed(2)}</span>
+            {/* Totals with Discount */}
+            <div className="bg-white rounded-lg p-4 mb-4 border-2 border-slate-200">
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600">Subtotal:</span>
+                  <span className="font-semibold">৳{subtotal.toFixed(2)}</span>
+                </div>
+
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-sm text-red-600">
+                    <span>
+                      Discount
+                      {discountType === 'percentage' && ` (${discountValue}%)`}
+                      {discountType === 'fixed' && ` (৳${discountValue})`}:
+                    </span>
+                    <span className="font-semibold">-৳{discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
+
+                <div className="border-t-2 pt-2 flex justify-between">
+                  <span className="text-lg font-bold text-slate-900">Total to Pay:</span>
+                  <span className="text-3xl font-black text-emerald-600">
+                    ৳{finalTotal.toFixed(2)}
+                  </span>
+                </div>
               </div>
-              {selectedOrder.order.tax > 0 && (
-                <div className="flex justify-between text-slate-600">
-                  <span>Tax:</span>
-                  <span className="font-semibold">৳{selectedOrder.order.tax.toFixed(2)}</span>
+            </div>
+
+            {/* Discount Controls */}
+            <div className="bg-slate-50 rounded-lg p-4 mb-4 border-2 border-slate-200 print:hidden">
+              <h3 className="font-bold text-sm text-slate-700 mb-3">💸 Discount (Optional)</h3>
+
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDiscountType('none')
+                    setDiscountValue(0)
+                  }}
+                  className={`py-2 rounded-lg font-bold text-sm transition-colors ${
+                    discountType === 'none'
+                      ? 'bg-slate-600 text-white'
+                      : 'bg-white text-slate-600 border-2 border-slate-200'
+                  }`}
+                >
+                  No Discount
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDiscountType('percentage')}
+                  className={`py-2 rounded-lg font-bold text-sm transition-colors ${
+                    discountType === 'percentage'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-white text-slate-600 border-2 border-slate-200'
+                  }`}
+                >
+                  Percentage %
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDiscountType('fixed')}
+                  className={`py-2 rounded-lg font-bold text-sm transition-colors ${
+                    discountType === 'fixed'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-slate-600 border-2 border-slate-200'
+                  }`}
+                >
+                  Fixed ৳
+                </button>
+              </div>
+
+              {discountType === 'percentage' && (
+                <div className="mt-3">
+                  <div className="text-xs text-slate-600 mb-2 font-bold">Quick Discounts:</div>
+                  <div className="flex gap-2 flex-wrap">
+                    {[5, 10, 15, 20, 25].map((percent) => (
+                      <button
+                        key={percent}
+                        type="button"
+                        onClick={() => setDiscountValue(percent)}
+                        className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded font-bold text-sm hover:bg-emerald-200 transition-colors"
+                      >
+                        {percent}%
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
-              <div className="flex justify-between text-2xl font-brand font-black text-slate-900 pt-2 border-t border-slate-200">
-                <span>TOTAL:</span>
-                <span className="text-emerald-600">৳{selectedOrder.order.total.toFixed(2)}</span>
-              </div>
+
+              {discountType === 'fixed' && (
+                <div className="mt-3">
+                  <div className="text-xs text-slate-600 mb-2 font-bold">Quick Amounts:</div>
+                  <div className="flex gap-2 flex-wrap">
+                    {[50, 100, 200, 500].map((amount) => (
+                      <button
+                        key={amount}
+                        type="button"
+                        onClick={() => setDiscountValue(amount)}
+                        className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded font-bold text-sm hover:bg-blue-200 transition-colors"
+                      >
+                        ৳{amount}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {discountType !== 'none' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-2">
+                    {discountType === 'percentage' ? 'Discount Percentage' : 'Discount Amount'}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={discountValue}
+                      onChange={(e) => setDiscountValue(parseFloat(e.target.value) || 0)}
+                      min={0}
+                      max={discountType === 'percentage' ? 100 : subtotal}
+                      step={discountType === 'percentage' ? 1 : 10}
+                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg text-slate-900 text-lg font-bold focus:border-emerald-500 focus:outline-none"
+                      placeholder={discountType === 'percentage' ? 'Enter %' : 'Enter amount'}
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-lg">
+                      {discountType === 'percentage' ? '%' : '৳'}
+                    </div>
+                  </div>
+                  {discountAmount > 0 && (
+                    <div className="mt-2 text-sm text-emerald-600 font-bold">
+                      Discount: -৳{discountAmount.toFixed(2)}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Payment Buttons (Hide on Print) */}
