@@ -43,6 +43,7 @@ function POSContent() {
   const [kotSuccess, setKotSuccess] = useState<{ orderNumber: string; total: number } | null>(null)
   const [loadingCategories, setLoadingCategories] = useState(true)
   const [loadingItems, setLoadingItems] = useState(false)
+  const [isPrintingKOT, setIsPrintingKOT] = useState(false)
 
   const { toast, showToast, hideToast } = useToast()
 
@@ -123,6 +124,10 @@ function POSContent() {
   }
 
   const printKOT = (order: { order_number: string; total: number }, cartItems: CartItem[], tableLabel: string) => {
+    if (isPrintingKOT) return
+
+    setIsPrintingKOT(true)
+
     const orderData = {
       order_number: order.order_number,
       total: order.total,
@@ -144,6 +149,7 @@ function POSContent() {
 
       if (!printWindow) {
         showToast('Please allow popups to print KOT', 'error')
+        setIsPrintingKOT(false)
         return
       }
 
@@ -159,14 +165,26 @@ function POSContent() {
                 margin: 0; 
                 size: 80mm auto;
               }
+
+              body {
+                margin: 0;
+                padding: 0;
+              }
+            }
+            
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
             }
             
             body {
               font-family: 'Courier New', monospace;
-              padding: 10px;
-              margin: 0;
-              font-size: 12px;
               width: 80mm;
+              padding: 5mm;
+              font-size: 11px;
+              color: #000;
+              background: #fff;
             }
             
             .header {
@@ -322,12 +340,16 @@ function POSContent() {
       printWindow.onload = () => {
         setTimeout(() => {
           printWindow.print()
-          printWindow.close()
-        }, 250)
+          setTimeout(() => {
+            printWindow.close()
+            setIsPrintingKOT(false)
+          }, 500)
+        }, 300)
       }
     } catch (e) {
       console.error('KOT print failed:', e)
       showToast('Failed to print KOT', 'error')
+      setIsPrintingKOT(false)
     }
   }
 

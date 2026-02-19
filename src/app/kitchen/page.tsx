@@ -76,6 +76,7 @@ export default function KitchenPage() {
 
   // All tables for showing table number/floor on orders (dine-in)
   const [tablesForLabel, setTablesForLabel] = useState<Table[]>([])
+  const [isPrintingKOT, setIsPrintingKOT] = useState(false)
   useEffect(() => {
     getAllTables().then(setTablesForLabel)
   }, [])
@@ -90,6 +91,10 @@ export default function KitchenPage() {
 
   // Manual KOT re-print from Kitchen
   const printKOT = async (order: Order) => {
+    if (isPrintingKOT) return
+
+    setIsPrintingKOT(true)
+
     try {
       const data = await getOrderWithItems(order.id)
 
@@ -116,6 +121,7 @@ export default function KitchenPage() {
 
       if (!printWindow) {
         showToast('Please allow popups to print', 'error')
+        setIsPrintingKOT(false)
         return
       }
 
@@ -131,14 +137,26 @@ export default function KitchenPage() {
                 margin: 0; 
                 size: 80mm auto;
               }
+
+              body {
+                margin: 0;
+                padding: 0;
+              }
+            }
+            
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
             }
             
             body {
               font-family: 'Courier New', monospace;
-              padding: 10px;
-              margin: 0;
-              font-size: 12px;
               width: 80mm;
+              padding: 5mm;
+              font-size: 11px;
+              color: #000;
+              background: #fff;
             }
             
             .header {
@@ -288,12 +306,16 @@ export default function KitchenPage() {
       printWindow.onload = () => {
         setTimeout(() => {
           printWindow.print()
-          printWindow.close()
-        }, 250)
+          setTimeout(() => {
+            printWindow.close()
+            setIsPrintingKOT(false)
+          }, 500)
+        }, 300)
       }
     } catch (e) {
       console.error('KOT re-print failed:', e)
       showToast('Failed to print KOT', 'error')
+      setIsPrintingKOT(false)
     }
   }
 

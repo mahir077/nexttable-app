@@ -23,6 +23,7 @@ export default function BillingPage() {
   const [selectedOrder, setSelectedOrder] = useState<{ order: OrderForBilling; items: OrderItem[] } | null>(null)
   const [loading, setLoading] = useState(true)
   const [processingPayment, setProcessingPayment] = useState(false)
+  const [isPrinting, setIsPrinting] = useState(false)
 
   const { toast, showToast, hideToast } = useToast()
 
@@ -84,12 +85,35 @@ export default function BillingPage() {
 
   // Print bill — choice at print time: open cash drawer or not
   const handlePrint = async (openDrawer: boolean) => {
-    if (openDrawer) await openCashDrawer()
-    window.print()
+    if (!selectedOrder) return
+
+    if (isPrinting) {
+      console.log('Already printing, please wait...')
+      return
+    }
+
+    setIsPrinting(true)
+
+    try {
+      if (openDrawer) {
+        await openCashDrawer()
+      }
+
+      window.print()
+
+      // Reset printing state after print dialog shows
+      setTimeout(() => {
+        setIsPrinting(false)
+      }, 1500)
+    } catch (error) {
+      console.error('Error printing invoice:', error)
+      showToast('Failed to print invoice', 'error')
+      setIsPrinting(false)
+    }
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-3 lg:p-6">
+    <div className="min-h-screen bg-slate-50 p-3 lg:p-6 billing-print">
       {/* Header */}
       <div className="mb-4 lg:mb-6 flex items-center gap-3 lg:gap-4">
         <BackButton />
@@ -284,15 +308,25 @@ export default function BillingPage() {
                 </button>
                 <button
                   onClick={() => handlePrint(true)}
-                  className="py-4 rounded-xl bg-slate-500 hover:bg-slate-600 text-white font-bold text-lg transition-colors"
+                  disabled={isPrinting}
+                  className={`py-4 rounded-xl font-bold text-lg transition-colors ${
+                    isPrinting
+                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                      : 'bg-slate-500 hover:bg-slate-600 text-white'
+                  }`}
                 >
-                  🖨️ Print (open drawer)
+                  {isPrinting ? '🖨️ Printing...' : '🖨️ Print (open drawer)'}
                 </button>
                 <button
                   onClick={() => handlePrint(false)}
-                  className="py-4 rounded-xl bg-slate-400 hover:bg-slate-500 text-white font-bold text-lg transition-colors"
+                  disabled={isPrinting}
+                  className={`py-4 rounded-xl font-bold text-lg transition-colors ${
+                    isPrinting
+                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                      : 'bg-slate-400 hover:bg-slate-500 text-white'
+                  }`}
                 >
-                  🖨️ Print (no drawer)
+                  {isPrinting ? '🖨️ Printing...' : '🖨️ Print (no drawer)'}
                 </button>
               </div>
             </div>

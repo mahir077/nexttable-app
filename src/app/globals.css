@@ -29,6 +29,25 @@ body {
   font-family: var(--font-inter), system-ui, sans-serif;
 }
 
+/* Thermal print defaults (80mm) */
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+  }
+}
+
+.billing-print {
+  width: 72mm;
+  margin: 0 auto;
+  padding: 0 4mm;
+}
+
 @keyframes slideIn {
   from {
     transform: translateX(100%);
