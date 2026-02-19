@@ -1,190 +1,373 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { supabase } from '@/app/lib/api/tables'
 import BackButton from '@/components/BackButton'
+import { useToast } from '@/hooks/useToast'
+import Toast from '@/components/Toast'
 
 interface MenuItem {
   id: string
   name: string
-  name_bangla: string | null
+  making_cost: number
   category: string
-  stock_quantity: number
+}
+
+interface StockSummary {
+  id: string
+  menu_item_id: string
+  current_quantity: number
+  opening_value: number
+  total_in_value: number
+  total_out_value: number
+  current_value: number
+  last_updated: string
+  menu_item?: MenuItem
 }
 
 export default function StockPage() {
-  const [items, setItems] = useState<MenuItem[]>([])
+  const [stockData, setStockData] = useState<StockSummary[]>([])
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [showOpeningModal, setShowOpeningModal] = useState(false)
+  const [selectedItem, setSelectedItem] = useState('')
+  const [openingQty, setOpeningQty] = useState('')
+  const [openingValue, setOpeningValue] = useState('')
+
+  const { toast, showToast, hideToast } = useToast()
 
   useEffect(() => {
-    fetchItems()
+    fetchData()
   }, [])
 
-  const fetchItems = async () => {
+  const fetchData = async () => {
     try {
-      const { data, error } = await supabase
+      setLoading(true)
+
+      // Fetch stock summary with menu items
+      const { data: stockDataRes, error: stockError } = await supabase
+        .from('stock_summary')
+        .select(`
+          *,
+          menu_item:menu_items(id, name, making_cost, category)
+        `)
+        .order('last_updated', { ascending: false })
+
+      if (stockError) throw stockError
+      setStockData(stockDataRes || [])
+
+      // Fetch all menu items for opening balance entry
+      const { data: itemsData } = await supabase
         .from('menu_items')
-        .select('*')
+        .select('id, name, making_cost, category')
         .order('name')
 
-      if (error) throw error
-      setItems(data || [])
+      setMenuItems(itemsData || [])
     } catch (error) {
       console.error('Error:', error)
+      showToast('Failed to load stock data', 'error')
     } finally {
       setLoading(false)
     }
   }
 
-  const updateStock = async (itemId: string, change: number) => {
-    const item = items.find(i => i.id === itemId)
-    if (!item) return
+  const handleSetOpening = async (e: React.FormEvent) => {
+    e.preventDefault()
 
-    const newQuantity = Math.max(0, (item.stock_quantity || 0) + change)
+    if (!selectedItem || !openingQty || !openingValue) {
+      showToast('Please fill all fields', 'error')
+      return
+    }
 
     try {
-      const { error } = await supabase
-        .from('menu_items')
-        .update({ stock_quantity: newQuantity })
-        .eq('id', itemId)
+      const quantity = parseFloat(openingQty)
+      const value = parseFloat(openingValue)
 
-      if (error) throw error
-      fetchItems()
+      // Create opening stock movement
+      const { error: movementError } = await supabase
+        .from('stock_movements')
+        .insert({
+          menu_item_id: selectedItem,
+          movement_type: 'opening',
+          quantity: quantity,
+          unit_cost: value / quantity,
+          total_value: value,
+          notes: 'Opening stock balance'
+        })
+
+      if (movementError) throw movementError
+
+      // Update stock summary
+      const { error: summaryError } = await supabase
+        .from('stock_summary')
+        .upsert({
+          menu_item_id: selectedItem,
+          current_quantity: quantity,
+          opening_value: value,
+          total_in_value: 0,
+          total_out_value: 0,
+          current_value: value,
+          last_updated: new Date().toISOString()
+        }, {
+          onConflict: 'menu_item_id'
+        })
+
+      if (summaryError) throw summaryError
+
+      showToast('✅ Opening balance set!', 'success')
+      setShowOpeningModal(false)
+      setSelectedItem('')
+      setOpeningQty('')
+      setOpeningValue('')
+      fetchData()
     } catch (error) {
       console.error('Error:', error)
-      alert('Failed to update stock')
+      showToast('Failed to set opening balance', 'error')
     }
   }
 
-  const filteredItems = items.filter(item =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (item.name_bangla?.toLowerCase().includes(searchQuery.toLowerCase()))
-  )
-
-  const lowStock = items.filter(i => (i.stock_quantity || 0) < 10).length
-  const outOfStock = items.filter(i => (i.stock_quantity || 0) === 0).length
+  // Calculate totals
+  const totalStockValue = stockData.reduce((sum, item) => sum + (item.current_value || 0), 0)
+  const totalInValue = stockData.reduce((sum, item) => sum + (item.total_in_value || 0), 0)
+  const totalOutValue = stockData.reduce((sum, item) => sum + (item.total_out_value || 0), 0)
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
+    <div className="min-h-screen bg-slate-50 p-3 lg:p-6">
       {/* Header */}
-      <div className="mb-6 flex items-center gap-4">
-        <BackButton />
-        <div>
-          <h1 className="text-3xl font-brand font-black text-slate-900">📦 STOCK</h1>
-          <p className="text-slate-600">Inventory management</p>
+      <div className="mb-4 lg:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-3 lg:gap-4">
+          <BackButton />
+          <div>
+            <h1 className="text-2xl lg:text-4xl font-brand font-black text-slate-900">📦 STOCK VALUE</h1>
+            <p className="text-xs lg:text-sm text-slate-600">Value-based inventory tracking</p>
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <Link
+            href="/stock/ledger"
+            className="px-4 py-3 bg-slate-600 text-white rounded-lg font-bold hover:bg-slate-700 text-center"
+          >
+            📜 View Ledger
+          </Link>
+          <button
+            onClick={() => setShowOpeningModal(true)}
+            className="px-6 py-3 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600"
+          >
+            📝 Set Opening Balance
+          </button>
         </div>
       </div>
 
-      {/* Stats - compact */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        <div className="bg-white rounded-lg p-3 border border-slate-200">
-          <div className="text-xs text-slate-500">Total Items</div>
-          <div className="text-xl font-bold text-slate-900">{items.length}</div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 lg:gap-4 mb-6">
+        <div className="bg-blue-50 rounded-xl p-4 border-2 border-blue-200">
+          <div className="text-xs text-blue-600 mb-1">Current Stock Value</div>
+          <div className="text-2xl lg:text-3xl font-bold text-blue-700">
+            ৳{totalStockValue.toFixed(2)}
+          </div>
         </div>
-        <div className="bg-white rounded-lg p-3 border border-orange-200">
-          <div className="text-xs text-orange-600">Low Stock</div>
-          <div className="text-xl font-bold text-orange-600">{lowStock}</div>
+
+        <div className="bg-emerald-50 rounded-xl p-4 border-2 border-emerald-200">
+          <div className="text-xs text-emerald-600 mb-1">Total IN (Purchases)</div>
+          <div className="text-2xl lg:text-3xl font-bold text-emerald-700">
+            ৳{totalInValue.toFixed(2)}
+          </div>
         </div>
-        <div className="bg-white rounded-lg p-3 border border-red-200">
-          <div className="text-xs text-red-600">Out of Stock</div>
-          <div className="text-xl font-bold text-red-600">{outOfStock}</div>
+
+        <div className="bg-red-50 rounded-xl p-4 border-2 border-red-200">
+          <div className="text-xs text-red-600 mb-1">Total OUT (Sales)</div>
+          <div className="text-2xl lg:text-3xl font-bold text-red-700">
+            ৳{totalOutValue.toFixed(2)}
+          </div>
+        </div>
+
+        <div className="bg-purple-50 rounded-xl p-4 border-2 border-purple-200">
+          <div className="text-xs text-purple-600 mb-1">Total Items</div>
+          <div className="text-2xl lg:text-3xl font-bold text-purple-700">
+            {stockData.length}
+          </div>
         </div>
       </div>
 
-      {/* Search - compact */}
-      <div className="mb-4">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search items..."
-          className="w-full px-4 py-2 rounded-lg border border-slate-200 text-slate-900 focus:border-emerald-500 focus:outline-none placeholder:text-slate-400"
-        />
-      </div>
+      {/* Opening Balance Modal */}
+      {showOpeningModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold">Set Opening Balance</h2>
+              <button type="button" onClick={() => setShowOpeningModal(false)} className="text-2xl">×</button>
+            </div>
 
-      {/* Table - cleaner */}
-      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[500px]">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="px-3 py-2 text-left text-xs font-bold text-slate-600">ITEM</th>
-                <th className="px-3 py-2 text-left text-xs font-bold text-slate-600">CATEGORY</th>
-                <th className="px-3 py-2 text-center text-xs font-bold text-slate-600">STOCK</th>
-                <th className="px-3 py-2 text-center text-xs font-bold text-slate-600">ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
+            <form onSubmit={handleSetOpening} className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">
+                  Select Item *
+                </label>
+                <select
+                  value={selectedItem}
+                  onChange={(e) => setSelectedItem(e.target.value)}
+                  required
+                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg text-slate-900"
+                >
+                  <option value="">Choose item...</option>
+                  {menuItems.map(item => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} (Cost: ৳{item.making_cost})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">
+                  Opening Quantity *
+                </label>
+                <input
+                  type="number"
+                  value={openingQty}
+                  onChange={(e) => setOpeningQty(e.target.value)}
+                  step="0.01"
+                  min="0"
+                  required
+                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg text-slate-900"
+                  placeholder="e.g., 100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">
+                  Opening Value (৳) *
+                </label>
+                <input
+                  type="number"
+                  value={openingValue}
+                  onChange={(e) => setOpeningValue(e.target.value)}
+                  step="0.01"
+                  min="0"
+                  required
+                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg text-slate-900"
+                  placeholder="e.g., 5000.00"
+                />
+                {openingQty && openingValue && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    Unit cost: ৳{(parseFloat(openingValue) / parseFloat(openingQty)).toFixed(2)}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowOpeningModal(false)}
+                  className="flex-1 px-4 py-3 bg-slate-200 text-slate-700 rounded-lg font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-3 bg-emerald-500 text-white rounded-lg font-bold"
+                >
+                  Set Balance
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Stock Table */}
+      {loading ? (
+        <div className="bg-white rounded-xl p-12 text-center">
+          <div className="text-4xl mb-3">⏳</div>
+          <div className="text-slate-500">Loading...</div>
+        </div>
+      ) : stockData.length === 0 ? (
+        <div className="bg-white rounded-xl p-12 text-center border-2 border-slate-200">
+          <div className="text-6xl mb-4">📦</div>
+          <div className="text-xl font-bold text-slate-900 mb-2">No Stock Data Yet</div>
+          <div className="text-slate-600 mb-4">Set opening balances or make purchases to start tracking</div>
+          <div className="flex flex-wrap gap-3 justify-center">
+            <Link
+              href="/stock/ledger"
+              className="px-6 py-3 bg-slate-600 text-white rounded-lg font-bold hover:bg-slate-700"
+            >
+              📜 View Ledger
+            </Link>
+            <button
+              onClick={() => setShowOpeningModal(true)}
+              className="px-6 py-3 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600"
+            >
+              📝 Set Opening Balance
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] text-sm">
+              <thead className="bg-slate-50 border-b">
                 <tr>
-                  <td colSpan={4} className="px-3 py-8 text-center text-slate-500">Loading...</td>
+                  <th className="px-4 py-3 text-left text-xs font-bold">Item Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold">Category</th>
+                  <th className="px-4 py-3 text-right text-xs font-bold">Quantity</th>
+                  <th className="px-4 py-3 text-right text-xs font-bold">Opening Value</th>
+                  <th className="px-4 py-3 text-right text-xs font-bold">IN (+৳)</th>
+                  <th className="px-4 py-3 text-right text-xs font-bold">OUT (-৳)</th>
+                  <th className="px-4 py-3 text-right text-xs font-bold">Current Value</th>
                 </tr>
-              ) : filteredItems.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-3 py-8 text-center text-slate-500">No items found</td>
+              </thead>
+              <tbody>
+                {stockData.map(item => (
+                  <tr key={item.id} className="border-b hover:bg-slate-50">
+                    <td className="px-4 py-3 font-bold text-slate-900">
+                      {item.menu_item?.name}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 capitalize">
+                      {item.menu_item?.category}
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold">
+                      {item.current_quantity.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-blue-600">
+                      ৳{item.opening_value.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-emerald-600 font-bold">
+                      +৳{item.total_in_value.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-red-600 font-bold">
+                      -৳{item.total_out_value.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-black text-lg text-slate-900">
+                      ৳{item.current_value.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+
+                {/* Totals Row */}
+                <tr className="border-t-2 bg-slate-100 font-bold">
+                  <td colSpan={3} className="px-4 py-4 text-right">TOTAL:</td>
+                  <td className="px-4 py-4 text-right text-blue-700">
+                    ৳{stockData.reduce((s, i) => s + i.opening_value, 0).toFixed(2)}
+                  </td>
+                  <td className="px-4 py-4 text-right text-emerald-700">
+                    +৳{totalInValue.toFixed(2)}
+                  </td>
+                  <td className="px-4 py-4 text-right text-red-700">
+                    -৳{totalOutValue.toFixed(2)}
+                  </td>
+                  <td className="px-4 py-4 text-right text-xl text-slate-900">
+                    ৳{totalStockValue.toFixed(2)}
+                  </td>
                 </tr>
-              ) : (
-                filteredItems.map((item) => {
-                  const stock = item.stock_quantity || 0
-                  return (
-                    <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="px-3 py-2">
-                        <div className="font-medium text-slate-900">{item.name}</div>
-                        {item.name_bangla && (
-                          <div className="text-xs text-slate-500">{item.name_bangla}</div>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-slate-600">{item.category}</td>
-                      <td className="px-3 py-2 text-center">
-                        <span
-                          className={`text-lg font-bold ${
-                            stock === 0 ? 'text-red-600' : stock < 10 ? 'text-orange-600' : 'text-emerald-600'
-                          }`}
-                        >
-                          {stock}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex justify-center gap-1 flex-wrap">
-                          <button
-                            type="button"
-                            onClick={() => updateStock(item.id, -10)}
-                            className="px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-bold"
-                          >
-                            -10
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => updateStock(item.id, -1)}
-                            className="px-2 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded text-xs font-bold"
-                          >
-                            -1
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => updateStock(item.id, 1)}
-                            className="px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs font-bold"
-                          >
-                            +1
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => updateStock(item.id, 10)}
-                            className="px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-bold"
-                          >
-                            +10
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
+
+      {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
     </div>
   )
 }

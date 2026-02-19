@@ -27,6 +27,8 @@ interface Order {
     item_name: string
     item_name_bangla: string | null
     subtotal?: number
+    menu_item_id?: string | null
+    menu_item?: { id: string; making_cost?: number } | null
   }>
 }
 
@@ -99,7 +101,9 @@ export default function BillingPage() {
             unit_price,
             item_name,
             item_name_bangla,
-            subtotal
+            subtotal,
+            menu_item_id,
+            menu_item:menu_items(id, making_cost)
           )
         `)
         .in('status', ['ready', 'preparing', 'kot_sent', 'pending'])
@@ -252,6 +256,37 @@ export default function BillingPage() {
       }
 
       console.log('Order updated successfully')
+
+      // Auto-deduct stock value on sale
+      const items = selectedOrder.order_items || []
+      if (items.length > 0) {
+        const stockMovements = items
+          .filter(item => item.menu_item_id || item.menu_item?.id)
+          .map(item => {
+            const menuItemId = item.menu_item_id ?? item.menu_item?.id ?? ''
+            const makingCost = item.menu_item?.making_cost ?? 0
+            const qty = item.quantity
+            return {
+              menu_item_id: menuItemId,
+              movement_type: 'sale',
+              quantity: qty,
+              unit_cost: makingCost,
+              total_value: makingCost * qty,
+              reference_type: 'order',
+              reference_id: selectedOrder.id,
+              notes: `Sale - Order ${selectedOrder.order_number}`
+            }
+          })
+        if (stockMovements.length > 0) {
+          const { error: movementsError } = await supabase
+            .from('stock_movements')
+            .insert(stockMovements)
+          if (movementsError) {
+            console.error('Stock deduction error:', movementsError)
+            // Don't throw - payment already completed
+          }
+        }
+      }
 
       // Update table status if dine-in
       if (selectedOrder.table_id) {
