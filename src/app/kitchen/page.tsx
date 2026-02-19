@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getOrders, getOrderWithItems, updateOrderStatus } from '@/app/lib/api/orders'
+import { getOrders, getOrderWithItems } from '@/app/lib/api/orders'
 import { supabase } from '@/app/lib/api/orders'
 import { getFloors, getTablesByFloor, getAllTables, type Floor, type Table } from '@/app/lib/api/tables'
 import { getCategories, getMenuItemsByCategory, getAllMenuItems, type MenuItem } from '@/app/lib/api/menu'
@@ -76,13 +76,39 @@ export default function KitchenPage() {
       const activeOrders = data.filter(order =>
         order.status === 'pending' ||
         order.status === 'preparing' ||
-        order.status === 'ready'
+        order.status === 'ready' ||
+        order.status === 'served'
       )
       setOrders(activeOrders)
     } catch (error) {
       console.error('Error fetching pending orders (kitchen):', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleStatusChange = async (orderId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: newStatus })
+        .eq('id', orderId)
+
+      if (error) {
+        console.error('Error updating status:', error)
+        alert('Failed to update status')
+        return
+      }
+
+      // Close details modal if open
+      setSelectedOrder(null)
+      // Refresh orders list
+      fetchOrders()
+      // Show success message
+      alert(`✅ Order status changed to ${newStatus}`)
+    } catch (error) {
+      console.error('Error:', error)
+      alert('Failed to update status')
     }
   }
 
@@ -101,21 +127,45 @@ export default function KitchenPage() {
     }
   }
 
-  const handleStatusUpdate = async (orderId: string, newStatus: string) => {
-    const success = await updateOrderStatus(orderId, newStatus)
-    if (success) {
-      fetchOrders()
-      setSelectedOrder(null)
+  const getStatusBadge = (status: string) => {
+    const badges: Record<string, { bg: string; text: string; border: string; icon: string; label: string }> = {
+      pending: {
+        bg: 'bg-orange-100',
+        text: 'text-orange-700',
+        border: 'border-orange-200',
+        icon: '🟠',
+        label: 'Pending'
+      },
+      preparing: {
+        bg: 'bg-blue-100',
+        text: 'text-blue-700',
+        border: 'border-blue-200',
+        icon: '🔵',
+        label: 'Preparing'
+      },
+      ready: {
+        bg: 'bg-emerald-100',
+        text: 'text-emerald-700',
+        border: 'border-emerald-200',
+        icon: '🟢',
+        label: 'Ready'
+      },
+      served: {
+        bg: 'bg-slate-100',
+        text: 'text-slate-500',
+        border: 'border-slate-200',
+        icon: '✅',
+        label: 'Served'
+      }
     }
-  }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return 'bg-orange-500'
-      case 'preparing': return 'bg-blue-500'
-      case 'ready': return 'bg-emerald-500'
-      default: return 'bg-slate-500'
-    }
+    const badge = badges[status] || badges.pending
+
+    return (
+      <div className={`px-3 py-1 rounded-full text-xs font-bold border-2 flex-shrink-0 ${badge.bg} ${badge.text} ${badge.border}`}>
+        {badge.icon} {badge.label}
+      </div>
+    )
   }
 
   const formatTime = (dateString: string) => {
@@ -347,6 +397,91 @@ export default function KitchenPage() {
     }
   }
 
+  const pendingOrders = orders.filter(o => o.status === 'pending')
+  const preparingOrders = orders.filter(o => o.status === 'preparing')
+  const readyOrders = orders.filter(o => o.status === 'ready')
+  const servedOrders = orders.filter(o => o.status === 'served')
+
+  const OrderCard = ({ order }: { order: Order }) => (
+    <div className="bg-white rounded-lg border border-slate-200 p-3 hover:shadow-md transition-all text-left">
+      <div
+        className="cursor-pointer"
+        onClick={() => viewOrderDetails(order)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') viewOrderDetails(order) }}
+      >
+        <div className="flex justify-between items-start mb-2 gap-2">
+          <div className="text-sm font-black text-slate-900 truncate min-w-0">{order.order_number}</div>
+          {getStatusBadge(order.status)}
+        </div>
+        <div className="flex items-center gap-1 text-slate-500 text-xs mb-1">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {formatTime(order.created_at)}
+        </div>
+        <div className="text-sm font-bold text-slate-900">৳{order.total.toFixed(2)}</div>
+      </div>
+      <div className="flex flex-col gap-1 mt-2 pt-2 border-t border-slate-100">
+        {order.status === 'pending' && (
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); handleStatusChange(order.id, 'preparing') }}
+            className="w-full py-2 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 transition-colors"
+          >
+            🔵 Start Preparing
+          </button>
+        )}
+        {order.status === 'preparing' && (
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); handleStatusChange(order.id, 'ready') }}
+            className="w-full py-2 bg-emerald-500 text-white rounded-lg font-bold hover:bg-emerald-600 transition-colors"
+          >
+            🟢 Mark Ready
+          </button>
+        )}
+        {order.status === 'ready' && (
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); handleStatusChange(order.id, 'served') }}
+            className="w-full py-2 bg-slate-500 text-white rounded-lg font-bold hover:bg-slate-600 transition-colors"
+          >
+            ✅ Mark Served
+          </button>
+        )}
+        {order.status === 'served' && (
+          <div className="text-center py-2 text-slate-500 font-bold">
+            Completed
+          </div>
+        )}
+        {(order.status === 'pending' || order.status === 'preparing') && (
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); openEditModal(order) }}
+              className="flex-1 py-1.5 bg-slate-500 hover:bg-slate-600 text-white rounded text-xs font-bold"
+              title="Edit order"
+            >
+              ✏️
+            </button>
+            {order.status === 'pending' && (
+              <button
+                type="button"
+                onClick={e => { e.stopPropagation(); openDeleteModal(order) }}
+                className="py-1.5 px-2 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-bold"
+                title="Delete order"
+              >
+                🗑️
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
   return (
     <div className="min-h-screen bg-slate-900 text-white p-4 lg:p-6">
       <div className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -379,83 +514,65 @@ export default function KitchenPage() {
           description="No pending orders. Kitchen is ready for new orders!"
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {orders.map((order) => (
-            <div
-              key={order.id}
-              className="bg-white rounded-lg border border-slate-200 p-3 hover:shadow-md transition-all text-left"
-            >
-              {/* Order info - compact */}
-              <div
-                className="cursor-pointer"
-                onClick={() => viewOrderDetails(order)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') viewOrderDetails(order) }}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <div className="text-sm font-black text-slate-900 truncate">{order.order_number}</div>
-                  <span className={`px-2 py-0.5 rounded text-xs font-bold flex-shrink-0 ${
-                    order.status === 'pending' ? 'bg-orange-100 text-orange-700' :
-                    order.status === 'preparing' ? 'bg-blue-100 text-blue-700' :
-                    'bg-emerald-100 text-emerald-700'
-                  }`}>
-                    {order.status}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 text-slate-500 text-xs mb-1">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {formatTime(order.created_at)}
-                </div>
-                <div className="text-sm font-bold text-slate-900">৳{order.total.toFixed(2)}</div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            {/* Pending Column */}
+            <div>
+              <div className="bg-orange-50 rounded-lg p-3 mb-3 border-2 border-orange-200">
+                <h3 className="font-bold text-orange-700 flex items-center justify-between">
+                  <span>🟠 Pending</span>
+                  <span className="text-2xl">{pendingOrders.length}</span>
+                </h3>
               </div>
-
-              {/* Buttons - compact */}
-              <div className="flex gap-1 mt-2 pt-2 border-t border-slate-100">
-                {order.status === 'pending' && (
-                  <button
-                    type="button"
-                    onClick={e => { e.stopPropagation(); handleStatusUpdate(order.id, 'preparing') }}
-                    className="flex-1 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-bold"
-                  >
-                    Start
-                  </button>
-                )}
-                {order.status === 'preparing' && (
-                  <button
-                    type="button"
-                    onClick={e => { e.stopPropagation(); handleStatusUpdate(order.id, 'ready') }}
-                    className="flex-1 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs font-bold"
-                  >
-                    Ready
-                  </button>
-                )}
-                {(order.status === 'pending' || order.status === 'preparing') && (
-                  <button
-                    type="button"
-                    onClick={e => { e.stopPropagation(); openEditModal(order) }}
-                    className="py-1.5 px-2 bg-slate-500 hover:bg-slate-600 text-white rounded text-xs font-bold"
-                    title="Edit order"
-                  >
-                    ✏️
-                  </button>
-                )}
-                {order.status === 'pending' && (
-                  <button
-                    type="button"
-                    onClick={e => { e.stopPropagation(); openDeleteModal(order) }}
-                    className="py-1.5 px-2 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-bold"
-                    title="Delete order"
-                  >
-                    🗑️
-                  </button>
-                )}
+              <div className="space-y-3">
+                {pendingOrders.map(order => (
+                  <OrderCard key={order.id} order={order} />
+                ))}
               </div>
             </div>
-          ))}
-        </div>
+
+            {/* Preparing Column */}
+            <div>
+              <div className="bg-blue-50 rounded-lg p-3 mb-3 border-2 border-blue-200">
+                <h3 className="font-bold text-blue-700 flex items-center justify-between">
+                  <span>🔵 Preparing</span>
+                  <span className="text-2xl">{preparingOrders.length}</span>
+                </h3>
+              </div>
+              <div className="space-y-3">
+                {preparingOrders.map(order => (
+                  <OrderCard key={order.id} order={order} />
+                ))}
+              </div>
+            </div>
+
+            {/* Ready Column */}
+            <div>
+              <div className="bg-emerald-50 rounded-lg p-3 mb-3 border-2 border-emerald-200">
+                <h3 className="font-bold text-emerald-700 flex items-center justify-between">
+                  <span>🟢 Ready</span>
+                  <span className="text-2xl">{readyOrders.length}</span>
+                </h3>
+              </div>
+              <div className="space-y-3">
+                {readyOrders.map(order => (
+                  <OrderCard key={order.id} order={order} />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Served Today - Collapsed */}
+          {servedOrders.length > 0 && (
+            <div className="mt-6">
+              <div className="bg-slate-50 rounded-lg p-3 border-2 border-slate-200">
+                <h3 className="font-bold text-slate-600">
+                  ✅ Served Today ({servedOrders.length})
+                </h3>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Order Details Modal */}
@@ -492,14 +609,24 @@ export default function KitchenPage() {
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
               {selectedOrder.order.status === 'pending' && (
-                <button onClick={() => handleStatusUpdate(selectedOrder.order.id, 'preparing')} className="w-full sm:flex-1 min-h-[44px] py-4 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold text-base lg:text-lg transition-colors">
-                  🔥 Start Preparing
+                <button onClick={() => handleStatusChange(selectedOrder.order.id, 'preparing')} className="w-full sm:flex-1 min-h-[44px] py-4 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold text-base lg:text-lg transition-colors">
+                  🔵 Start Preparing
                 </button>
               )}
               {selectedOrder.order.status === 'preparing' && (
-                <button onClick={() => handleStatusUpdate(selectedOrder.order.id, 'ready')} className="w-full sm:flex-1 min-h-[44px] py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-base lg:text-lg transition-colors">
-                  ✅ Mark as Ready
+                <button onClick={() => handleStatusChange(selectedOrder.order.id, 'ready')} className="w-full sm:flex-1 min-h-[44px] py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-base lg:text-lg transition-colors">
+                  🟢 Mark Ready
                 </button>
+              )}
+              {selectedOrder.order.status === 'ready' && (
+                <button onClick={() => handleStatusChange(selectedOrder.order.id, 'served')} className="w-full sm:flex-1 min-h-[44px] py-4 rounded-xl bg-slate-500 hover:bg-slate-600 text-white font-bold text-base lg:text-lg transition-colors">
+                  ✅ Mark Served
+                </button>
+              )}
+              {selectedOrder.order.status === 'served' && (
+                <div className="text-center py-4 text-slate-500 font-bold text-base lg:text-lg">
+                  Completed
+                </div>
               )}
             </div>
           </div>
