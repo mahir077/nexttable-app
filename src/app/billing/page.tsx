@@ -347,7 +347,7 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-3 lg:p-6 billing-print">
+    <div className="min-h-screen bg-slate-50 px-3 py-3 lg:px-6 lg:py-6 billing-print">
       {/* Header */}
       <div className="mb-4 lg:mb-6 flex items-center gap-3 lg:gap-4">
         <BackButton />
@@ -364,25 +364,25 @@ export default function BillingPage() {
       ) : (
         <div className="max-w-5xl mx-auto">
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 mb-5">
             <div className="bg-red-50 rounded-xl p-4 border-2 border-red-200">
               <div className="text-xs text-red-600 mb-1">Pending Bills</div>
-              <div className="text-3xl font-bold text-red-700">{pendingOrders.length}</div>
+              <div className="text-2xl md:text-3xl font-bold text-red-700">{pendingOrders.length}</div>
             </div>
             <div className="bg-blue-50 rounded-xl p-4 border-2 border-blue-200">
               <div className="text-xs text-blue-600 mb-1">Total Amount</div>
-              <div className="text-3xl font-bold text-blue-700">
+              <div className="text-2xl md:text-3xl font-bold text-blue-700">
                 ৳{pendingOrders.reduce((sum, o) => sum + (o.total || 0), 0).toFixed(2)}
               </div>
             </div>
             <div className="bg-emerald-50 rounded-xl p-4 border-2 border-emerald-200">
               <div className="text-xs text-emerald-600 mb-1">Completed Today</div>
-              <div className="text-3xl font-bold text-emerald-700">{completedToday}</div>
+              <div className="text-2xl md:text-3xl font-bold text-emerald-700">{completedToday}</div>
             </div>
           </div>
 
           {/* Pending Bills - Simple Responsive Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
             {pendingOrders.map((order) => (
               <div
                 key={order.id}
@@ -404,7 +404,7 @@ export default function BillingPage() {
                   </div>
                   <div className="text-right">
                     <div className="text-[11px] font-semibold text-slate-600">TOTAL BILL</div>
-                    <div className="text-2xl font-black text-emerald-600 leading-tight">
+                    <div className="text-xl md:text-2xl font-black text-emerald-600 leading-tight">
                       ৳{(order.total ?? 0).toFixed(2)}
                     </div>
                   </div>
