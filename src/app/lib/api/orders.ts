@@ -12,7 +12,7 @@ export interface Order {
   order_number: string
   table_id: string | null
   order_type: 'dine-in' | 'takeaway' | 'online' | 'event'
-  status: 'pending' | 'preparing' | 'ready' | 'served' | 'paid' | 'cancelled'
+  status: 'pending' | 'preparing' | 'ready' | 'served' | 'paid' | 'cancelled' | 'rejected'
   subtotal: number
   tax: number
   discount: number
@@ -28,6 +28,9 @@ export interface Order {
   updated_at: string
   payment_method?: string
   paid_at?: string
+  rejection_reason?: string | null
+  rejected_at?: string | null
+  rejected_by?: string | null
 }
 
 export interface OrderItem {

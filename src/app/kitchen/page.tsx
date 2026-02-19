@@ -19,6 +19,8 @@ interface Order {
   created_at: string
   table_id?: string | null
   order_type?: string
+  rejection_reason?: string | null
+  rejected_at?: string | null
 }
 
 interface OrderItem {
@@ -71,6 +73,12 @@ export default function KitchenPage() {
   const [deleteOrder, setDeleteOrder] = useState<Order | null>(null)
   const [deleteReason, setDeleteReason] = useState('')
   const [deleteLoading, setDeleteLoading] = useState(false)
+
+  // Reject Order
+  const [showRejectModal, setShowRejectModal] = useState(false)
+  const [rejectOrderId, setRejectOrderId] = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [showRejected, setShowRejected] = useState(false)
 
   const { toast, showToast, hideToast } = useToast()
 
@@ -326,7 +334,8 @@ export default function KitchenPage() {
         order.status === 'pending' ||
         order.status === 'preparing' ||
         order.status === 'ready' ||
-        order.status === 'served'
+        order.status === 'served' ||
+        order.status === 'rejected'
       )
       setOrders(activeOrders)
     } catch (error) {
@@ -645,10 +654,44 @@ export default function KitchenPage() {
     }
   }
 
+  const handleRejectOrder = async () => {
+    if (!rejectOrderId) return
+
+    if (!rejectReason.trim()) {
+      showToast('Please provide a reason for rejection', 'error')
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          status: 'rejected',
+          rejected_at: new Date().toISOString(),
+          rejected_by: 'Kitchen Staff',
+          rejection_reason: rejectReason
+        })
+        .eq('id', rejectOrderId)
+
+      if (error) throw error
+
+      showToast('✅ Order rejected', 'success')
+
+      setShowRejectModal(false)
+      setRejectOrderId(null)
+      setRejectReason('')
+      fetchOrders()
+    } catch (error) {
+      console.error('Reject error:', error)
+      showToast('Failed to reject order', 'error')
+    }
+  }
+
   const pendingOrders = orders.filter(o => o.status === 'pending')
   const preparingOrders = orders.filter(o => o.status === 'preparing')
   const readyOrders = orders.filter(o => o.status === 'ready')
   const servedOrders = orders.filter(o => o.status === 'served')
+  const rejectedOrders = orders.filter(o => o.status === 'rejected')
 
   const OrderCard = ({ order }: { order: Order }) => (
     <div
@@ -744,6 +787,27 @@ export default function KitchenPage() {
               )}
             </div>
           )}
+          {(order.status === 'pending' || order.status === 'preparing') && (
+            <button
+              type="button"
+              onClick={e => {
+                e.stopPropagation()
+                setRejectOrderId(order.id)
+                setRejectReason('')
+                setShowRejectModal(true)
+              }}
+              className="w-full py-2 bg-red-500 text-white rounded-lg font-bold hover:bg-red-600 transition-colors flex items-center justify-center gap-2 text-sm"
+            >
+              ❌ Reject Order
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); printKOT(order) }}
+            className="w-full py-2 bg-slate-600 text-white rounded-lg font-bold hover:bg-slate-700 transition-colors flex items-center justify-center gap-2 text-sm"
+          >
+            🖨️ Print KOT
+          </button>
         </div>
       </div>
     </div>
@@ -852,6 +916,59 @@ export default function KitchenPage() {
                   <span>✅ Served today</span>
                   <span className="bg-slate-600 text-slate-200 rounded-full px-2.5 py-0.5 font-black tabular-nums">{servedOrders.length}</span>
                 </h3>
+              </div>
+            </div>
+          )}
+
+          {/* Rejected Orders - Collapsible */}
+          {rejectedOrders.length > 0 && (
+            <div className="mt-6">
+              <div className="bg-red-950/40 rounded-xl p-4 border-2 border-red-800/60">
+                <h3 className="font-bold text-red-300 text-sm mb-3 flex items-center justify-between">
+                  <span>❌ Rejected today ({rejectedOrders.length})</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowRejected(!showRejected)}
+                    className="text-sm px-3 py-1.5 bg-red-900/60 text-red-200 rounded-lg hover:bg-red-800/60 transition-colors"
+                  >
+                    {showRejected ? 'Hide' : 'Show'}
+                  </button>
+                </h3>
+                {showRejected && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
+                    {rejectedOrders.map(order => (
+                      <div key={order.id} className="bg-slate-800/80 rounded-lg p-3 border border-red-800/50">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="text-sm font-bold text-white tabular-nums">{order.order_number}</div>
+                          <span className="px-2 py-0.5 bg-red-900/60 text-red-300 rounded text-xs font-bold border border-red-700/50">
+                            REJECTED
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-400 mb-2">
+                          🪑 {getOrderTableLabel(order)}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => viewOrderDetails(order)}
+                          className="text-xs text-emerald-400 hover:text-emerald-300 mb-2"
+                        >
+                          View details
+                        </button>
+                        {order.rejection_reason && (
+                          <div className="mt-2 p-2 bg-red-950/40 rounded border border-red-800/40">
+                            <div className="text-xs font-bold text-red-400 mb-1">Reason</div>
+                            <div className="text-xs text-red-300/90">{order.rejection_reason}</div>
+                          </div>
+                        )}
+                        {order.rejected_at && (
+                          <div className="text-xs text-slate-500 mt-2">
+                            Rejected: {new Date(order.rejected_at).toLocaleTimeString()}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1045,6 +1162,95 @@ export default function KitchenPage() {
             <div className="flex flex-col sm:flex-row gap-3">
               <button type="button" onClick={() => setShowDeleteModal(false)} className="flex-1 min-h-[48px] py-3 rounded-xl bg-slate-700 text-white font-bold hover:bg-slate-600 transition-colors border border-slate-600">Cancel</button>
               <button type="button" onClick={handleDeleteOrder} disabled={deleteLoading || !deleteReason.trim()} className="flex-1 min-h-[48px] py-3 rounded-xl bg-red-600 text-white font-bold hover:bg-red-500 disabled:opacity-50 transition-all active:scale-[0.98]">{deleteLoading ? 'Deleting...' : 'Delete'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Order Modal */}
+      {showRejectModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-slate-900">❌ Reject Order</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRejectModal(false)
+                  setRejectOrderId(null)
+                  setRejectReason('')
+                }}
+                className="text-slate-400 hover:text-slate-600 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-sm text-slate-600 mb-4">
+                Please provide a reason for rejecting this order. This will be logged for records.
+              </p>
+
+              <label className="block text-sm font-bold text-slate-700 mb-2">
+                Rejection Reason *
+              </label>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="e.g., Out of stock, Wrong order, Customer cancelled..."
+                rows={4}
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg text-slate-900 focus:border-red-500 focus:outline-none resize-none"
+                autoFocus
+              />
+            </div>
+
+            {/* Quick reason buttons */}
+            <div className="mb-4">
+              <div className="text-xs text-slate-600 mb-2 font-bold">Quick Reasons:</div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  'Out of stock',
+                  'Wrong order',
+                  'Customer cancelled',
+                  'Kitchen too busy',
+                  'Item unavailable'
+                ].map(reason => (
+                  <button
+                    key={reason}
+                    type="button"
+                    onClick={() => setRejectReason(reason)}
+                    className="px-3 py-1.5 bg-red-50 text-red-700 rounded-lg text-xs font-semibold hover:bg-red-100 transition-colors"
+                  >
+                    {reason}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRejectModal(false)
+                  setRejectOrderId(null)
+                  setRejectReason('')
+                }}
+                className="flex-1 px-4 py-3 bg-slate-200 text-slate-700 rounded-lg font-bold hover:bg-slate-300 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRejectOrder}
+                disabled={!rejectReason.trim()}
+                className={`flex-1 px-4 py-3 rounded-lg font-bold transition-colors ${
+                  rejectReason.trim()
+                    ? 'bg-red-500 text-white hover:bg-red-600'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                }`}
+              >
+                Reject Order
+              </button>
             </div>
           </div>
         </div>
