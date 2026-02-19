@@ -145,28 +145,34 @@ export default function BillingPage() {
     }
 
     try {
-      console.log('Completing payment for order:', selectedOrder.id)
-      console.log('Payment method:', selectedPaymentMethod)
-      console.log('Final total:', finalTotal)
+      console.log('Completing payment for:', selectedOrder.id)
 
-      // Update order with only the columns that exist
+      // Build update object with only essential fields
       const updateData: Record<string, unknown> = {
         status: 'completed',
-        payment_method: selectedPaymentMethod,
-        completed_at: new Date().toISOString()
+        payment_method: selectedPaymentMethod
       }
 
-      // Add discount info only if columns exist
-      if (discountType !== 'none') {
-        updateData.discount_type = discountType
-        updateData.discount_value = discountValue
-        updateData.discount_amount = discountAmount
+      // Add optional fields only if they make sense
+      try {
+        updateData.completed_at = new Date().toISOString()
+      } catch {
+        console.log('completed_at not available')
       }
 
-      // Add final_total only if it exists
-      if (finalTotal !== selectedOrder.total) {
-        updateData.final_total = finalTotal
+      // Add discount if applied
+      if (discountType !== 'none' && discountValue > 0) {
+        try {
+          updateData.discount_type = discountType
+          updateData.discount_value = discountValue
+          updateData.discount_amount = discountAmount
+          updateData.final_total = finalTotal
+        } catch {
+          console.log('Discount fields not available')
+        }
       }
+
+      console.log('Update data:', updateData)
 
       const { error: orderError } = await supabase
         .from('orders')
@@ -175,8 +181,10 @@ export default function BillingPage() {
 
       if (orderError) {
         console.error('Order update error:', orderError)
-        throw orderError
+        throw new Error(orderError.message)
       }
+
+      console.log('Order updated successfully')
 
       // Update table status if dine-in
       if (selectedOrder.table_id) {
@@ -186,25 +194,25 @@ export default function BillingPage() {
           .eq('id', selectedOrder.table_id)
 
         if (tableError) {
-          console.error('Table update error:', tableError)
-          // Don't throw - payment already completed
+          console.error('Table update warning:', tableError)
+          // Don't throw - payment completed
         }
       }
 
       showToast('✅ Payment completed successfully!', 'success')
 
-      // Reset all states
+      // Reset states
       setSelectedOrder(null)
       setDiscountType('none')
       setDiscountValue(0)
       setSelectedPaymentMethod(null)
 
-      // Refresh orders list
+      // Refresh
       await fetchOrders()
     } catch (error) {
-      console.error('Payment completion error:', error)
-      const errorMessage = (error as Error)?.message || 'Unknown error'
-      showToast('Payment failed: ' + errorMessage, 'error')
+      console.error('Payment error:', error)
+      const msg = (error as Error)?.message ?? 'Unknown error'
+      showToast('Payment failed: ' + msg, 'error')
     }
   }
 
