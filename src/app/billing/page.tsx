@@ -23,11 +23,10 @@ interface Order {
   }
   order_items?: Array<{
     quantity: number
-    price: number
-    menu_item: {
-      name: string
-      name_bangla: string
-    }
+    unit_price: number
+    item_name: string
+    item_name_bangla: string | null
+    subtotal?: number
   }>
 }
 
@@ -74,11 +73,10 @@ export default function BillingPage() {
           ),
           order_items (
             quantity,
-            price,
-            menu_item:menu_items (
-              name,
-              name_bangla
-            )
+            unit_price,
+            item_name,
+            item_name_bangla,
+            subtotal
           )
         `)
         .in('status', ['ready', 'preparing', 'kot_sent', 'pending'])
@@ -333,9 +331,9 @@ export default function BillingPage() {
           <tbody>
             ${selectedOrder.order_items?.map(item => `
               <tr>
-                <td>${item.menu_item.name}</td>
+                <td>${item.item_name}</td>
                 <td style="text-align: center;">${item.quantity}</td>
-                <td style="text-align: right;">৳${(item.quantity * item.price).toFixed(2)}</td>
+                <td style="text-align: right;">৳${((item.subtotal ?? item.quantity * item.unit_price)).toFixed(2)}</td>
               </tr>
             `).join('') || ''}
           </tbody>
@@ -506,8 +504,8 @@ export default function BillingPage() {
                   <div className="space-y-1 text-sm">
                     {selectedOrder.order_items?.map((item, idx) => (
                       <div key={idx} className="flex justify-between">
-                        <span>{item.quantity}× {item.menu_item.name}</span>
-                        <span>৳{(item.quantity * item.price).toFixed(2)}</span>
+                        <span>{item.quantity}× {item.item_name}</span>
+                        <span>৳{(item.subtotal ?? item.quantity * item.unit_price).toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
