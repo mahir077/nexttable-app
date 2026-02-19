@@ -362,9 +362,9 @@ export default function BillingPage() {
           <LoadingSpinner size="lg" />
         </div>
       ) : (
-        <>
+        <div className="max-w-5xl mx-auto">
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 mb-6">
             <div className="bg-red-50 rounded-xl p-4 border-2 border-red-200">
               <div className="text-xs text-red-600 mb-1">Pending Bills</div>
               <div className="text-3xl font-bold text-red-700">{pendingOrders.length}</div>
@@ -382,7 +382,7 @@ export default function BillingPage() {
           </div>
 
           {/* Pending Bills - Large Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {pendingOrders.map((order) => (
               <div
                 key={order.id}
@@ -450,7 +450,7 @@ export default function BillingPage() {
               <div className="text-slate-600">No pending bills at the moment</div>
             </div>
           )}
-        </>
+        </div>
       )}
 
       {/* Bill Modal */}
