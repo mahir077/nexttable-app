@@ -403,104 +403,121 @@ export default function KitchenPage() {
   const servedOrders = orders.filter(o => o.status === 'served')
 
   const OrderCard = ({ order }: { order: Order }) => (
-    <div className="bg-white rounded-lg border border-slate-200 p-3 hover:shadow-md transition-all text-left">
+    <div
+      className={`
+        relative overflow-hidden rounded-xl border-2 bg-white text-left shadow-lg
+        transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5
+        focus-within:ring-2 focus-within:ring-emerald-400 focus-within:ring-offset-2 focus-within:ring-offset-slate-900
+        ${order.status === 'pending' ? 'border-orange-200' : order.status === 'preparing' ? 'border-blue-200' : order.status === 'ready' ? 'border-emerald-200' : 'border-slate-200'}
+      `}
+    >
+      {/* Subtle top accent bar */}
       <div
-        className="cursor-pointer"
-        onClick={() => viewOrderDetails(order)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') viewOrderDetails(order) }}
-      >
-        <div className="flex justify-between items-start mb-2 gap-2">
-          <div className="text-sm font-black text-slate-900 truncate min-w-0">{order.order_number}</div>
-          {getStatusBadge(order.status)}
-        </div>
-        <div className="flex items-center gap-1 text-slate-500 text-xs mb-1">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          {formatTime(order.created_at)}
-        </div>
-        <div className="text-sm font-bold text-slate-900">৳{order.total.toFixed(2)}</div>
-      </div>
-      <div className="flex flex-col gap-1 mt-2 pt-2 border-t border-slate-100">
-        {order.status === 'pending' && (
-          <button
-            type="button"
-            onClick={e => { e.stopPropagation(); handleStatusChange(order.id, 'preparing') }}
-            className="w-full py-2 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 transition-colors"
-          >
-            🔵 Start Preparing
-          </button>
-        )}
-        {order.status === 'preparing' && (
-          <button
-            type="button"
-            onClick={e => { e.stopPropagation(); handleStatusChange(order.id, 'ready') }}
-            className="w-full py-2 bg-emerald-500 text-white rounded-lg font-bold hover:bg-emerald-600 transition-colors"
-          >
-            🟢 Mark Ready
-          </button>
-        )}
-        {order.status === 'ready' && (
-          <button
-            type="button"
-            onClick={e => { e.stopPropagation(); handleStatusChange(order.id, 'served') }}
-            className="w-full py-2 bg-slate-500 text-white rounded-lg font-bold hover:bg-slate-600 transition-colors"
-          >
-            ✅ Mark Served
-          </button>
-        )}
-        {order.status === 'served' && (
-          <div className="text-center py-2 text-slate-500 font-bold">
-            Completed
+        className={`absolute top-0 left-0 right-0 h-1 ${order.status === 'pending' ? 'bg-orange-400' : order.status === 'preparing' ? 'bg-blue-400' : order.status === 'ready' ? 'bg-emerald-400' : 'bg-slate-300'}`}
+        aria-hidden
+      />
+      <div className="p-4 pt-5">
+        <div
+          className="cursor-pointer rounded-lg -m-1 p-1 active:bg-slate-50 transition-colors"
+          onClick={() => viewOrderDetails(order)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') viewOrderDetails(order) }}
+        >
+          <div className="flex justify-between items-start gap-2 mb-2">
+            <span className="text-base font-black text-slate-900 truncate min-w-0 tabular-nums">
+              {order.order_number}
+            </span>
+            {getStatusBadge(order.status)}
           </div>
-        )}
-        {(order.status === 'pending' || order.status === 'preparing') && (
-          <div className="flex gap-1">
+          <div className="flex items-center gap-1.5 text-slate-500 text-xs mb-1">
+            <svg className="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{formatTime(order.created_at)}</span>
+          </div>
+          <div className="text-lg font-bold text-slate-900 tracking-tight">৳{order.total.toFixed(2)}</div>
+        </div>
+        <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-slate-100">
+          {order.status === 'pending' && (
             <button
               type="button"
-              onClick={e => { e.stopPropagation(); openEditModal(order) }}
-              className="flex-1 py-1.5 bg-slate-500 hover:bg-slate-600 text-white rounded text-xs font-bold"
-              title="Edit order"
+              onClick={e => { e.stopPropagation(); handleStatusChange(order.id, 'preparing') }}
+              className="w-full py-2.5 bg-blue-500 text-white rounded-xl font-bold text-sm hover:bg-blue-600 active:scale-[0.98] transition-all shadow-sm"
             >
-              ✏️
+              🔵 Start Preparing
             </button>
-            {order.status === 'pending' && (
+          )}
+          {order.status === 'preparing' && (
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); handleStatusChange(order.id, 'ready') }}
+              className="w-full py-2.5 bg-emerald-500 text-white rounded-xl font-bold text-sm hover:bg-emerald-600 active:scale-[0.98] transition-all shadow-sm"
+            >
+              🟢 Mark Ready
+            </button>
+          )}
+          {order.status === 'ready' && (
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); handleStatusChange(order.id, 'served') }}
+              className="w-full py-2.5 bg-slate-600 text-white rounded-xl font-bold text-sm hover:bg-slate-700 active:scale-[0.98] transition-all shadow-sm"
+            >
+              ✅ Mark Served
+            </button>
+          )}
+          {order.status === 'served' && (
+            <div className="text-center py-2.5 text-slate-500 font-bold text-sm rounded-xl bg-slate-50">
+              Completed
+            </div>
+          )}
+          {(order.status === 'pending' || order.status === 'preparing') && (
+            <div className="flex gap-2">
               <button
                 type="button"
-                onClick={e => { e.stopPropagation(); openDeleteModal(order) }}
-                className="py-1.5 px-2 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-bold"
-                title="Delete order"
+                onClick={e => { e.stopPropagation(); openEditModal(order) }}
+                className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors"
+                title="Edit order"
               >
-                🗑️
+                ✏️ Edit
               </button>
-            )}
-          </div>
-        )}
+              {order.status === 'pending' && (
+                <button
+                  type="button"
+                  onClick={e => { e.stopPropagation(); openDeleteModal(order) }}
+                  className="py-2 px-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-bold transition-colors"
+                  title="Delete order"
+                >
+                  🗑️
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-4 lg:p-6">
+      {/* Header */}
       <div className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex items-center gap-4">
           <BackButton />
           <div>
-            <h1 className="text-3xl lg:text-4xl font-brand font-black">🍳 KITCHEN</h1>
-            <p className="text-slate-400 text-sm">Manage orders · {orders.length} active</p>
+            <h1 className="text-3xl lg:text-4xl font-brand font-black tracking-tight">🍳 Kitchen</h1>
+            <p className="text-slate-400 text-sm mt-0.5">
+              {orders.length} active · Pending {pendingOrders.length} · Preparing {preparingOrders.length} · Ready {readyOrders.length}
+            </p>
           </div>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={openAddModal}
-            className="min-h-[44px] px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-bold transition-colors"
-          >
-            + Add Order
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={openAddModal}
+          className="min-h-[48px] px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 active:scale-[0.98]"
+        >
+          + Add Order
+        </button>
       </div>
 
       {loading ? (
@@ -515,59 +532,72 @@ export default function KitchenPage() {
         />
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 lg:gap-6 mb-8">
             {/* Pending Column */}
-            <div>
-              <div className="bg-orange-50 rounded-lg p-3 mb-3 border-2 border-orange-200">
-                <h3 className="font-bold text-orange-700 flex items-center justify-between">
-                  <span>🟠 Pending</span>
-                  <span className="text-2xl">{pendingOrders.length}</span>
+            <div className="flex flex-col min-h-[200px]">
+              <div className="bg-orange-500/15 rounded-xl p-4 mb-4 border-2 border-orange-400/40 shadow-lg shadow-orange-500/10">
+                <h3 className="font-bold text-orange-200 flex items-center justify-between text-lg">
+                  <span className="flex items-center gap-2">🟠 Pending</span>
+                  <span className="bg-orange-500/30 text-white rounded-full w-10 h-10 flex items-center justify-center font-black text-lg tabular-nums">
+                    {pendingOrders.length}
+                  </span>
                 </h3>
               </div>
-              <div className="space-y-3">
-                {pendingOrders.map(order => (
-                  <OrderCard key={order.id} order={order} />
-                ))}
+              <div className="space-y-4 flex-1">
+                {pendingOrders.length === 0 ? (
+                  <p className="text-slate-500 text-sm py-4 text-center">No pending orders</p>
+                ) : (
+                  pendingOrders.map(order => <OrderCard key={order.id} order={order} />)
+                )}
               </div>
             </div>
 
             {/* Preparing Column */}
-            <div>
-              <div className="bg-blue-50 rounded-lg p-3 mb-3 border-2 border-blue-200">
-                <h3 className="font-bold text-blue-700 flex items-center justify-between">
-                  <span>🔵 Preparing</span>
-                  <span className="text-2xl">{preparingOrders.length}</span>
+            <div className="flex flex-col min-h-[200px]">
+              <div className="bg-blue-500/15 rounded-xl p-4 mb-4 border-2 border-blue-400/40 shadow-lg shadow-blue-500/10">
+                <h3 className="font-bold text-blue-200 flex items-center justify-between text-lg">
+                  <span className="flex items-center gap-2">🔵 Preparing</span>
+                  <span className="bg-blue-500/30 text-white rounded-full w-10 h-10 flex items-center justify-center font-black text-lg tabular-nums">
+                    {preparingOrders.length}
+                  </span>
                 </h3>
               </div>
-              <div className="space-y-3">
-                {preparingOrders.map(order => (
-                  <OrderCard key={order.id} order={order} />
-                ))}
+              <div className="space-y-4 flex-1">
+                {preparingOrders.length === 0 ? (
+                  <p className="text-slate-500 text-sm py-4 text-center">None in progress</p>
+                ) : (
+                  preparingOrders.map(order => <OrderCard key={order.id} order={order} />)
+                )}
               </div>
             </div>
 
             {/* Ready Column */}
-            <div>
-              <div className="bg-emerald-50 rounded-lg p-3 mb-3 border-2 border-emerald-200">
-                <h3 className="font-bold text-emerald-700 flex items-center justify-between">
-                  <span>🟢 Ready</span>
-                  <span className="text-2xl">{readyOrders.length}</span>
+            <div className="flex flex-col min-h-[200px]">
+              <div className="bg-emerald-500/15 rounded-xl p-4 mb-4 border-2 border-emerald-400/40 shadow-lg shadow-emerald-500/10">
+                <h3 className="font-bold text-emerald-200 flex items-center justify-between text-lg">
+                  <span className="flex items-center gap-2">🟢 Ready</span>
+                  <span className="bg-emerald-500/30 text-white rounded-full w-10 h-10 flex items-center justify-center font-black text-lg tabular-nums">
+                    {readyOrders.length}
+                  </span>
                 </h3>
               </div>
-              <div className="space-y-3">
-                {readyOrders.map(order => (
-                  <OrderCard key={order.id} order={order} />
-                ))}
+              <div className="space-y-4 flex-1">
+                {readyOrders.length === 0 ? (
+                  <p className="text-slate-500 text-sm py-4 text-center">None ready yet</p>
+                ) : (
+                  readyOrders.map(order => <OrderCard key={order.id} order={order} />)
+                )}
               </div>
             </div>
           </div>
 
-          {/* Served Today - Collapsed */}
+          {/* Served Today */}
           {servedOrders.length > 0 && (
             <div className="mt-6">
-              <div className="bg-slate-50 rounded-lg p-3 border-2 border-slate-200">
-                <h3 className="font-bold text-slate-600">
-                  ✅ Served Today ({servedOrders.length})
+              <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600">
+                <h3 className="font-bold text-slate-300 text-sm flex items-center gap-2">
+                  <span>✅ Served today</span>
+                  <span className="bg-slate-600 text-slate-200 rounded-full px-2.5 py-0.5 font-black tabular-nums">{servedOrders.length}</span>
                 </h3>
               </div>
             </div>
@@ -577,31 +607,36 @@ export default function KitchenPage() {
 
       {/* Order Details Modal */}
       {selectedOrder && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 overflow-y-auto" onClick={() => setSelectedOrder(null)}>
-          <div className="bg-slate-800 rounded-2xl lg:rounded-3xl p-4 lg:p-8 max-w-2xl w-full my-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/70 backdrop-blur-sm" onClick={() => setSelectedOrder(null)}>
+          <div className="bg-slate-800 rounded-2xl lg:rounded-3xl p-6 lg:p-8 max-w-2xl w-full my-4 shadow-2xl border border-slate-700" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4 mb-6">
               <div>
-                <div className="text-sm text-slate-400 mb-1">ORDER DETAILS</div>
-                <div className="text-4xl font-brand font-black text-emerald-400">
+                <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Order details</div>
+                <div className="text-3xl lg:text-4xl font-brand font-black text-white tabular-nums">
                   #{selectedOrder.order.order_number.replace('ORD', '')}
                 </div>
+                <div className="mt-2">{getStatusBadge(selectedOrder.order.status)}</div>
               </div>
-              <button onClick={() => setSelectedOrder(null)} className="w-12 h-12 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center">
+              <button
+                onClick={() => setSelectedOrder(null)}
+                className="w-12 h-12 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white flex items-center justify-center transition-colors focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800"
+                aria-label="Close"
+              >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
-            <div className="mb-6 space-y-2">
+            <div className="mb-6 space-y-3">
               {selectedOrder.items.map((item) => (
-                <div key={item.id} className="bg-slate-700 rounded-xl p-3 lg:p-4">
-                  <div className="flex items-start justify-between gap-2">
+                <div key={item.id} className="bg-slate-700/80 rounded-xl p-4 border border-slate-600/50">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm lg:text-base font-bold mb-0.5">{item.item_name}</div>
-                      {item.item_name_bangla && <div className="text-xs lg:text-sm text-slate-400 mb-1">{item.item_name_bangla}</div>}
-                      {item.notes && <div className="text-xs lg:text-sm text-orange-400 mt-1">📝 {item.notes}</div>}
+                      <div className="text-base font-bold text-white mb-0.5">{item.item_name}</div>
+                      {item.item_name_bangla && <div className="text-sm text-slate-400 mb-1">{item.item_name_bangla}</div>}
+                      {item.notes && <div className="text-sm text-orange-300 mt-1">📝 {item.notes}</div>}
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-sm lg:text-base text-slate-300">৳{((item.unit_price ?? 0) * item.quantity).toFixed(2)}</span>
-                      <span className="text-xl lg:text-2xl font-brand font-black text-emerald-400">×{item.quantity}</span>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <span className="text-sm text-slate-400">৳{((item.unit_price ?? 0) * item.quantity).toFixed(2)}</span>
+                      <span className="text-xl font-black text-emerald-400 tabular-nums">×{item.quantity}</span>
                     </div>
                   </div>
                 </div>
@@ -609,22 +644,22 @@ export default function KitchenPage() {
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
               {selectedOrder.order.status === 'pending' && (
-                <button onClick={() => handleStatusChange(selectedOrder.order.id, 'preparing')} className="w-full sm:flex-1 min-h-[44px] py-4 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-bold text-base lg:text-lg transition-colors">
+                <button onClick={() => handleStatusChange(selectedOrder.order.id, 'preparing')} className="w-full sm:flex-1 min-h-[48px] py-4 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-bold text-base transition-all active:scale-[0.98] shadow-lg shadow-blue-500/25">
                   🔵 Start Preparing
                 </button>
               )}
               {selectedOrder.order.status === 'preparing' && (
-                <button onClick={() => handleStatusChange(selectedOrder.order.id, 'ready')} className="w-full sm:flex-1 min-h-[44px] py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-base lg:text-lg transition-colors">
+                <button onClick={() => handleStatusChange(selectedOrder.order.id, 'ready')} className="w-full sm:flex-1 min-h-[48px] py-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-base transition-all active:scale-[0.98] shadow-lg shadow-emerald-500/25">
                   🟢 Mark Ready
                 </button>
               )}
               {selectedOrder.order.status === 'ready' && (
-                <button onClick={() => handleStatusChange(selectedOrder.order.id, 'served')} className="w-full sm:flex-1 min-h-[44px] py-4 rounded-xl bg-slate-500 hover:bg-slate-600 text-white font-bold text-base lg:text-lg transition-colors">
+                <button onClick={() => handleStatusChange(selectedOrder.order.id, 'served')} className="w-full sm:flex-1 min-h-[48px] py-4 rounded-xl bg-slate-600 hover:bg-slate-500 text-white font-bold text-base transition-all active:scale-[0.98]">
                   ✅ Mark Served
                 </button>
               )}
               {selectedOrder.order.status === 'served' && (
-                <div className="text-center py-4 text-slate-500 font-bold text-base lg:text-lg">
+                <div className="w-full min-h-[48px] py-4 rounded-xl bg-slate-700 text-slate-400 font-bold text-center flex items-center justify-center">
                   Completed
                 </div>
               )}
@@ -635,18 +670,18 @@ export default function KitchenPage() {
 
       {/* Add Order Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 overflow-y-auto" onClick={() => setShowAddModal(false)}>
-          <div className="bg-slate-800 rounded-2xl p-6 max-w-lg w-full my-8" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/70 backdrop-blur-sm" onClick={() => setShowAddModal(false)}>
+          <div className="bg-slate-800 rounded-2xl p-6 max-w-lg w-full my-8 shadow-2xl border border-slate-700" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
               <h2 className="text-xl font-bold text-white">Add Order</h2>
-              <button type="button" onClick={() => setShowAddModal(false)} className="p-2 rounded-lg hover:bg-slate-700 text-slate-400">
+              <button type="button" onClick={() => setShowAddModal(false)} className="p-2.5 rounded-xl hover:bg-slate-700 text-slate-400 hover:text-white transition-colors focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800" aria-label="Close">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Order type</label>
-                <select value={addOrderType} onChange={e => setAddOrderType(e.target.value as OrderType)} className="w-full px-4 py-3 rounded-xl bg-slate-700 border border-slate-600 text-white focus:ring-2 focus:ring-emerald-500">
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Order type</label>
+                <select value={addOrderType} onChange={e => setAddOrderType(e.target.value as OrderType)} className="w-full px-4 py-3 rounded-xl bg-slate-700 border border-slate-600 text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow">
                   <option value="dine-in">Dine-in</option>
                   <option value="takeaway">Takeaway</option>
                   <option value="online">Online</option>
@@ -655,31 +690,31 @@ export default function KitchenPage() {
               </div>
               {addOrderType === 'dine-in' && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Table</label>
-                  <div className="flex gap-2 mb-2">
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Table</label>
+                  <div className="flex flex-wrap gap-2 mb-3">
                     {addFloors.map(f => (
-                      <button key={f.id} type="button" onClick={() => setAddSelectedFloor(f)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${addSelectedFloor?.id === f.id ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-slate-300'}`}>{f.name}</button>
+                      <button key={f.id} type="button" onClick={() => setAddSelectedFloor(f)} className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${addSelectedFloor?.id === f.id ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>{f.name}</button>
                     ))}
                   </div>
-                  <select value={addTableId} onChange={e => setAddTableId(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-slate-700 border border-slate-600 text-white focus:ring-2 focus:ring-emerald-500">
+                  <select value={addTableId} onChange={e => setAddTableId(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-slate-700 border border-slate-600 text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
                     <option value="">Select table</option>
                     {addTables.map(t => <option key={t.id} value={t.id}>Table {t.table_number}</option>)}
                   </select>
                 </div>
               )}
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase mb-2">Items (quantity)</label>
-                <div className="max-h-60 overflow-y-auto space-y-2">
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Items (quantity)</label>
+                <div className="max-h-60 overflow-y-auto space-y-3 pr-1">
                   {addCategories.map(cat => {
                     const items = addMenuItems.filter(m => m.category_id === cat.id)
                     if (items.length === 0) return null
                     return (
                       <div key={cat.id}>
-                        <div className="text-sm text-slate-500 font-semibold mb-1">{cat.name}</div>
+                        <div className="text-sm text-slate-500 font-semibold mb-2 sticky top-0 bg-slate-800 py-1">{cat.name}</div>
                         {items.map(m => (
-                          <div key={m.id} className="flex items-center justify-between gap-2 py-1">
+                          <div key={m.id} className="flex items-center justify-between gap-3 py-2 border-b border-slate-700/50 last:border-0">
                             <span className="text-white text-sm">{m.name}</span>
-                            <input type="number" min={0} value={addItemQty[m.id] ?? 0} onChange={e => setAddItemQuantity(m.id, parseInt(e.target.value, 10) || 0)} className="w-20 px-2 py-1 rounded bg-slate-700 border border-slate-600 text-white" />
+                            <input type="number" min={0} value={addItemQty[m.id] ?? 0} onChange={e => setAddItemQuantity(m.id, parseInt(e.target.value, 10) || 0)} className="w-20 px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-center font-medium focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" />
                           </div>
                         ))}
                       </div>
@@ -689,8 +724,8 @@ export default function KitchenPage() {
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 mt-6">
-              <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 min-h-[44px] py-3 rounded-xl bg-slate-600 text-white font-bold hover:bg-slate-500">Cancel</button>
-              <button type="button" onClick={handleAddOrder} disabled={addLoading} className="flex-1 min-h-[44px] py-3 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600 disabled:opacity-50">{addLoading ? 'Creating...' : 'Create Order'}</button>
+              <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 min-h-[48px] py-3 rounded-xl bg-slate-700 text-white font-bold hover:bg-slate-600 transition-colors border border-slate-600">Cancel</button>
+              <button type="button" onClick={handleAddOrder} disabled={addLoading} className="flex-1 min-h-[48px] py-3 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-400 disabled:opacity-50 transition-all active:scale-[0.98] shadow-lg shadow-emerald-500/25">{addLoading ? 'Creating...' : 'Create Order'}</button>
             </div>
           </div>
         </div>
@@ -698,11 +733,11 @@ export default function KitchenPage() {
 
       {/* Edit Order Modal */}
       {showEditModal && editOrder && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 overflow-y-auto" onClick={() => setShowEditModal(false)}>
-          <div className="bg-slate-800 rounded-2xl p-6 max-w-lg w-full my-8" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-white">✏️ Edit Order #{editOrder.order.order_number.replace('ORD', '')}</h2>
-              <button type="button" onClick={() => setShowEditModal(false)} className="p-2 rounded-lg hover:bg-slate-700 text-slate-400">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/70 backdrop-blur-sm" onClick={() => setShowEditModal(false)}>
+          <div className="bg-slate-800 rounded-2xl p-6 max-w-lg w-full my-8 shadow-2xl border border-slate-700" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl font-bold text-white">✏️ Edit #{editOrder.order.order_number.replace('ORD', '')}</h2>
+              <button type="button" onClick={() => setShowEditModal(false)} className="p-2.5 rounded-xl hover:bg-slate-700 text-slate-400 hover:text-white transition-colors focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800" aria-label="Close">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -710,14 +745,14 @@ export default function KitchenPage() {
               <div className="space-y-2">
                 <label className="block text-xs font-semibold text-slate-400 uppercase">Items</label>
                 {editLines.map((line, i) => (
-                  <div key={i} className="flex items-center gap-2 bg-slate-700 rounded-lg p-2">
-                    <span className="flex-1 text-white text-sm truncate">{line.item_name}</span>
+                  <div key={i} className="flex items-center gap-3 bg-slate-700/80 rounded-xl p-3 border border-slate-600/50">
+                    <span className="flex-1 text-white text-sm font-medium truncate">{line.item_name}</span>
                     <div className="flex items-center gap-1">
-                      <button type="button" onClick={() => updateEditLineQty(i, -1)} className="w-8 h-8 rounded bg-slate-600 text-white font-bold">−</button>
-                      <span className="w-8 text-center font-bold">{line.quantity}</span>
-                      <button type="button" onClick={() => updateEditLineQty(i, 1)} className="w-8 h-8 rounded bg-emerald-600 text-white font-bold">+</button>
+                      <button type="button" onClick={() => updateEditLineQty(i, -1)} className="w-9 h-9 rounded-lg bg-slate-600 hover:bg-slate-500 text-white font-bold transition-colors">−</button>
+                      <span className="w-8 text-center font-bold text-white tabular-nums">{line.quantity}</span>
+                      <button type="button" onClick={() => updateEditLineQty(i, 1)} className="w-9 h-9 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-colors">+</button>
                     </div>
-                    <button type="button" onClick={() => removeEditLine(i)} className="text-red-400 text-sm">Remove</button>
+                    <button type="button" onClick={() => removeEditLine(i)} className="text-red-400 hover:text-red-300 text-sm font-medium">Remove</button>
                   </div>
                 ))}
               </div>
@@ -734,8 +769,8 @@ export default function KitchenPage() {
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 mt-6">
-              <button type="button" onClick={() => setShowEditModal(false)} className="flex-1 min-h-[44px] py-3 rounded-xl bg-slate-600 text-white font-bold hover:bg-slate-500">Cancel</button>
-              <button type="button" onClick={handleSaveEdit} disabled={editLoading || editLines.length === 0 || !editReason.trim()} className="flex-1 min-h-[44px] py-3 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600 disabled:opacity-50">{editLoading ? 'Saving...' : 'Save'}</button>
+              <button type="button" onClick={() => setShowEditModal(false)} className="flex-1 min-h-[48px] py-3 rounded-xl bg-slate-700 text-white font-bold hover:bg-slate-600 transition-colors border border-slate-600">Cancel</button>
+              <button type="button" onClick={handleSaveEdit} disabled={editLoading || editLines.length === 0 || !editReason.trim()} className="flex-1 min-h-[48px] py-3 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-400 disabled:opacity-50 transition-all active:scale-[0.98] shadow-lg shadow-emerald-500/25">{editLoading ? 'Saving...' : 'Save'}</button>
             </div>
           </div>
         </div>
@@ -743,17 +778,17 @@ export default function KitchenPage() {
 
       {/* Delete Order Modal */}
       {showDeleteModal && deleteOrder && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setShowDeleteModal(false)}>
-          <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setShowDeleteModal(false)}>
+          <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-700" onClick={e => e.stopPropagation()}>
             <h2 className="text-xl font-bold text-white mb-2">🗑️ Delete Order</h2>
-            <p className="text-slate-400 mb-4">Delete order #{deleteOrder.order_number.replace('ORD', '')}? This cannot be undone.</p>
-            <div className="mb-4">
-              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Reason *</label>
-              <input type="text" value={deleteReason} onChange={e => setDeleteReason(e.target.value)} placeholder="e.g. Duplicate order" className="w-full px-4 py-3 rounded-xl bg-slate-700 border border-slate-600 text-white placeholder:text-slate-400" />
+            <p className="text-slate-400 mb-4">Delete order <span className="font-mono font-bold text-white">#{deleteOrder.order_number.replace('ORD', '')}</span>? This cannot be undone.</p>
+            <div className="mb-5">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Reason *</label>
+              <input type="text" value={deleteReason} onChange={e => setDeleteReason(e.target.value)} placeholder="e.g. Duplicate order" className="w-full px-4 py-3 rounded-xl bg-slate-700 border border-slate-600 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-red-500 focus:border-red-500" />
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
-              <button type="button" onClick={() => setShowDeleteModal(false)} className="flex-1 min-h-[44px] py-3 rounded-xl bg-slate-600 text-white font-bold hover:bg-slate-500">Cancel</button>
-              <button type="button" onClick={handleDeleteOrder} disabled={deleteLoading || !deleteReason.trim()} className="flex-1 min-h-[44px] py-3 rounded-xl bg-red-600 text-white font-bold hover:bg-red-500 disabled:opacity-50">{deleteLoading ? 'Deleting...' : 'Delete'}</button>
+              <button type="button" onClick={() => setShowDeleteModal(false)} className="flex-1 min-h-[48px] py-3 rounded-xl bg-slate-700 text-white font-bold hover:bg-slate-600 transition-colors border border-slate-600">Cancel</button>
+              <button type="button" onClick={handleDeleteOrder} disabled={deleteLoading || !deleteReason.trim()} className="flex-1 min-h-[48px] py-3 rounded-xl bg-red-600 text-white font-bold hover:bg-red-500 disabled:opacity-50 transition-all active:scale-[0.98]">{deleteLoading ? 'Deleting...' : 'Delete'}</button>
             </div>
           </div>
         </div>
