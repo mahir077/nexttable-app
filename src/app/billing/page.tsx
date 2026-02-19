@@ -46,10 +46,30 @@ export default function BillingPage() {
   // Cash drawer: true = auto-open on cash payment, false = stay closed
   const [cashDrawerEnabled, setCashDrawerEnabled] = useState(true)
 
+  const [restaurantInfo, setRestaurantInfo] = useState({
+    name: 'Restaurant Name',
+    address: '',
+    phone: '',
+    email: ''
+  })
+
+  const [invoiceSettings, setInvoiceSettings] = useState({
+    show_business_info: true,
+    show_table_number: true,
+    show_order_type: true,
+    show_date_time: true,
+    show_item_prices: true,
+    show_thank_you: true,
+    custom_header: '',
+    custom_footer: 'Thank you for your visit!\nPlease come again'
+  })
+
   const { toast, showToast, hideToast } = useToast()
 
   useEffect(() => {
     fetchOrders()
+    fetchRestaurantInfo()
+    fetchInvoiceSettings()
   }, [])
 
   const fetchOrders = async () => {
@@ -100,6 +120,53 @@ export default function BillingPage() {
       setOrders([])
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchRestaurantInfo = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('restaurant_settings')
+        .select('display_name, address, phone, email')
+        .limit(1)
+        .single()
+
+      if (data) {
+        setRestaurantInfo({
+          name: data.display_name || 'Restaurant Name',
+          address: data.address || '',
+          phone: data.phone || '',
+          email: data.email || ''
+        })
+      }
+    } catch {
+      console.log('Could not fetch restaurant info')
+    }
+  }
+
+  const fetchInvoiceSettings = async () => {
+    try {
+      const { data } = await supabase
+        .from('invoice_settings')
+        .select('*')
+        .eq('id', 1)
+        .maybeSingle()
+
+      if (data) {
+        setInvoiceSettings(prev => ({
+          ...prev,
+          show_business_info: data.show_business_info ?? prev.show_business_info,
+          show_table_number: data.show_table_number ?? prev.show_table_number,
+          show_order_type: data.show_order_type ?? prev.show_order_type,
+          show_date_time: data.show_date_time ?? prev.show_date_time,
+          show_item_prices: data.show_item_prices ?? prev.show_item_prices,
+          show_thank_you: data.show_thank_you ?? prev.show_thank_you,
+          custom_header: (data.custom_header as string) ?? prev.custom_header,
+          custom_footer: (data.custom_footer as string) ?? prev.custom_footer
+        }))
+      }
+    } catch {
+      console.log('Using default invoice settings')
     }
   }
 
@@ -265,6 +332,12 @@ export default function BillingPage() {
             margin-bottom: 4px;
           }
 
+          .business-info {
+            font-size: 9px;
+            line-height: 1.5;
+            margin-top: 5px;
+          }
+
           .info { margin: 10px 0; font-size: 10px; }
           .info-row {
             display: flex;
@@ -329,11 +402,27 @@ export default function BillingPage() {
       </head>
       <body>
         <div class="header">
-          <h1>INVOICE</h1>
-          <div>${selectedOrder.order_number}</div>
+          ${invoiceSettings.show_business_info ? `
+          <h1>${restaurantInfo.name}</h1>
+          <div class="business-info">
+            ${restaurantInfo.address ? `${restaurantInfo.address}<br>` : ''}
+            ${restaurantInfo.phone ? `Phone: ${restaurantInfo.phone}<br>` : ''}
+            ${restaurantInfo.email ? `Email: ${restaurantInfo.email}<br>` : ''}
+          </div>
+          ` : '<h1>INVOICE</h1>'}
+          ${invoiceSettings.custom_header ? `
+          <div style="margin-top: 8px; font-size: 10px; font-weight: bold;">
+            ${invoiceSettings.custom_header}
+          </div>
+          ` : ''}
         </div>
 
         <div class="info">
+          <div class="info-row">
+            <span>Order:</span>
+            <span><strong>${selectedOrder.order_number}</strong></span>
+          </div>
+          ${invoiceSettings.show_date_time ? `
           <div class="info-row">
             <span>Date:</span>
             <span>${new Date().toLocaleDateString()}</span>
@@ -342,16 +431,19 @@ export default function BillingPage() {
             <span>Time:</span>
             <span>${new Date().toLocaleTimeString()}</span>
           </div>
-          ${selectedOrder.table ? `
+          ` : ''}
+          ${invoiceSettings.show_table_number && selectedOrder.table ? `
           <div class="info-row">
             <span>Table:</span>
             <span><strong>${selectedOrder.table.table_number}</strong></span>
           </div>
           ` : ''}
+          ${invoiceSettings.show_order_type ? `
           <div class="info-row">
             <span>Type:</span>
             <span>${selectedOrder.order_type}</span>
           </div>
+          ` : ''}
         </div>
 
         <div class="divider"></div>
@@ -361,7 +453,7 @@ export default function BillingPage() {
             <tr>
               <th>Item</th>
               <th style="width: 30px; text-align: center;">Qty</th>
-              <th style="width: 55px; text-align: right;">Total</th>
+              ${invoiceSettings.show_item_prices ? '<th style="width: 55px; text-align: right;">Total</th>' : ''}
             </tr>
           </thead>
           <tbody>
@@ -369,7 +461,7 @@ export default function BillingPage() {
               <tr>
                 <td>${item.item_name}</td>
                 <td style="text-align: center;">${item.quantity}</td>
-                <td style="text-align: right;">৳${((item.subtotal ?? item.quantity * item.unit_price)).toFixed(2)}</td>
+                ${invoiceSettings.show_item_prices ? `<td style="text-align: right;">৳${(item.subtotal ?? item.quantity * item.unit_price).toFixed(2)}</td>` : ''}
               </tr>
             `).join('') || ''}
           </tbody>
@@ -399,10 +491,11 @@ export default function BillingPage() {
           </div>
         </div>
 
+        ${invoiceSettings.show_thank_you ? `
         <div class="footer">
-          <p><strong>Thank you!</strong></p>
-          <p>Please visit again</p>
+          ${(invoiceSettings.custom_footer || 'Thank you for your visit!').split('\n').map(line => `<p>${line}</p>`).join('')}
         </div>
+        ` : ''}
       </body>
       </html>
     `

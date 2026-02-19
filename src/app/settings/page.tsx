@@ -8,8 +8,34 @@ import BackButton from '@/components/BackButton'
 import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
 
+type InvoiceSettings = {
+  show_logo: boolean
+  show_business_info: boolean
+  show_table_number: boolean
+  show_order_type: boolean
+  show_customer_name: boolean
+  show_date_time: boolean
+  show_item_prices: boolean
+  show_thank_you: boolean
+  custom_header: string
+  custom_footer: string
+}
+
+const defaultInvoiceSettings: InvoiceSettings = {
+  show_logo: true,
+  show_business_info: true,
+  show_table_number: true,
+  show_order_type: true,
+  show_customer_name: true,
+  show_date_time: true,
+  show_item_prices: true,
+  show_thank_you: true,
+  custom_header: '',
+  custom_footer: 'Thank you for your visit!\nPlease come again'
+}
+
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<'restaurant' | 'tables' | 'printer'>('restaurant')
+  const [activeTab, setActiveTab] = useState<'restaurant' | 'tables' | 'printer' | 'invoice'>('restaurant')
   
   // Restaurant info state (synced with restaurant_settings in DB)
   const [restaurantInfo, setRestaurantInfo] = useState({
@@ -48,6 +74,9 @@ export default function SettingsPage() {
   // Printer & Cash Drawer (URL for open drawer)
   const [cashDrawerUrl, setCashDrawerUrl] = useState('')
 
+  // Invoice customization
+  const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings>(defaultInvoiceSettings)
+
   const { toast, showToast, hideToast } = useToast()
 
   // Fetch data
@@ -64,6 +93,10 @@ export default function SettingsPage() {
   useEffect(() => {
     setCashDrawerUrl(getCashDrawerUrl())
   }, [activeTab])
+
+  useEffect(() => {
+    loadInvoiceSettings()
+  }, [])
 
   // Fetch restaurant settings (first row – single restaurant mode)
   const fetchRestaurantSettings = async () => {
@@ -345,6 +378,44 @@ export default function SettingsPage() {
     }
   }
 
+  const saveInvoiceSettings = async () => {
+    try {
+      const { error } = await supabase
+        .from('invoice_settings')
+        .upsert({
+          id: 1,
+          ...invoiceSettings,
+          updated_at: new Date().toISOString()
+        })
+
+      if (error) throw error
+      showToast('✅ Invoice settings saved!', 'success')
+    } catch (error) {
+      console.error('Save error:', error)
+      showToast('Failed to save settings', 'error')
+    }
+  }
+
+  const loadInvoiceSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('invoice_settings')
+        .select('*')
+        .eq('id', 1)
+        .maybeSingle()
+
+      if (!error && data) {
+        setInvoiceSettings(prev => ({
+          ...defaultInvoiceSettings,
+          ...prev,
+          ...(data as Partial<InvoiceSettings>)
+        }))
+      }
+    } catch {
+      console.log('Using default invoice settings')
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 p-4 lg:p-6">
       {/* Header */}
@@ -391,6 +462,17 @@ export default function SettingsPage() {
             }`}
           >
             🖨️ Printer & Cash Drawer
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('invoice')}
+            className={`px-6 py-4 whitespace-nowrap rounded-xl font-bold transition-all ml-1 ${
+              activeTab === 'invoice'
+                ? 'bg-slate-900 text-white shadow-lg'
+                : 'bg-white text-slate-700 border-2 border-slate-200 hover:border-slate-300'
+            }`}
+          >
+            🧾 Invoice
           </button>
         </div>
       </div>
@@ -469,6 +551,112 @@ export default function SettingsPage() {
                 className="w-full px-4 py-3 text-base rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
               />
               <p className="text-xs text-slate-500 mt-1">বিল প্রিন্ট করার সময় &quot;Print (open drawer)&quot; দিলে এই URL এ request যাবে। লোকাল সার্ভিস চালু থাকলে ক্যাশ ড্রয়ার খুলবে।</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invoice Tab */}
+      {activeTab === 'invoice' && (
+        <div className="bg-white rounded-xl p-6 border-2 border-slate-200">
+          <h2 className="text-2xl font-bold mb-6">🖨️ Invoice Customization</h2>
+
+          <div className="space-y-6">
+            {/* Toggle Options */}
+            <div>
+              <h3 className="font-bold text-slate-700 mb-3">Show/Hide Elements</h3>
+              <div className="space-y-3">
+                {(
+                  [
+                    { key: 'show_business_info' as const, label: 'Business Info (Name, Address, Phone)' },
+                    { key: 'show_table_number' as const, label: 'Table Number' },
+                    { key: 'show_order_type' as const, label: 'Order Type (Dine-in/Takeaway)' },
+                    { key: 'show_customer_name' as const, label: 'Customer Name' },
+                    { key: 'show_date_time' as const, label: 'Date & Time' },
+                    { key: 'show_item_prices' as const, label: 'Individual Item Prices' },
+                    { key: 'show_thank_you' as const, label: 'Thank You Message' }
+                  ] as const
+                ).map(option => (
+                  <label key={option.key} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100">
+                    <span className="font-medium text-slate-900">{option.label}</span>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={invoiceSettings[option.key]}
+                        onChange={(e) =>
+                          setInvoiceSettings({
+                            ...invoiceSettings,
+                            [option.key]: e.target.checked
+                          })
+                        }
+                        className="w-5 h-5 text-emerald-500 rounded focus:ring-emerald-500"
+                      />
+                      <span
+                        className={`text-xs font-bold ${
+                          invoiceSettings[option.key] ? 'text-emerald-600' : 'text-slate-400'
+                        }`}
+                      >
+                        {invoiceSettings[option.key] ? 'ON' : 'OFF'}
+                      </span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom Header */}
+            <div>
+              <label className="block font-bold text-slate-700 mb-2">Custom Header Text (Optional)</label>
+              <input
+                type="text"
+                value={invoiceSettings.custom_header}
+                onChange={(e) =>
+                  setInvoiceSettings({
+                    ...invoiceSettings,
+                    custom_header: e.target.value
+                  })
+                }
+                placeholder="e.g., Welcome to our restaurant!"
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg text-slate-900"
+              />
+              <p className="text-xs text-slate-500 mt-1">Will appear at the top of invoice</p>
+            </div>
+
+            {/* Custom Footer */}
+            <div>
+              <label className="block font-bold text-slate-700 mb-2">Custom Footer Text</label>
+              <textarea
+                value={invoiceSettings.custom_footer}
+                onChange={(e) =>
+                  setInvoiceSettings({
+                    ...invoiceSettings,
+                    custom_footer: e.target.value
+                  })
+                }
+                rows={3}
+                className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg text-slate-900"
+              />
+              <p className="text-xs text-slate-500 mt-1">Will appear at the bottom of invoice</p>
+            </div>
+
+            {/* Save & Preview */}
+            <div className="flex gap-3 pt-4 border-t-2">
+              <button
+                type="button"
+                onClick={saveInvoiceSettings}
+                className="flex-1 py-3 bg-emerald-500 text-white rounded-lg font-bold hover:bg-emerald-600"
+              >
+                💾 Save Invoice Settings
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  showToast('Preview when printing from Billing page', 'info')
+                }}
+                className="flex-1 py-3 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600"
+              >
+                👁️ Preview Invoice
+              </button>
             </div>
           </div>
         </div>
