@@ -38,12 +38,10 @@ export default function SettingsPage() {
     table_number: string
     floor_id: string
     seats: string
-    location: string
   }>({ 
     table_number: '', 
     floor_id: '',
-    seats: '4',
-    location: ''
+    seats: '4'
   })
 
   // Printer & Cash Drawer (URL for open drawer)
@@ -280,8 +278,7 @@ export default function SettingsPage() {
           .from('tables')
           .update({
             table_number: tableForm.table_number.trim(),
-            seats: parseInt(tableForm.seats, 10) || 4,
-            location: (tableForm.location || '').trim()
+            seats: parseInt(tableForm.seats, 10) || 4
           })
           .eq('id', editingTable.id)
 
@@ -289,7 +286,7 @@ export default function SettingsPage() {
         showToast('Table updated!', 'success')
         setShowTableModal(false)
         setEditingTable(null)
-        setTableForm({ table_number: '', floor_id: '', seats: '4', location: '' })
+        setTableForm({ table_number: '', floor_id: '', seats: '4' })
         fetchTables()
         return
       }
@@ -302,7 +299,6 @@ export default function SettingsPage() {
           floor_id: tableForm.floor_id,
           table_number: tableForm.table_number.trim(),
           seats: parseInt(tableForm.seats, 10) || 4,
-          location: (tableForm.location || '').trim() || null,
           status: 'available',
           is_active: true
         })
@@ -317,7 +313,7 @@ export default function SettingsPage() {
       showToast('Table created successfully!', 'success')
       setShowTableModal(false)
       setEditingTable(null)
-      setTableForm({ table_number: '', floor_id: '', seats: '4', location: '' })
+      setTableForm({ table_number: '', floor_id: '', seats: '4' })
       fetchFloors()
       const floorId = tableForm.floor_id
       const floor = floors.find(f => f.id === floorId)
@@ -549,8 +545,7 @@ export default function SettingsPage() {
                     setTableForm({
                       table_number: '',
                       floor_id: selectedFloor?.id ?? floors[0]?.id ?? '',
-                      seats: '4',
-                      location: ''
+                      seats: '4'
                     })
                     setShowTableModal(true)
                   }}
@@ -569,9 +564,6 @@ export default function SettingsPage() {
                         {table.table_number}
                       </div>
                       <div className="text-sm text-slate-600">{table.seats} seats</div>
-                      {table.location && (
-                        <div className="text-xs text-slate-500 mt-1">{table.location}</div>
-                      )}
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -580,8 +572,7 @@ export default function SettingsPage() {
                           setTableForm({
                             table_number: table.table_number.toString(),
                             floor_id: table.floor_id,
-                            seats: table.seats.toString(),
-                            location: table.location || ''
+                            seats: table.seats.toString()
                           })
                           setShowTableModal(true)
                         }}
@@ -692,22 +683,12 @@ export default function SettingsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Number of Seats*</label>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Number of Seats *</label>
                 <input
                   type="number"
                   min={1}
                   value={tableForm.seats}
                   onChange={(e) => setTableForm({ ...tableForm, seats: e.target.value })}
-                  className="w-full px-4 py-3 text-base rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Location (Optional)</label>
-                <input
-                  type="text"
-                  value={tableForm.location}
-                  onChange={(e) => setTableForm({ ...tableForm, location: e.target.value })}
-                  placeholder="e.g., By Window, Corner"
                   className="w-full px-4 py-3 text-base rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
                 />
               </div>
