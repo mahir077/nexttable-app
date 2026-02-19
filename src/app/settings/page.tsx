@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { getFloors, getTablesByFloor, Floor, Table } from '@/app/lib/api/tables'
 import { supabase } from '@/app/lib/api/tables'
 import { getCashDrawerUrl, setCashDrawerUrl as saveCashDrawerUrl } from '@/app/lib/cashDrawer'
+import Toast from '@/components/Toast'
+import { useToast } from '@/hooks/useToast'
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'restaurant' | 'tables' | 'printer'>('restaurant')
@@ -40,6 +42,8 @@ export default function SettingsPage() {
 
   // Printer & Cash Drawer (URL for open drawer)
   const [cashDrawerUrl, setCashDrawerUrl] = useState('')
+
+  const { toast, showToast, hideToast } = useToast()
 
   // Fetch data
   useEffect(() => {
@@ -129,7 +133,7 @@ export default function SettingsPage() {
   // Save restaurant info – update existing row or insert (handles existing restaurant_settings row)
   const handleSaveRestaurantInfo = async () => {
     if (!restaurantInfo.name?.trim()) {
-      alert('❌ Please enter restaurant name')
+      showToast('Please enter restaurant name', 'error')
       return
     }
     setRestaurantInfoLoading(true)
@@ -174,11 +178,11 @@ export default function SettingsPage() {
       }
 
       localStorage.setItem('restaurantInfo', JSON.stringify(restaurantInfo))
-      alert('✅ Settings saved!')
+      showToast('Settings saved!', 'success')
       fetchRestaurantSettings()
     } catch (error) {
       console.error('Save error:', error)
-      alert('❌ Failed: ' + (error as Error).message)
+      showToast('Failed: ' + (error as Error).message, 'error')
     } finally {
       setRestaurantInfoLoading(false)
     }
@@ -187,7 +191,7 @@ export default function SettingsPage() {
   // Add/Edit Floor
   const handleSaveFloor = async () => {
     if (!floorForm.name.trim()) {
-      alert('❌ Please enter floor name')
+      showToast('Please enter floor name', 'error')
       return
     }
 
@@ -200,7 +204,7 @@ export default function SettingsPage() {
           .eq('id', editingFloor.id)
 
         if (error) throw error
-        alert('✅ Floor updated!')
+        showToast('Floor updated!', 'success')
       } else {
         // Add new floor
         const { error } = await supabase
@@ -208,7 +212,7 @@ export default function SettingsPage() {
           .insert({ name: floorForm.name, is_active: true })
 
         if (error) throw error
-        alert('✅ Floor added!')
+        showToast('Floor added!', 'success')
       }
 
       setShowFloorModal(false)
@@ -217,7 +221,7 @@ export default function SettingsPage() {
       fetchFloors()
     } catch (error) {
       console.error('Error saving floor:', error)
-      alert('❌ Failed to save floor')
+      showToast('Failed to save floor', 'error')
     }
   }
 
@@ -232,18 +236,18 @@ export default function SettingsPage() {
         .eq('id', floor.id)
 
       if (error) throw error
-      alert('✅ Floor deleted!')
+      showToast('Floor deleted!', 'success')
       fetchFloors()
     } catch (error) {
       console.error('Error deleting floor:', error)
-      alert('❌ Failed to delete floor')
+      showToast('Failed to delete floor', 'error')
     }
   }
 
   // Add/Edit Table
   const handleSaveTable = async () => {
     if (!selectedFloor || !tableForm.table_number.trim()) {
-      alert('❌ Please enter table number')
+      showToast('Please enter table number', 'error')
       return
     }
 
@@ -260,7 +264,7 @@ export default function SettingsPage() {
           .eq('id', editingTable.id)
 
         if (error) throw error
-        alert('✅ Table updated!')
+        showToast('Table updated!', 'success')
       } else {
         // Add new table
         const { error } = await supabase
@@ -274,7 +278,7 @@ export default function SettingsPage() {
           })
 
         if (error) throw error
-        alert('✅ Table added!')
+        showToast('Table added!', 'success')
       }
 
       setShowTableModal(false)
@@ -283,7 +287,7 @@ export default function SettingsPage() {
       fetchTables()
     } catch (error) {
       console.error('Error saving table:', error)
-      alert('❌ Failed to save table')
+      showToast('Failed to save table', 'error')
     }
   }
 
@@ -298,11 +302,11 @@ export default function SettingsPage() {
         .eq('id', table.id)
 
       if (error) throw error
-      alert('✅ Table deleted!')
+      showToast('Table deleted!', 'success')
       fetchTables()
     } catch (error) {
       console.error('Error deleting table:', error)
-      alert('❌ Failed to delete table')
+      showToast('Failed to delete table', 'error')
     }
   }
 
@@ -652,6 +656,7 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
     </div>
   )
 }

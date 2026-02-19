@@ -8,6 +8,8 @@ import { getCategories, getMenuItemsByCategory, getAllMenuItems, type MenuItem }
 import BackButton from '@/components/BackButton'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import EmptyState from '@/components/EmptyState'
+import Toast from '@/components/Toast'
+import { useToast } from '@/hooks/useToast'
 
 interface Order {
   id: string
@@ -70,6 +72,8 @@ export default function KitchenPage() {
   const [deleteReason, setDeleteReason] = useState('')
   const [deleteLoading, setDeleteLoading] = useState(false)
 
+  const { toast, showToast, hideToast } = useToast()
+
   const fetchOrders = async () => {
     try {
       const data = await getOrders()
@@ -96,7 +100,7 @@ export default function KitchenPage() {
 
       if (error) {
         console.error('Error updating status:', error)
-        alert('Failed to update status')
+        showToast('Failed to update status', 'error')
         return
       }
 
@@ -104,11 +108,10 @@ export default function KitchenPage() {
       setSelectedOrder(null)
       // Refresh orders list
       fetchOrders()
-      // Show success message
-      alert(`✅ Order status changed to ${newStatus}`)
+      showToast(`Order status changed to ${newStatus}`, 'success')
     } catch (error) {
       console.error('Error:', error)
-      alert('Failed to update status')
+      showToast('Failed to update status', 'error')
     }
   }
 
@@ -224,11 +227,11 @@ export default function KitchenPage() {
       }
     }
     if (items.length === 0) {
-      alert('Add at least one item.')
+      showToast('Add at least one item.', 'error')
       return
     }
     if (addOrderType === 'dine-in' && !addTableId) {
-      alert('Select a table for dine-in.')
+      showToast('Select a table for dine-in.', 'error')
       return
     }
     setAddLoading(true)
@@ -267,7 +270,7 @@ export default function KitchenPage() {
       fetchOrders()
     } catch (e) {
       console.error(e)
-      alert('Failed to create order')
+      showToast('Failed to create order', 'error')
     } finally {
       setAddLoading(false)
     }
@@ -325,11 +328,11 @@ export default function KitchenPage() {
 
   const handleSaveEdit = async () => {
     if (!editOrder || editLines.length === 0) {
-      alert('Order must have at least one item.')
+      showToast('Order must have at least one item.', 'error')
       return
     }
     if (!editReason.trim()) {
-      alert('Reason is required.')
+      showToast('Reason is required.', 'error')
       return
     }
     setEditLoading(true)
@@ -362,7 +365,7 @@ export default function KitchenPage() {
       fetchOrders()
     } catch (e) {
       console.error(e)
-      alert('Failed to update order')
+      showToast('Failed to update order', 'error')
     } finally {
       setEditLoading(false)
     }
@@ -378,7 +381,7 @@ export default function KitchenPage() {
   const handleDeleteOrder = async () => {
     if (!deleteOrder) return
     if (!deleteReason.trim()) {
-      alert('Reason is required.')
+      showToast('Reason is required.', 'error')
       return
     }
     setDeleteLoading(true)
@@ -391,7 +394,7 @@ export default function KitchenPage() {
       fetchOrders()
     } catch (e) {
       console.error(e)
-      alert('Failed to delete order')
+      showToast('Failed to delete order', 'error')
     } finally {
       setDeleteLoading(false)
     }
@@ -500,6 +503,8 @@ export default function KitchenPage() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-4 lg:p-6">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
+
       {/* Header */}
       <div className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex items-center gap-4">

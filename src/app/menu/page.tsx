@@ -14,6 +14,8 @@ import {
   MenuItem 
 } from '@/app/lib/api/menu'
 import BackButton from '@/components/BackButton'
+import Toast from '@/components/Toast'
+import { useToast } from '@/hooks/useToast'
 
 export default function MenuManagementPage() {
   const [categories, setCategories] = useState<Category[]>([])
@@ -40,6 +42,8 @@ export default function MenuManagementPage() {
   const [newCategoryIcon, setNewCategoryIcon] = useState('🍽️')
   const [newCategory, setNewCategory] = useState('')
   const [showCategoryForm, setShowCategoryForm] = useState(false)
+
+  const { toast, showToast, hideToast } = useToast()
 
   // Fetch data
   const fetchData = async () => {
@@ -85,7 +89,7 @@ export default function MenuManagementPage() {
         imageUrl = await uploadImage(imageFile)
       } catch (err) {
         console.error('Image upload failed:', err)
-        alert('❌ Image upload failed. Try again.')
+        showToast('Image upload failed. Try again.', 'error')
         return
       }
     }
@@ -113,7 +117,7 @@ export default function MenuManagementPage() {
       setSuccessMessage(editingItem ? 'Item updated!' : 'Item added!')
       setTimeout(() => setSuccessMessage(null), 3000)
     } else {
-      alert('❌ Failed to save item')
+      showToast('Failed to save item', 'error')
     }
   }
 
@@ -123,10 +127,10 @@ export default function MenuManagementPage() {
     
     const success = await deleteMenuItem(itemId)
     if (success) {
-      alert('✅ Item deleted!')
+      showToast('Item deleted!', 'success')
       fetchData()
     } else {
-      alert('❌ Failed to delete item')
+      showToast('Failed to delete item', 'error')
     }
   }
 
@@ -189,7 +193,7 @@ export default function MenuManagementPage() {
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newCategoryName.trim()) {
-      alert('Category name required')
+      showToast('Category name required', 'error')
       return
     }
     const created = await createCategory({
@@ -206,7 +210,7 @@ export default function MenuManagementPage() {
       fetchData()
       fetchCategories()
     } else {
-      alert('Failed to add category')
+      showToast('Failed to add category', 'error')
     }
   }
 
@@ -227,7 +231,7 @@ export default function MenuManagementPage() {
       setSuccessMessage('Category added!')
       setTimeout(() => setSuccessMessage(null), 3000)
     } else {
-      alert('Failed to add category')
+      showToast('Failed to add category', 'error')
     }
   }
 
@@ -609,6 +613,7 @@ export default function MenuManagementPage() {
           </div>
         </div>
       )}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
     </div>
   )
 }

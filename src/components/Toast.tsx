@@ -2,42 +2,51 @@
 
 import { useEffect } from 'react'
 
-type ToastType = 'success' | 'error' | 'info'
-
-const typeConfig: Record<ToastType, { bg: string; icon: string }> = {
-  success: { bg: 'bg-emerald-500', icon: '✅' },
-  error: { bg: 'bg-rose-500', icon: '❌' },
-  info: { bg: 'bg-blue-500', icon: 'ℹ️' }
-}
-
 interface ToastProps {
   message: string
-  type: ToastType
+  type: 'success' | 'error' | 'info'
   onClose: () => void
-  duration?: number
 }
 
-export default function Toast({ message, type, onClose, duration = 3000 }: ToastProps) {
-  const { bg, icon } = typeConfig[type]
-
+export default function Toast({ message, type, onClose }: ToastProps) {
   useEffect(() => {
-    const timer = setTimeout(onClose, duration)
+    const timer = setTimeout(() => {
+      onClose()
+    }, 3000) // Auto close after 3 seconds
+
     return () => clearTimeout(timer)
-  }, [duration, onClose])
+  }, [onClose])
+
+  const styles: Record<ToastProps['type'], { bg: string; icon: string }> = {
+    success: {
+      bg: 'bg-emerald-500',
+      icon: '✅'
+    },
+    error: {
+      bg: 'bg-red-500',
+      icon: '❌'
+    },
+    info: {
+      bg: 'bg-blue-500',
+      icon: 'ℹ️'
+    }
+  }
+
+  const style = styles[type]
 
   return (
     <div
-      className={`fixed top-4 right-4 z-[100] flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl text-white ${bg}`}
+      className={`fixed top-4 right-4 ${style.bg} text-white px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 z-50 min-w-[300px]`}
       role="alert"
     >
-      <span className="text-xl" aria-hidden>
-        {icon}
+      <span className="text-2xl" aria-hidden>
+        {style.icon}
       </span>
-      <p className="flex-1 font-medium">{message}</p>
+      <span className="font-medium flex-1">{message}</span>
       <button
         type="button"
         onClick={onClose}
-        className="p-1 rounded-lg hover:bg-white/20 transition-colors text-white font-bold text-lg leading-none"
+        className="text-xl hover:text-slate-200 font-bold ml-2"
         aria-label="Close"
       >
         ×

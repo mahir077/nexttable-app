@@ -5,6 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase, getFloors, getTablesByFloor, Floor, Table } from '@/app/lib/api/tables'
 import { getCategories, getMenuItemsByCategory, type CartItem, type Category, type MenuItem } from '@/app/lib/api/menu'
+import Toast from '@/components/Toast'
+import { useToast } from '@/hooks/useToast'
 
 const ORDER_TYPES = [
   { id: 'dine-in', label: 'Dine-in', emoji: '🍽️', color: 'emerald', border: 'border-emerald-400', bg: 'bg-emerald-50' },
@@ -41,6 +43,8 @@ function POSContent() {
   const [kotSuccess, setKotSuccess] = useState<{ orderNumber: string; total: number } | null>(null)
   const [loadingCategories, setLoadingCategories] = useState(true)
   const [loadingItems, setLoadingItems] = useState(false)
+
+  const { toast, showToast, hideToast } = useToast()
 
   // Sync URL -> state
   useEffect(() => {
@@ -158,54 +162,54 @@ function POSContent() {
 
   const validateAndSendKOT = () => {
     if (cart.length === 0) {
-      alert('Cart is empty. Add items first.')
+      showToast('Cart is empty. Add items first.', 'error')
       return
     }
 
     if (orderType === 'dine-in') {
       if (!selectedTable) {
-        alert('Please select a table.')
+        showToast('Please select a table.', 'error')
         return
       }
     }
 
     if (orderType === 'takeaway') {
       if (!customerName.trim()) {
-        alert('Customer name is required.')
+        showToast('Customer name is required.', 'error')
         return
       }
     }
 
     if (orderType === 'online') {
       if (!customerName.trim()) {
-        alert('Customer name is required.')
+        showToast('Customer name is required.', 'error')
         return
       }
       if (!customerPhone.trim()) {
-        alert('Phone number is required for online orders.')
+        showToast('Phone number is required for online orders.', 'error')
         return
       }
       if (!deliveryAddress.trim()) {
-        alert('Delivery address is required.')
+        showToast('Delivery address is required.', 'error')
         return
       }
     }
 
     if (orderType === 'event') {
       if (!eventDate) {
-        alert('Event date is required.')
+        showToast('Event date is required.', 'error')
         return
       }
       if (!guestCount.trim() || parseInt(guestCount, 10) < 1) {
-        alert('Please enter number of guests.')
+        showToast('Please enter number of guests.', 'error')
         return
       }
       if (!customerName.trim()) {
-        alert('Contact person name is required.')
+        showToast('Contact person name is required.', 'error')
         return
       }
       if (!customerPhone.trim()) {
-        alert('Phone number is required.')
+        showToast('Phone number is required.', 'error')
         return
       }
     }
@@ -265,17 +269,7 @@ function POSContent() {
       printKOT({ ...order, order_number: order.order_number, total: order.total }, cart, tableLabel)
 
       const orderTotal = order.total
-      const orderSummary = [
-        '✅ ORDER SENT TO KITCHEN!',
-        '',
-        `Order: ${orderNumber}`,
-        orderType === 'dine-in' && selectedTable ? `Table: ${tableLabel}` : null,
-        `Items: ${cart.length}`,
-        `Total: ৳${orderTotal.toFixed(2)}`,
-        '',
-        'KOT has been sent to kitchen!'
-      ].filter(Boolean).join('\n')
-      alert(orderSummary)
+      showToast(`Order ${orderNumber} sent to kitchen! Total ৳${orderTotal.toFixed(2)}`, 'success')
 
       setCart([])
       setCartOpen(false)
@@ -288,7 +282,7 @@ function POSContent() {
       setEventDate('')
     } catch (err) {
       console.error(err)
-      alert('Failed to create order')
+      showToast('Failed to create order', 'error')
     }
   }
 
@@ -783,6 +777,7 @@ function POSContent() {
           </div>
         </div>
       )}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
     </div>
   )
 }

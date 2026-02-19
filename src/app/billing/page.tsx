@@ -5,6 +5,8 @@ import { getOrdersForBilling, getOrderWithItems, processPayment } from '@/app/li
 import { openCashDrawer } from '@/app/lib/cashDrawer'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import EmptyState from '@/components/EmptyState'
+import Toast from '@/components/Toast'
+import { useToast } from '@/hooks/useToast'
 
 interface Order {
   id: string
@@ -31,6 +33,8 @@ export default function BillingPage() {
   const [selectedOrder, setSelectedOrder] = useState<{ order: Order; items: OrderItem[] } | null>(null)
   const [loading, setLoading] = useState(true)
   const [processingPayment, setProcessingPayment] = useState(false)
+
+  const { toast, showToast, hideToast } = useToast()
 
   // Fetch orders ready for billing
   const fetchOrders = async () => {
@@ -70,15 +74,15 @@ export default function BillingPage() {
       const success = await processPayment(selectedOrder.order.id, paymentMethod)
       
       if (success) {
-        alert(`✅ Payment Received!\n\nOrder #${selectedOrder.order.order_number}\nAmount: ৳${selectedOrder.order.total.toFixed(2)}\nMethod: ${paymentMethod.toUpperCase()}\n\nThank you!`)
+        showToast(`Payment received! Order #${selectedOrder.order.order_number} · ৳${selectedOrder.order.total.toFixed(2)} · Thank you!`, 'success')
         setSelectedOrder(null)
         fetchOrders()
       } else {
-        alert('❌ Payment failed. Please try again.')
+        showToast('Payment failed. Please try again.', 'error')
       }
     } catch (error) {
       console.error('Error processing payment:', error)
-      alert('❌ Error processing payment.')
+      showToast('Error processing payment.', 'error')
     } finally {
       setProcessingPayment(false)
     }
@@ -259,6 +263,7 @@ export default function BillingPage() {
           </div>
         </div>
       )}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
     </div>
   )
 }
