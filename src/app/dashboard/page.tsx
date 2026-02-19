@@ -42,6 +42,8 @@ export default function DashboardPage() {
   const [weeklyRevenue, setWeeklyRevenue] = useState(0)
   // Per-table food status: 'kot' = in kitchen, 'table' = at table
   const [tableFoodStatus, setTableFoodStatus] = useState<Record<string, 'kot' | 'table'>>({})
+  // Pending bill amount per table (ready + served orders)
+  const [tablePendingBills, setTablePendingBills] = useState<Record<string, number>>({})
 
   // Merge Table modal
   const [showMergeModal, setShowMergeModal] = useState(false)
@@ -146,32 +148,39 @@ export default function DashboardPage() {
     })
   }, [])
 
-  // Fetch order/food status per table (KOT vs At table)
+  // Fetch order/food status per table (KOT vs At table) + pending bill per table
   useEffect(() => {
     if (tables.length === 0) {
       setTableFoodStatus({})
+      setTablePendingBills({})
       return
     }
     const tableIds = tables.map(t => t.id)
-    async function fetchFoodStatus() {
+    async function fetchFoodStatusAndBills() {
       try {
         const { data } = await supabase
           .from('orders')
-          .select('table_id, status')
+          .select('table_id, status, total')
           .in('table_id', tableIds)
           .in('status', ['pending', 'preparing', 'ready', 'served'])
-        const map: Record<string, 'kot' | 'table'> = {}
-        ;(data || []).forEach((row: { table_id: string | null; status: string }) => {
+        const statusMap: Record<string, 'kot' | 'table'> = {}
+        const billsMap: Record<string, number> = {}
+        ;(data || []).forEach((row: { table_id: string | null; status: string; total?: number }) => {
           if (!row.table_id) return
-          if (row.status === 'preparing' || row.status === 'pending') map[row.table_id] = 'kot'
-          if (row.status === 'ready' || row.status === 'served') map[row.table_id] = 'table'
+          if (row.status === 'preparing' || row.status === 'pending') statusMap[row.table_id] = 'kot'
+          if (row.status === 'ready' || row.status === 'served') statusMap[row.table_id] = 'table'
+          if (row.status === 'ready' || row.status === 'served') {
+            billsMap[row.table_id] = (billsMap[row.table_id] || 0) + (row.total ?? 0)
+          }
         })
-        setTableFoodStatus(map)
+        setTableFoodStatus(statusMap)
+        setTablePendingBills(billsMap)
       } catch {
         setTableFoodStatus({})
+        setTablePendingBills({})
       }
     }
-    fetchFoodStatus()
+    fetchFoodStatusAndBills()
   }, [tables])
 
   // Fetch analytics
@@ -529,10 +538,11 @@ export default function DashboardPage() {
                   <LoadingSpinner size="lg" />
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-2 sm:gap-3">
                   {tables.map((table) => {
                     const colors = getStatusColors(table.status)
                     const foodStatus = tableFoodStatus[table.id]
+                    const pendingBill = tablePendingBills[table.id] ?? 0
                     return (
                       <div
                         key={table.id}
@@ -540,33 +550,22 @@ export default function DashboardPage() {
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTableClick(table); } }}
-                        className={`${colors.bg} border ${colors.border} rounded-xl p-3 sm:p-4 cursor-pointer hover:shadow-md transition-all active:scale-[0.98] min-h-[120px] sm:min-h-[140px] flex flex-col items-center justify-between text-center`}
+                        className={`${colors.bg} border ${colors.border} rounded-lg p-2 sm:p-2.5 cursor-pointer hover:shadow-md transition-all active:scale-[0.98] min-h-0 flex flex-col items-center justify-center text-center`}
                       >
-                        {/* Top: capacity */}
-                        <div className="flex items-center gap-1.5 text-slate-600 w-full justify-center">
-                          <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
-                          </svg>
-                          <span className="text-xs sm:text-sm font-bold">{table.seats} Seats</span>
+                        <span className="text-xl sm:text-2xl font-black text-slate-900 font-brand leading-none">{table.table_number}</span>
+                        <span className="text-[10px] text-slate-600 mt-0.5">{table.seats} seats</span>
+                        <div className={`mt-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded ${colors.badge} text-white`}>
+                          <span className="w-1 h-1 rounded-full bg-white/90" />
+                          <span className="font-bold text-[9px] uppercase">{table.status}</span>
                         </div>
-                        {/* Center: table number */}
-                        <div className="flex-1 flex items-center justify-center min-h-[2.5rem]">
-                          <span className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 font-brand leading-none">{table.table_number}</span>
-                        </div>
-                        {/* Bottom: status + food status */}
-                        <div className="flex flex-col items-center gap-1.5 w-full">
-                          <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md ${colors.badge} text-white`}>
-                            <span className="w-1.5 h-1.5 rounded-full bg-white/90" />
-                            <span className="font-bold text-[10px] uppercase">{table.status}</span>
-                          </div>
-                          {foodStatus && (
-                            <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                              foodStatus === 'kot' ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'
-                            }`}>
-                              {foodStatus === 'kot' ? 'In KOT' : 'At table'}
-                            </div>
-                          )}
-                        </div>
+                        {foodStatus && (
+                          <span className={`mt-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${foodStatus === 'kot' ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                            {foodStatus === 'kot' ? 'KOT' : 'Table'}
+                          </span>
+                        )}
+                        {pendingBill > 0 && (
+                          <div className="mt-1.5 text-xs font-bold text-emerald-700">৳{pendingBill.toFixed(0)}</div>
+                        )}
                       </div>
                     )
                   })}

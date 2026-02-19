@@ -74,6 +74,20 @@ export default function KitchenPage() {
 
   const { toast, showToast, hideToast } = useToast()
 
+  // All tables for showing table number/floor on orders (dine-in)
+  const [tablesForLabel, setTablesForLabel] = useState<Table[]>([])
+  useEffect(() => {
+    getAllTables().then(setTablesForLabel)
+  }, [])
+
+  const getOrderTableLabel = (order: Order) => {
+    if (!order.table_id) return order.order_type === 'dine-in' ? '—' : (order.order_type || 'Takeaway')
+    const t = tablesForLabel.find(t => t.id === order.table_id)
+    if (!t) return `Table ?`
+    const floorName = t.floor?.name ? `${t.floor.name} · ` : ''
+    return `${floorName}Table ${t.table_number}`
+  }
+
   const fetchOrders = async () => {
     try {
       const data = await getOrders()
@@ -433,6 +447,9 @@ export default function KitchenPage() {
             </span>
             {getStatusBadge(order.status)}
           </div>
+          <div className="text-xs font-bold text-slate-600 mb-1 uppercase tracking-wide">
+            🪑 {getOrderTableLabel(order)}
+          </div>
           <div className="flex items-center gap-1.5 text-slate-500 text-xs mb-1">
             <svg className="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -619,6 +636,9 @@ export default function KitchenPage() {
                 <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Order details</div>
                 <div className="text-3xl lg:text-4xl font-brand font-black text-white tabular-nums">
                   #{selectedOrder.order.order_number.replace('ORD', '')}
+                </div>
+                <div className="mt-2 text-sm font-bold text-emerald-400">
+                  🪑 {getOrderTableLabel(selectedOrder.order)}
                 </div>
                 <div className="mt-2">{getStatusBadge(selectedOrder.order.status)}</div>
               </div>
