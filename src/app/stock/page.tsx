@@ -45,28 +45,56 @@ export default function StockPage() {
     try {
       setLoading(true)
 
-      // Fetch stock summary with menu items
+      // Fetch stock summary - simplified query
       const { data: stockDataRes, error: stockError } = await supabase
         .from('stock_summary')
-        .select(`
-          *,
-          menu_item:menu_items(id, name, making_cost, category)
-        `)
+        .select('*')
         .order('last_updated', { ascending: false })
 
-      if (stockError) throw stockError
-      setStockData(stockDataRes || [])
+      if (stockError) {
+        console.error('Stock error:', stockError)
+        throw stockError
+      }
 
-      // Fetch all menu items for opening balance entry
-      const { data: itemsData } = await supabase
+      console.log('Stock data fetched:', stockDataRes?.length)
+
+      // Fetch menu items separately
+      const menuItemIds = stockDataRes?.map((s: { menu_item_id?: string }) => s.menu_item_id).filter(Boolean) || []
+
+      let itemsMap: Record<string, { id: string; name: string; making_cost: number; category: string }> = {}
+      if (menuItemIds.length > 0) {
+        const { data: itemsData, error: itemsError } = await supabase
+          .from('menu_items')
+          .select('id, name, making_cost, category')
+          .in('id', menuItemIds)
+
+        if (!itemsError && itemsData) {
+          itemsMap = itemsData.reduce((acc, item) => {
+            acc[item.id] = item
+            return acc
+          }, {} as Record<string, { id: string; name: string; making_cost: number; category: string }>)
+        }
+      }
+
+      // Combine data
+      const combinedData = (stockDataRes || []).map((stock: StockSummary) => ({
+        ...stock,
+        menu_item: itemsMap[stock.menu_item_id] || null
+      }))
+
+      setStockData(combinedData)
+
+      // Fetch all menu items for opening balance dropdown
+      const { data: allItems } = await supabase
         .from('menu_items')
         .select('id, name, making_cost, category')
         .order('name')
 
-      setMenuItems(itemsData || [])
+      setMenuItems(allItems || [])
     } catch (error) {
       console.error('Error:', error)
-      showToast('Failed to load stock data', 'error')
+      showToast('Failed to load stock data: ' + (error as Error).message, 'error')
+      setStockData([])
     } finally {
       setLoading(false)
     }
@@ -281,27 +309,21 @@ export default function StockPage() {
       {loading ? (
         <div className="bg-white rounded-xl p-12 text-center">
           <div className="text-4xl mb-3">⏳</div>
-          <div className="text-slate-500">Loading...</div>
+          <div className="text-slate-500">Loading stock data...</div>
         </div>
       ) : stockData.length === 0 ? (
         <div className="bg-white rounded-xl p-12 text-center border-2 border-slate-200">
           <div className="text-6xl mb-4">📦</div>
           <div className="text-xl font-bold text-slate-900 mb-2">No Stock Data Yet</div>
-          <div className="text-slate-600 mb-4">Set opening balances or make purchases to start tracking</div>
-          <div className="flex flex-wrap gap-3 justify-center">
-            <Link
-              href="/stock/ledger"
-              className="px-6 py-3 bg-slate-600 text-white rounded-lg font-bold hover:bg-slate-700"
-            >
-              📜 View Ledger
-            </Link>
-            <button
-              onClick={() => setShowOpeningModal(true)}
-              className="px-6 py-3 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600"
-            >
-              📝 Set Opening Balance
-            </button>
+          <div className="text-slate-600 mb-4">
+            Set opening balances or make purchases to start tracking stock values
           </div>
+          <button
+            onClick={() => setShowOpeningModal(true)}
+            className="px-6 py-3 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600"
+          >
+            📝 Set Opening Balance
+          </button>
         </div>
       ) : (
         <div className="bg-white rounded-xl border overflow-hidden">
