@@ -53,28 +53,50 @@ export default function BillingPage() {
   const fetchOrders = async () => {
     try {
       setLoading(true)
+
+      // Fetch orders with proper error handling
       const { data, error } = await supabase
         .from('orders')
         .select(`
-          *,
-          table:tables(
+          id,
+          order_number,
+          order_type,
+          total,
+          status,
+          created_at,
+          table_id,
+          customer_name,
+          table:tables (
             table_number,
-            floor:floors(name)
+            floor:floors (
+              name
+            )
           ),
-          order_items(
+          order_items (
             quantity,
             price,
-            menu_item:menu_items(name, name_bangla)
+            menu_item:menu_items (
+              name,
+              name_bangla
+            )
           )
         `)
-        .in('status', ['ready', 'preparing'])
+        .in('status', ['ready', 'preparing', 'kot_sent', 'pending'])
         .order('created_at', { ascending: false })
 
-      if (error) throw error
-      setOrders(data || [])
+      if (error) {
+        console.error('Supabase error:', error)
+        showToast('Database error: ' + error.message, 'error')
+        setOrders([])
+        return
+      }
+
+      console.log('Fetched orders:', data) // Debug log
+      setOrders((data || []) as unknown as Order[])
     } catch (error) {
-      console.error('Error fetching orders:', error)
+      console.error('Catch error:', error)
       showToast('Failed to load orders', 'error')
+      setOrders([])
     } finally {
       setLoading(false)
     }
