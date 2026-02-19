@@ -148,18 +148,22 @@ export default function BillingPage() {
     <meta charSet="utf-8" />
     <title>Invoice #${order.order_number}</title>
     <style>
+      @page {
+        size: 80mm auto;
+        margin: 0;
+      }
       * {
         box-sizing: border-box;
       }
       body {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         margin: 0;
-        padding: 10px;
+        padding: 6px 4px 10px;
         font-size: 12px;
       }
       .invoice-wrapper {
         width: 100%;
-        max-width: 75mm;
+        max-width: 72mm;
         margin: 0 auto;
       }
       .invoice-header {
