@@ -88,6 +88,215 @@ export default function KitchenPage() {
     return `${floorName}Table ${t.table_number}`
   }
 
+  // Manual KOT re-print from Kitchen
+  const printKOT = async (order: Order) => {
+    try {
+      const data = await getOrderWithItems(order.id)
+
+      const tableInfo = order.table_id
+        ? tablesForLabel.find(t => t.id === order.table_id)
+        : undefined
+
+      const orderData = {
+        order_number: data.order.order_number,
+        created_at: data.order.created_at,
+        order_type: data.order.order_type ?? 'dine-in',
+        total: data.order.total,
+        table_number: tableInfo ? tableInfo.table_number : null,
+        buzzer_number: null as number | null,
+        items: data.items.map((item) => ({
+          name: item.item_name,
+          quantity: item.quantity,
+          price: item.unit_price ?? 0,
+          notes: item.notes ?? ''
+        }))
+      }
+
+      const printWindow = window.open('', '', 'width=300,height=600')
+
+      if (!printWindow) {
+        showToast('Please allow popups to print', 'error')
+        return
+      }
+
+      const printContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>KOT - ${orderData.order_number}</title>
+          <style>
+            @media print {
+              @page { 
+                margin: 0; 
+                size: 80mm auto;
+              }
+            }
+            
+            body {
+              font-family: 'Courier New', monospace;
+              padding: 10px;
+              margin: 0;
+              font-size: 12px;
+              width: 80mm;
+            }
+            
+            .header {
+              text-align: center;
+              border-bottom: 2px dashed #000;
+              padding-bottom: 10px;
+              margin-bottom: 10px;
+            }
+            
+            .header h2 {
+              margin: 5px 0;
+              font-size: 18px;
+              font-weight: bold;
+            }
+            
+            .header h3 {
+              margin: 5px 0;
+              font-size: 16px;
+            }
+            
+            .info {
+              margin: 10px 0;
+            }
+            
+            .info-row {
+              display: flex;
+              justify-content: space-between;
+              margin: 3px 0;
+            }
+            
+            .info-label {
+              font-weight: bold;
+            }
+            
+            .divider {
+              border-bottom: 1px dashed #000;
+              margin: 10px 0;
+            }
+            
+            .items {
+              margin: 10px 0;
+            }
+            
+            .item-row {
+              display: flex;
+              justify-content: space-between;
+              margin: 5px 0;
+              font-size: 12px;
+            }
+            
+            .item-name {
+              flex: 1;
+              font-weight: bold;
+            }
+            
+            .item-qty {
+              width: 40px;
+              text-align: center;
+            }
+            
+            .item-price {
+              width: 60px;
+              text-align: right;
+            }
+            
+            .total {
+              border-top: 2px dashed #000;
+              margin-top: 10px;
+              padding-top: 10px;
+            }
+            
+            .total-row {
+              display: flex;
+              justify-content: space-between;
+              font-size: 14px;
+              font-weight: bold;
+              margin: 5px 0;
+            }
+            
+            .footer {
+              text-align: center;
+              border-top: 2px dashed #000;
+              margin-top: 10px;
+              padding-top: 10px;
+              font-size: 10px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h2>KITCHEN ORDER TICKET</h2>
+            <h3>${orderData.order_number}</h3>
+          </div>
+          
+          <div class="info">
+            <div class="info-row">
+              <span class="info-label">Date:</span>
+              <span>${new Date(orderData.created_at).toLocaleDateString()}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Time:</span>
+              <span>${new Date(orderData.created_at).toLocaleTimeString()}</span>
+            </div>
+            ${orderData.table_number ? `
+            <div class="info-row">
+              <span class="info-label">Table:</span>
+              <span style="font-size: 16px; font-weight: bold;">${orderData.table_number}</span>
+            </div>
+            ` : ''}
+            <div class="info-row">
+              <span class="info-label">Type:</span>
+              <span style="text-transform: uppercase;">${orderData.order_type}</span>
+            </div>
+          </div>
+          
+          <div class="divider"></div>
+          
+          <div class="items">
+            ${orderData.items.map((item: any) => `
+              <div class="item-row">
+                <span class="item-qty">${item.quantity}×</span>
+                <span class="item-name">${item.name}</span>
+                <span class="item-price">৳${(item.price * item.quantity).toFixed(2)}</span>
+              </div>
+              ${item.notes ? `<div style="font-size: 10px; margin-left: 40px; color: #666;">Note: ${item.notes}</div>` : ''}
+            `).join('')}
+          </div>
+          
+          <div class="total">
+            <div class="total-row">
+              <span>TOTAL:</span>
+              <span>৳${orderData.total.toFixed(2)}</span>
+            </div>
+          </div>
+          
+          <div class="footer">
+            <p>Thank you!</p>
+            <p style="margin-top: 5px;">Reprinted: ${new Date().toLocaleString()}</p>
+          </div>
+        </body>
+        </html>
+      `
+
+      printWindow.document.write(printContent)
+      printWindow.document.close()
+
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print()
+          printWindow.close()
+        }, 250)
+      }
+    } catch (e) {
+      console.error('KOT re-print failed:', e)
+      showToast('Failed to print KOT', 'error')
+    }
+  }
+
   const fetchOrders = async () => {
     try {
       const data = await getOrders()
@@ -463,7 +672,7 @@ export default function KitchenPage() {
             <button
               type="button"
               onClick={e => { e.stopPropagation(); handleStatusChange(order.id, 'preparing') }}
-              className="w-full py-2.5 bg-blue-500 text-white rounded-xl font-bold text-sm hover:bg-blue-600 active:scale-[0.98] transition-all shadow-sm"
+              className="w-full py-2.5 rounded-full bg-blue-500/95 hover:bg-blue-400 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-500/25 border border-blue-400/70 active:scale-[0.98] transition-all"
             >
               🔵 Start Preparing
             </button>
@@ -472,7 +681,7 @@ export default function KitchenPage() {
             <button
               type="button"
               onClick={e => { e.stopPropagation(); handleStatusChange(order.id, 'ready') }}
-              className="w-full py-2.5 bg-emerald-500 text-white rounded-xl font-bold text-sm hover:bg-emerald-600 active:scale-[0.98] transition-all shadow-sm"
+              className="w-full py-2.5 rounded-full bg-emerald-500/95 hover:bg-emerald-400 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-md shadow-emerald-500/25 border border-emerald-400/70 active:scale-[0.98] transition-all"
             >
               🟢 Mark Ready
             </button>
@@ -481,14 +690,14 @@ export default function KitchenPage() {
             <button
               type="button"
               onClick={e => { e.stopPropagation(); handleStatusChange(order.id, 'served') }}
-              className="w-full py-2.5 bg-slate-600 text-white rounded-xl font-bold text-sm hover:bg-slate-700 active:scale-[0.98] transition-all shadow-sm"
+              className="w-full py-2.5 rounded-full bg-slate-600 hover:bg-slate-500 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-md shadow-slate-900/30 border border-slate-500 active:scale-[0.98] transition-all"
             >
               ✅ Mark Served
             </button>
           )}
           {order.status === 'served' && (
-            <div className="text-center py-2.5 text-slate-500 font-bold text-sm rounded-xl bg-slate-50">
-              Completed
+            <div className="text-center py-2.5 rounded-full bg-slate-50 text-slate-500 font-bold text-xs tracking-wide border border-slate-200">
+              ✅ Completed
             </div>
           )}
           {(order.status === 'pending' || order.status === 'preparing') && (

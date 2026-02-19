@@ -123,40 +123,211 @@ function POSContent() {
   }
 
   const printKOT = (order: { order_number: string; total: number }, cartItems: CartItem[], tableLabel: string) => {
+    const orderData = {
+      order_number: order.order_number,
+      total: order.total,
+      order_type: orderType,
+      customer_name: customerName.trim() || '',
+      // For dine-in we expect \"Table X\" in tableLabel, otherwise leave blank
+      table_number: orderType === 'dine-in' ? tableLabel.replace(/^Table\\s*/i, '') : '',
+      buzzer_number: null as number | null,
+      items: cartItems.map(item => ({
+        quantity: item.quantity,
+        name: item.name,
+        price: item.price,
+        notes: item.notes
+      }))
+    }
+
     try {
-      const printWindow = window.open('', '', 'height=600,width=400')
-      if (!printWindow) return
-      printWindow.document.write(`
+      const printWindow = window.open('', '', 'width=300,height=600')
+
+      if (!printWindow) {
+        showToast('Please allow popups to print KOT', 'error')
+        return
+      }
+
+      const printContent = `
+        <!DOCTYPE html>
         <html>
-          <head>
-            <title>KOT - ${order.order_number}</title>
-            <style>
-              body { font-family: monospace; padding: 20px; }
-              h1 { text-align: center; }
-              .item { margin: 10px 0; }
-            </style>
-          </head>
-          <body>
-            <h1>KOT</h1>
-            <h2>${order.order_number}</h2>
-            <p>Table: ${tableLabel}</p>
-            <p>Time: ${new Date().toLocaleTimeString()}</p>
-            <hr>
-            ${cartItems.map(item => `
-              <div class="item">
-                ${item.quantity}x ${item.name} - ৳${item.price * item.quantity}
+        <head>
+          <meta charset="UTF-8">
+          <title>KOT - ${orderData.order_number}</title>
+          <style>
+            @media print {
+              @page { 
+                margin: 0; 
+                size: 80mm auto;
+              }
+            }
+            
+            body {
+              font-family: 'Courier New', monospace;
+              padding: 10px;
+              margin: 0;
+              font-size: 12px;
+              width: 80mm;
+            }
+            
+            .header {
+              text-align: center;
+              border-bottom: 2px dashed #000;
+              padding-bottom: 10px;
+              margin-bottom: 10px;
+            }
+            
+            .header h2 {
+              margin: 5px 0;
+              font-size: 18px;
+              font-weight: bold;
+            }
+            
+            .header h3 {
+              margin: 5px 0;
+              font-size: 16px;
+            }
+            
+            .info {
+              margin: 10px 0;
+            }
+            
+            .info-row {
+              display: flex;
+              justify-content: space-between;
+              margin: 3px 0;
+            }
+            
+            .info-label {
+              font-weight: bold;
+            }
+            
+            .divider {
+              border-bottom: 1px dashed #000;
+              margin: 10px 0;
+            }
+            
+            .items {
+              margin: 10px 0;
+            }
+            
+            .item-row {
+              display: flex;
+              justify-content: space-between;
+              margin: 5px 0;
+              font-size: 12px;
+            }
+            
+            .item-name {
+              flex: 1;
+              font-weight: bold;
+            }
+            
+            .item-qty {
+              width: 40px;
+              text-align: center;
+            }
+            
+            .item-price {
+              width: 60px;
+              text-align: right;
+            }
+            
+            .total {
+              border-top: 2px dashed #000;
+              margin-top: 10px;
+              padding-top: 10px;
+            }
+            
+            .total-row {
+              display: flex;
+              justify-content: space-between;
+              font-size: 14px;
+              font-weight: bold;
+              margin: 5px 0;
+            }
+            
+            .footer {
+              text-align: center;
+              border-top: 2px dashed #000;
+              margin-top: 10px;
+              padding-top: 10px;
+              font-size: 10px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class=\"header\">
+            <h2>KITCHEN ORDER TICKET</h2>
+            <h3>${orderData.order_number}</h3>
+          </div>
+          
+          <div class=\"info\">
+            <div class=\"info-row\">
+              <span class=\"info-label\">Date:</span>
+              <span>${new Date().toLocaleDateString()}</span>
+            </div>
+            <div class=\"info-row\">
+              <span class=\"info-label\">Time:</span>
+              <span>${new Date().toLocaleTimeString()}</span>
+            </div>
+            ${orderData.table_number ? `
+            <div class=\"info-row\">
+              <span class=\"info-label\">Table:</span>
+              <span style=\"font-size: 16px; font-weight: bold;\">${orderData.table_number}</span>
+            </div>
+            ` : ''}
+            <div class=\"info-row\">
+              <span class=\"info-label\">Type:</span>
+              <span style=\"text-transform: uppercase;\">${orderData.order_type}</span>
+            </div>
+            ${orderData.customer_name ? `
+            <div class=\"info-row\">
+              <span class=\"info-label\">Customer:</span>
+              <span>${orderData.customer_name}</span>
+            </div>
+            ` : ''}
+          </div>
+          
+          <div class=\"divider\"></div>
+          
+          <div class=\"items\">
+            ${orderData.items.map((item: any) => `
+              <div class=\"item-row\">
+                <span class=\"item-qty\">${item.quantity}×</span>
+                <span class=\"item-name\">${item.name}</span>
+                <span class=\"item-price\">৳${(item.price * item.quantity).toFixed(2)}</span>
               </div>
+              ${item.notes ? `<div style=\"font-size: 10px; margin-left: 40px; color: #666;\">Note: ${item.notes}</div>` : ''}
             `).join('')}
-            <hr>
-            <p>Total: ৳${order.total}</p>
-          </body>
+          </div>
+          
+          <div class=\"total\">
+            <div class=\"total-row\">
+              <span>TOTAL:</span>
+              <span>৳${orderData.total.toFixed(2)}</span>
+            </div>
+          </div>
+          
+          <div class=\"footer\">
+            <p>Thank you!</p>
+            <p style=\"margin-top: 5px;\">Printed: ${new Date().toLocaleString()}</p>
+          </div>
+        </body>
         </html>
-      `)
+      `
+
+      printWindow.document.write(printContent)
       printWindow.document.close()
-      printWindow.print()
-      printWindow.onafterprint = () => printWindow.close()
+
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print()
+          printWindow.close()
+        }, 250)
+      }
     } catch (e) {
       console.error('KOT print failed:', e)
+      showToast('Failed to print KOT', 'error')
     }
   }
 

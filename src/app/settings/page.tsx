@@ -557,38 +557,38 @@ export default function SettingsPage() {
 
               <div className="overflow-x-auto">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 min-w-0">
-                {tables.map(table => (
-                  <div key={table.id} className="bg-slate-50 rounded-xl p-4 border-2 border-slate-200">
-                    <div className="text-center mb-3">
-                      <div className="text-3xl font-brand font-black text-emerald-600">
-                        {table.table_number}
+                  {tables.map(table => (
+                    <div key={table.id} className="bg-slate-50 rounded-xl p-4 border-2 border-slate-200">
+                      <div className="text-center mb-3">
+                        <div className="text-3xl font-brand font-black text-emerald-600">
+                          {table.table_number}
+                        </div>
+                        <div className="text-sm text-slate-600">{table.seats} seats</div>
                       </div>
-                      <div className="text-sm text-slate-600">{table.seats} seats</div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setEditingTable(table)
+                            setTableForm({
+                              table_number: table.table_number.toString(),
+                              floor_id: table.floor_id,
+                              seats: table.seats.toString()
+                            })
+                            setShowTableModal(true)
+                          }}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-lg border border-blue-500 text-blue-600 bg-white hover:bg-blue-50 font-semibold text-xs sm:text-sm shadow-sm transition-colors"
+                        >
+                          ✏️ <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTable(table)}
+                          className="w-10 h-10 inline-flex items-center justify-center rounded-full bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 text-sm font-bold shadow-sm transition-colors"
+                        >
+                          🗑️
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setEditingTable(table)
-                          setTableForm({
-                            table_number: table.table_number.toString(),
-                            floor_id: table.floor_id,
-                            seats: table.seats.toString()
-                          })
-                          setShowTableModal(true)
-                        }}
-                        className="flex-1 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-bold text-sm"
-                      >
-                        ✏️ Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteTable(table)}
-                        className="flex-1 py-2 rounded-lg bg-rose-500 hover:bg-rose-600 text-white font-bold text-sm"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  ))}
                 </div>
               </div>
             </div>
