@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getFloors, getTablesByFloor, Floor, Table } from '@/app/lib/api/tables'
+import { getTablesByFloor, Floor, Table } from '@/app/lib/api/tables'
 import { supabase } from '@/app/lib/api/tables'
 import { getCashDrawerUrl, setCashDrawerUrl as saveCashDrawerUrl } from '@/app/lib/cashDrawer'
 import Toast from '@/components/Toast'
@@ -34,8 +34,14 @@ export default function SettingsPage() {
 
   // Form states
   const [floorForm, setFloorForm] = useState({ name: '' })
-  const [tableForm, setTableForm] = useState({ 
+  const [tableForm, setTableForm] = useState<{ 
+    table_number: string
+    floor_id: string
+    seats: string
+    location: string
+  }>({ 
     table_number: '', 
+    floor_id: '',
     seats: '4',
     location: ''
   })
@@ -108,13 +114,24 @@ export default function SettingsPage() {
 
   const fetchFloors = async () => {
     try {
-      const data = await getFloors()
-      setFloors(data)
-      if (data.length > 0 && !selectedFloor) {
+      const { data, error } = await supabase
+        .from('floors')
+        .select('*')
+        .order('name')
+
+      if (error) {
+        console.error('Error fetching floors:', error)
+        showToast('Failed to load floors', 'error')
+        return
+      }
+      console.log('Floors loaded:', data)
+      setFloors(data || [])
+      if (data && data.length > 0 && !selectedFloor) {
         setSelectedFloor(data[0])
       }
     } catch (error) {
       console.error('Error fetching floors:', error)
+      showToast('Failed to load floors', 'error')
     } finally {
       setLoading(false)
     }
@@ -246,8 +263,13 @@ export default function SettingsPage() {
 
   // Add/Edit Table
   const handleSaveTable = async () => {
-    if (!selectedFloor || !tableForm.table_number.trim()) {
+    if (!tableForm.table_number.trim()) {
       showToast('Please enter table number', 'error')
+      return
+    }
+
+    if (!editingTable && !tableForm.floor_id) {
+      showToast('Please select a floor', 'error')
       return
     }
 
@@ -257,34 +279,50 @@ export default function SettingsPage() {
         const { error } = await supabase
           .from('tables')
           .update({
-            table_number: tableForm.table_number,
-            seats: parseInt(tableForm.seats),
-            location: tableForm.location
+            table_number: tableForm.table_number.trim(),
+            seats: parseInt(tableForm.seats, 10) || 4,
+            location: (tableForm.location || '').trim()
           })
           .eq('id', editingTable.id)
 
         if (error) throw error
         showToast('Table updated!', 'success')
-      } else {
-        // Add new table
-        const { error } = await supabase
-          .from('tables')
-          .insert({
-            floor_id: selectedFloor.id,
-            table_number: tableForm.table_number,
-            seats: parseInt(tableForm.seats),
-            location: tableForm.location,
-            status: 'available'
-          })
-
-        if (error) throw error
-        showToast('Table added!', 'success')
+        setShowTableModal(false)
+        setEditingTable(null)
+        setTableForm({ table_number: '', floor_id: '', seats: '4', location: '' })
+        fetchTables()
+        return
       }
 
+      // Add new table
+      console.log('Creating table:', tableForm)
+      const { data: inserted, error } = await supabase
+        .from('tables')
+        .insert({
+          floor_id: tableForm.floor_id,
+          table_number: tableForm.table_number.trim(),
+          seats: parseInt(tableForm.seats, 10) || 4,
+          location: (tableForm.location || '').trim() || null,
+          status: 'available',
+          is_active: true
+        })
+        .select()
+
+      if (error) {
+        console.error('Table creation error:', error)
+        showToast('Failed to create table: ' + error.message, 'error')
+        return
+      }
+      console.log('Table created successfully:', inserted)
+      showToast('Table created successfully!', 'success')
       setShowTableModal(false)
       setEditingTable(null)
-      setTableForm({ table_number: '', seats: '4', location: '' })
-      fetchTables()
+      setTableForm({ table_number: '', floor_id: '', seats: '4', location: '' })
+      fetchFloors()
+      const floorId = tableForm.floor_id
+      const floor = floors.find(f => f.id === floorId)
+      if (floor) setSelectedFloor(floor)
+      if (floorId === selectedFloor?.id) fetchTables()
     } catch (error) {
       console.error('Error saving table:', error)
       showToast('Failed to save table', 'error')
@@ -508,7 +546,12 @@ export default function SettingsPage() {
                   type="button"
                   onClick={() => {
                     setEditingTable(null)
-                    setTableForm({ table_number: '', seats: '4', location: '' })
+                    setTableForm({
+                      table_number: '',
+                      floor_id: selectedFloor?.id ?? floors[0]?.id ?? '',
+                      seats: '4',
+                      location: ''
+                    })
                     setShowTableModal(true)
                   }}
                   className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors"
@@ -536,6 +579,7 @@ export default function SettingsPage() {
                           setEditingTable(table)
                           setTableForm({
                             table_number: table.table_number.toString(),
+                            floor_id: table.floor_id,
                             seats: table.seats.toString(),
                             location: table.location || ''
                           })
@@ -605,9 +649,40 @@ export default function SettingsPage() {
             <h2 className="text-xl lg:text-2xl font-bold text-slate-900 mb-6">
               {editingTable ? '✏️ Edit Table' : '➕ Add Table'}
             </h2>
+            {!editingTable && (
+              <div className="mb-4">
+                <label className="block text-sm font-bold text-slate-700 mb-2">Floor *</label>
+                <select
+                  value={tableForm.floor_id}
+                  onChange={(e) => setTableForm({ ...tableForm, floor_id: e.target.value })}
+                  required
+                  className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg text-slate-900 focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="">Select Floor</option>
+                  {floors.map(floor => (
+                    <option key={floor.id} value={floor.id}>
+                      {floor.name}
+                    </option>
+                  ))}
+                </select>
+                {floors.length === 0 && (
+                  <div className="text-xs text-red-600 mt-1">
+                    No floors found! Please create floors first in the Floors tab.
+                  </div>
+                )}
+              </div>
+            )}
+            {editingTable && selectedFloor && (
+              <div className="mb-4">
+                <label className="block text-sm font-bold text-slate-700 mb-2">Floor</label>
+                <div className="w-full px-4 py-3 rounded-lg bg-slate-100 text-slate-700 font-medium">
+                  {selectedFloor.name}
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
               <div className="lg:col-span-2">
-                <label className="block text-sm font-bold text-slate-700 mb-2">Table Number*</label>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Table Number *</label>
                 <input
                   type="text"
                   value={tableForm.table_number}

@@ -61,6 +61,9 @@ export default function DashboardPage() {
   // Restaurant name from settings (DB first, then localStorage fallback)
   const [restaurantName, setRestaurantName] = useState<string>('NextTable')
 
+  // Available tables count (for Dine-in quick action)
+  const [availableTablesCount, setAvailableTablesCount] = useState<number>(0)
+
   useEffect(() => {
     const fetchRestaurantInfo = async () => {
       try {
@@ -134,6 +137,14 @@ export default function DashboardPage() {
     }
     loadTables()
   }, [selectedFloor])
+
+  // Fetch available tables count (for Dine-in link)
+  useEffect(() => {
+    getAllTables().then(data => {
+      const count = data.filter(t => t.status === 'available').length
+      setAvailableTablesCount(count)
+    })
+  }, [])
 
   // Fetch order/food status per table (KOT vs At table)
   useEffect(() => {
@@ -436,7 +447,8 @@ export default function DashboardPage() {
               <div className="flex flex-wrap gap-2 sm:gap-3">
                 <Link href="/pos?type=dine-in" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-emerald-50 hover:border-emerald-200 text-slate-700 text-sm font-semibold transition-colors cursor-pointer">
                   <svg className="w-5 h-5 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                  Dine-in
+                  <span>🍽️ Dine-in</span>
+                  <span className="text-xs text-slate-500 font-normal">({availableTablesCount} available)</span>
                 </Link>
                 <Link href="/pos?type=takeaway" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-emerald-50 hover:border-emerald-200 text-slate-700 text-sm font-semibold transition-colors cursor-pointer">
                   <svg className="w-5 h-5 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>

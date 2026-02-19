@@ -141,7 +141,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       <div
         className={`fixed lg:relative top-0 left-0 z-50 bg-slate-950 text-white h-screen overflow-y-auto flex flex-col transition-all duration-300 ease-out lg:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
-        } ${isCollapsed ? 'w-20' : 'w-80'}`}
+        } ${isCollapsed ? 'w-20' : 'w-64'}`}
       >
         {/* Header */}
         <div className={`border-b border-slate-800 flex items-center justify-between ${isCollapsed ? 'p-3 justify-center' : 'p-6'}`}>

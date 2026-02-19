@@ -189,6 +189,43 @@ export async function getOrdersForBilling(): Promise<Order[]> {
   return data || []
 }
 
+// Billing order with table & floor (for Billing Hub)
+export interface OrderForBilling extends Order {
+  table?: { table_number: number; floor?: { name: string } } | null
+  order_items?: { id: string }[]
+}
+
+// Get orders ready for billing with table and floor info
+export async function getOrdersForBillingWithDetails(): Promise<OrderForBilling[]> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select(`
+      *,
+      tables (
+        table_number,
+        floors (name)
+      ),
+      order_items (id)
+    `)
+    .in('status', ['ready', 'served'])
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  const rows = data || []
+  return rows.map((row: Record<string, unknown>) => {
+    const { tables, order_items, ...order } = row
+    const table = tables
+      ? {
+          table_number: (tables as { table_number: number }).table_number,
+          floor: (tables as { floors: { name: string } | null }).floors
+            ? { name: (tables as { floors: { name: string } }).floors.name }
+            : undefined
+        }
+      : null
+    return { ...order, table, order_items: order_items || [] } as OrderForBilling
+  })
+}
+
 // Mark order as served via RPC
 export async function markOrderAsServed(orderId: string): Promise<boolean> {
   const { error } = await supabase.rpc('mark_order_served', { order_id: orderId })

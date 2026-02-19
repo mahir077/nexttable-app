@@ -1,23 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getOrdersForBilling, getOrderWithItems, processPayment } from '@/app/lib/api/orders'
+import { getOrdersForBillingWithDetails, getPaidOrders, getOrderWithItems, processPayment, type OrderForBilling } from '@/app/lib/api/orders'
 import { openCashDrawer } from '@/app/lib/cashDrawer'
+import BackButton from '@/components/BackButton'
 import LoadingSpinner from '@/components/LoadingSpinner'
-import EmptyState from '@/components/EmptyState'
 import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
-
-interface Order {
-  id: string
-  order_number: string
-  table_id: string | null
-  status: string
-  subtotal: number
-  tax: number
-  total: number
-  created_at: string
-}
 
 interface OrderItem {
   id: string
@@ -29,18 +18,24 @@ interface OrderItem {
 }
 
 export default function BillingPage() {
-  const [orders, setOrders] = useState<Order[]>([])
-  const [selectedOrder, setSelectedOrder] = useState<{ order: Order; items: OrderItem[] } | null>(null)
+  const [pendingOrders, setPendingOrders] = useState<OrderForBilling[]>([])
+  const [completedToday, setCompletedToday] = useState(0)
+  const [selectedOrder, setSelectedOrder] = useState<{ order: OrderForBilling; items: OrderItem[] } | null>(null)
   const [loading, setLoading] = useState(true)
   const [processingPayment, setProcessingPayment] = useState(false)
 
   const { toast, showToast, hideToast } = useToast()
 
-  // Fetch orders ready for billing
   const fetchOrders = async () => {
     try {
-      const data = await getOrdersForBilling()
-      setOrders(data)
+      const [pending, paid] = await Promise.all([
+        getOrdersForBillingWithDetails(),
+        getPaidOrders()
+      ])
+      setPendingOrders(pending)
+      const today = new Date().toDateString()
+      const paidToday = paid.filter(o => o.paid_at && new Date(o.paid_at).toDateString() === today)
+      setCompletedToday(paidToday.length)
     } catch (error) {
       console.error('Error fetching orders for billing:', error)
     } finally {
@@ -54,11 +49,10 @@ export default function BillingPage() {
     return () => clearInterval(interval)
   }, [])
 
-  // View order details for billing
-  const viewBill = async (order: Order) => {
+  const handleSelectOrder = async (order: OrderForBilling) => {
     try {
       const data = await getOrderWithItems(order.id)
-      setSelectedOrder(data)
+      setSelectedOrder({ order: { ...order, ...data.order } as OrderForBilling, items: data.items })
     } catch (error) {
       console.error('Error fetching order details for bill:', error)
     }
@@ -95,54 +89,110 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
+    <div className="min-h-screen bg-slate-50 p-3 lg:p-6">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-brand font-black text-slate-900 mb-2">💰 BILLING HUB</h1>
-        <p className="text-slate-600">Orders Ready: <span className="font-bold text-2xl text-slate-900">{orders.length}</span></p>
+      <div className="mb-4 lg:mb-6 flex items-center gap-3 lg:gap-4">
+        <BackButton />
+        <div>
+          <h1 className="text-2xl lg:text-4xl font-brand font-black text-slate-900">💰 BILLING HUB</h1>
+          <p className="text-xs lg:text-sm text-slate-600">Pending bills & payments</p>
+        </div>
       </div>
 
-      {/* Orders Grid */}
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <LoadingSpinner size="lg" />
         </div>
-      ) : orders.length === 0 ? (
-        <EmptyState
-          icon="✨"
-          title="All Clear!"
-          description="No orders ready for billing. All caught up!"
-        />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {orders.map((order) => (
-            <button
-              key={order.id}
-              onClick={() => viewBill(order)}
-              className="bg-white rounded-2xl p-6 border-2 border-slate-200 hover:border-emerald-500 hover:shadow-lg transition-all text-left"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <div className="text-sm text-slate-500 mb-1">ORDER</div>
-                  <div className="text-3xl font-brand font-black text-emerald-600">
-                    #{order.order_number.replace('ORD', '')}
+        <>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4 mb-6">
+            <div className="bg-red-50 rounded-xl p-4 border-2 border-red-200">
+              <div className="text-xs text-red-600 mb-1">Pending Bills</div>
+              <div className="text-3xl font-bold text-red-700">{pendingOrders.length}</div>
+            </div>
+            <div className="bg-blue-50 rounded-xl p-4 border-2 border-blue-200">
+              <div className="text-xs text-blue-600 mb-1">Total Amount</div>
+              <div className="text-3xl font-bold text-blue-700">
+                ৳{pendingOrders.reduce((sum, o) => sum + (o.total || 0), 0).toFixed(2)}
+              </div>
+            </div>
+            <div className="bg-emerald-50 rounded-xl p-4 border-2 border-emerald-200">
+              <div className="text-xs text-emerald-600 mb-1">Completed Today</div>
+              <div className="text-3xl font-bold text-emerald-700">{completedToday}</div>
+            </div>
+          </div>
+
+          {/* Pending Bills - Large Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {pendingOrders.map((order) => (
+              <div
+                key={order.id}
+                onClick={() => handleSelectOrder(order)}
+                className="bg-white rounded-xl p-4 lg:p-6 border-2 border-slate-200 hover:border-emerald-500 cursor-pointer transition-all hover:shadow-lg"
+              >
+                {/* Table Number - Large */}
+                <div className="text-center mb-4 p-4 bg-slate-50 rounded-lg">
+                  <div className="text-sm text-slate-500 mb-1">TABLE</div>
+                  <div className="text-5xl font-black text-slate-900">
+                    {order.table?.table_number ?? '—'}
+                  </div>
+                  {order.table?.floor && (
+                    <div className="text-xs text-slate-500 mt-1">{order.table.floor.name}</div>
+                  )}
+                </div>
+
+                {/* Order Details */}
+                <div className="space-y-2 mb-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Order:</span>
+                    <span className="font-bold">{order.order_number}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Type:</span>
+                    <span className="font-semibold capitalize">{order.order_type || 'dine-in'}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Items:</span>
+                    <span className="font-semibold">{order.order_items?.length ?? 0}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Time:</span>
+                    <span className="font-semibold">
+                      {new Date(order.created_at).toLocaleTimeString()}
+                    </span>
                   </div>
                 </div>
-                <div className={`px-4 py-2 rounded-full font-bold text-sm ${
-                  order.status === 'ready' 
-                    ? 'bg-emerald-100 text-emerald-700' 
-                    : 'bg-blue-100 text-blue-700'
-                }`}>
-                  {order.status.toUpperCase()}
+
+                {/* Amount - Highlighted */}
+                <div className="border-t-2 pt-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-bold text-slate-600">TOTAL BILL:</span>
+                    <span className="text-3xl font-black text-emerald-600">
+                      ৳{(order.total ?? 0).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Status Badge */}
+                <div className="mt-3">
+                  <div className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold text-center">
+                    💳 PENDING PAYMENT
+                  </div>
                 </div>
               </div>
-              
-              <div className="text-3xl font-brand font-black text-slate-900">
-                ৳{order.total.toFixed(2)}
-              </div>
-            </button>
-          ))}
-        </div>
+            ))}
+          </div>
+
+          {/* Empty State */}
+          {pendingOrders.length === 0 && (
+            <div className="bg-white rounded-xl p-12 text-center border-2 border-slate-200">
+              <div className="text-6xl mb-4">✅</div>
+              <div className="text-xl font-bold text-slate-900 mb-2">All Clear!</div>
+              <div className="text-slate-600">No pending bills at the moment</div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Bill Modal */}

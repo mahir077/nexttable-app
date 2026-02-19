@@ -219,6 +219,19 @@ function POSContent() {
 
   const handleSendKOT = async () => {
     try {
+      if (orderType === 'dine-in' && selectedTable) {
+        const { data: tableCheck } = await supabase
+          .from('tables')
+          .select('status')
+          .eq('id', selectedTable)
+          .single()
+
+        if (tableCheck && tableCheck.status !== 'available') {
+          showToast('This table is no longer available! Please select another table.', 'error')
+          return
+        }
+      }
+
       const orderNumber = `ORD-${Date.now()}`
       const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
       const tax = 0
@@ -262,6 +275,10 @@ function POSContent() {
 
       const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
       if (itemsError) throw itemsError
+
+      if (orderType === 'dine-in' && selectedTable) {
+        await supabase.from('tables').update({ status: 'occupied' }).eq('id', selectedTable)
+      }
 
       const tableLabel = orderType === 'dine-in' && selectedTable
         ? `Table ${tables.find(t => t.id === selectedTable)?.table_number ?? '?'}`
@@ -730,21 +747,33 @@ function POSContent() {
               ))}
             </div>
             <div className="flex-1 overflow-y-auto p-4">
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {tables.map(t => (
                   <button
                     key={t.id}
                     type="button"
                     onClick={() => {
-                      setSelectedTable(t.id)
-                      setShowTableModal(false)
+                      if (t.status === 'available') {
+                        setSelectedTable(t.id)
+                        setShowTableModal(false)
+                      }
                     }}
-                    className={`min-h-[44px] py-4 rounded-xl font-bold text-slate-900 border-2 transition-all flex flex-col items-center justify-center text-center ${
-                      selectedTable === t.id ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white border-slate-200 hover:border-emerald-400'
+                    disabled={t.status !== 'available'}
+                    className={`min-h-[44px] py-4 rounded-lg border-2 font-bold flex flex-col items-center justify-center text-center transition-all ${
+                      t.status === 'available'
+                        ? selectedTable === t.id
+                          ? 'bg-emerald-500 text-white border-emerald-500 ring-4 ring-emerald-200 cursor-pointer'
+                          : 'bg-white border-emerald-500 hover:bg-emerald-50 text-slate-900 cursor-pointer'
+                        : 'bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed'
                     }`}
                   >
-                    <span>{t.table_number}</span>
-                    <span className="text-xs font-normal opacity-80">{t.seats} seats</span>
+                    <span className="text-lg">{t.table_number}</span>
+                    <span className="text-xs mt-1 font-normal">
+                      {t.status === 'available' && '🟢 Available'}
+                      {t.status === 'occupied' && '🔴 Occupied'}
+                      {t.status === 'reserved' && '🟡 Reserved'}
+                      {t.status === 'billing' && '🔵 Billing'}
+                    </span>
                   </button>
                 ))}
               </div>
