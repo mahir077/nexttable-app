@@ -468,20 +468,20 @@ export default function MenuManagementPage() {
               <div className="text-emerald-600 font-bold text-sm mt-1">৳{item.price.toFixed(0)}</div>
 
               {/* Action buttons - horizontal */}
-              <div className="flex gap-1 mt-2">
+              <div className="flex gap-2 mt-2">
                 <button
                   type="button"
                   onClick={() => openEditModal(item)}
-                  className="flex-1 px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-bold transition-colors"
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg border border-blue-500 bg-white text-blue-600 hover:bg-blue-50 text-[11px] font-semibold transition-colors shadow-sm"
                 >
-                  Edit
+                  ✏️ <span>Edit</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDelete(item.id, item.name)}
-                  className="flex-1 px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-bold transition-colors"
+                  className="w-8 inline-flex items-center justify-center rounded-lg bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 text-xs font-bold transition-colors shadow-sm"
                 >
-                  Delete
+                  🗑️
                 </button>
               </div>
             </div>

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { getTablesByFloor, Floor, Table } from '@/app/lib/api/tables'
 import { supabase } from '@/app/lib/api/tables'
 import { getCashDrawerUrl, setCashDrawerUrl as saveCashDrawerUrl } from '@/app/lib/cashDrawer'
+import BackButton from '@/components/BackButton'
 import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
 
@@ -347,9 +348,12 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 lg:p-6">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl lg:text-4xl font-brand font-black text-slate-900 mb-2">⚙️ SETTINGS</h1>
-        <p className="text-slate-600 text-sm">Manage your restaurant configuration</p>
+      <div className="mb-6 flex items-center gap-4">
+        <BackButton />
+        <div>
+          <h1 className="text-3xl lg:text-4xl font-brand font-black text-slate-900 mb-1">⚙️ SETTINGS</h1>
+          <p className="text-slate-600 text-sm">Manage your restaurant configuration</p>
+        </div>
       </div>
 
       {/* Tabs */}
