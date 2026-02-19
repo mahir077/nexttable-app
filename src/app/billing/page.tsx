@@ -43,6 +43,9 @@ export default function BillingPage() {
   // Print state
   const [isPrinting, setIsPrinting] = useState(false)
 
+  // Cash drawer: true = auto-open on cash payment, false = stay closed
+  const [cashDrawerEnabled, setCashDrawerEnabled] = useState(true)
+
   const { toast, showToast, hideToast } = useToast()
 
   useEffect(() => {
@@ -142,41 +145,66 @@ export default function BillingPage() {
     }
 
     try {
-      const { error } = await supabase
+      console.log('Completing payment for order:', selectedOrder.id)
+      console.log('Payment method:', selectedPaymentMethod)
+      console.log('Final total:', finalTotal)
+
+      // Update order with only the columns that exist
+      const updateData: Record<string, unknown> = {
+        status: 'completed',
+        payment_method: selectedPaymentMethod,
+        completed_at: new Date().toISOString()
+      }
+
+      // Add discount info only if columns exist
+      if (discountType !== 'none') {
+        updateData.discount_type = discountType
+        updateData.discount_value = discountValue
+        updateData.discount_amount = discountAmount
+      }
+
+      // Add final_total only if it exists
+      if (finalTotal !== selectedOrder.total) {
+        updateData.final_total = finalTotal
+      }
+
+      const { error: orderError } = await supabase
         .from('orders')
-        .update({
-          status: 'completed',
-          payment_method: selectedPaymentMethod,
-          discount_type: discountType,
-          discount_value: discountValue,
-          discount_amount: discountAmount,
-          final_total: finalTotal,
-          completed_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', selectedOrder.id)
 
-      if (error) throw error
+      if (orderError) {
+        console.error('Order update error:', orderError)
+        throw orderError
+      }
 
       // Update table status if dine-in
       if (selectedOrder.table_id) {
-        await supabase
+        const { error: tableError } = await supabase
           .from('tables')
           .update({ status: 'available' })
           .eq('id', selectedOrder.table_id)
+
+        if (tableError) {
+          console.error('Table update error:', tableError)
+          // Don't throw - payment already completed
+        }
       }
 
-      showToast('✅ Payment completed!', 'success')
+      showToast('✅ Payment completed successfully!', 'success')
 
-      // Reset
+      // Reset all states
       setSelectedOrder(null)
       setDiscountType('none')
       setDiscountValue(0)
       setSelectedPaymentMethod(null)
 
-      fetchOrders()
+      // Refresh orders list
+      await fetchOrders()
     } catch (error) {
-      console.error('Payment error:', error)
-      showToast('Failed to complete payment', 'error')
+      console.error('Payment completion error:', error)
+      const errorMessage = (error as Error)?.message || 'Unknown error'
+      showToast('Payment failed: ' + errorMessage, 'error')
     }
   }
 
@@ -377,6 +405,17 @@ export default function BillingPage() {
     printWindow.onload = () => {
       setTimeout(() => {
         printWindow.print()
+
+        // Open cash drawer ONLY if toggle is ON and payment method is CASH
+        if (cashDrawerEnabled && selectedPaymentMethod === 'cash') {
+          setTimeout(() => {
+            console.log('Opening cash drawer...')
+            openCashDrawerCommand()
+          }, 500)
+        } else {
+          console.log('Cash drawer disabled or not cash payment')
+        }
+
         setTimeout(() => {
           printWindow.close()
           setIsPrinting(false)
@@ -387,16 +426,88 @@ export default function BillingPage() {
     setTimeout(() => setIsPrinting(false), 3000)
   }
 
+  const openCashDrawerCommand = () => {
+    try {
+      // ESC/POS command for opening cash drawer: ESC + p + 0 + 25 + 250
+      const escPos = '\x1B\x70\x00\x19\xFA'
+
+      const iframe = document.createElement('iframe')
+      iframe.style.display = 'none'
+      document.body.appendChild(iframe)
+
+      const doc = iframe.contentWindow?.document
+      if (doc) {
+        doc.open()
+        doc.write(`
+          <html>
+          <head><title>Open Drawer</title></head>
+          <body>
+            <pre style="display:none;">${escPos}</pre>
+            <script>
+              setTimeout(function() {
+                window.print();
+              }, 100);
+            </script>
+          </body>
+          </html>
+        `)
+        doc.close()
+
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe)
+          }
+        }, 2000)
+      }
+
+      console.log('Cash drawer command sent')
+    } catch (error) {
+      console.error('Cash drawer error:', error)
+    }
+  }
+
   const pendingAmount = orders.reduce((sum, o) => sum + (o.total || 0), 0)
 
   return (
     <div className="min-h-screen bg-slate-50 p-3 lg:p-6">
       {/* Header */}
-      <div className="mb-4 lg:mb-6 flex items-center gap-3 lg:gap-4">
-        <BackButton />
-        <div>
-          <h1 className="text-2xl lg:text-4xl font-brand font-black text-slate-900">💰 BILLING HUB</h1>
-          <p className="text-xs lg:text-sm text-slate-600">Pending bills & checkout</p>
+      <div className="mb-4 lg:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-3 lg:gap-4">
+          <BackButton />
+          <div>
+            <h1 className="text-2xl lg:text-4xl font-brand font-black text-slate-900">💰 BILLING HUB</h1>
+            <p className="text-xs lg:text-sm text-slate-600">Pending bills & checkout</p>
+          </div>
+        </div>
+
+        {/* Cash Drawer Toggle - Always Visible */}
+        <div className="bg-white rounded-lg p-3 border-2 border-slate-200 flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">💰</span>
+            <div>
+              <div className="font-bold text-sm text-slate-900">Cash Drawer</div>
+              <div className="text-xs text-slate-500">Auto-open on cash payment</div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setCashDrawerEnabled(!cashDrawerEnabled)}
+            className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 ${
+              cashDrawerEnabled ? 'bg-emerald-500' : 'bg-slate-300'
+            }`}
+          >
+            <span className="sr-only">Toggle cash drawer</span>
+            <span
+              className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform ${
+                cashDrawerEnabled ? 'translate-x-7' : 'translate-x-1'
+              }`}
+            />
+          </button>
+
+          <span className={`text-xs font-bold ${cashDrawerEnabled ? 'text-emerald-600' : 'text-slate-400'}`}>
+            {cashDrawerEnabled ? 'ON' : 'OFF'}
+          </span>
         </div>
       </div>
 
@@ -593,6 +704,21 @@ export default function BillingPage() {
                       </button>
                     ))}
                   </div>
+
+                  {/* Show drawer status when cash selected */}
+                  {selectedPaymentMethod === 'cash' && (
+                    <div
+                      className={`mt-2 p-2 rounded text-xs font-semibold ${
+                        cashDrawerEnabled
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-slate-50 text-slate-600 border border-slate-200'
+                      }`}
+                    >
+                      {cashDrawerEnabled
+                        ? '✓ Cash drawer will open automatically'
+                        : '○ Cash drawer will stay closed'}
+                    </div>
+                  )}
                 </div>
 
                 {/* Actions */}
