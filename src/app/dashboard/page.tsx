@@ -545,9 +545,8 @@ export default function DashboardPage() {
                   <LoadingSpinner size="lg" />
                 </div>
               ) : (
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-2 sm:gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-3 lg:gap-4">
                   {tables.map((table) => {
-                    const colors = getStatusColors(table.status)
                     const foodStatus = tableFoodStatus[table.id]
                     const pendingBill = tablePendingBills[table.id] ?? 0
                     return (
@@ -557,21 +556,50 @@ export default function DashboardPage() {
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleTableClick(table); } }}
-                        className={`${colors.bg} border ${colors.border} rounded-lg p-2 sm:p-2.5 cursor-pointer hover:shadow-md transition-all active:scale-[0.98] min-h-0 flex flex-col items-center justify-center text-center`}
+                        className={`bg-white rounded-xl p-4 lg:p-6 border-2 min-h-[160px] lg:min-h-[200px] hover:shadow-xl transition-all cursor-pointer flex flex-col items-center justify-center text-center ${
+                          table.status === 'available' ? 'border-emerald-200 hover:border-emerald-400' :
+                          table.status === 'occupied' ? 'border-red-200 hover:border-red-400' :
+                          table.status === 'reserved' ? 'border-yellow-200 hover:border-yellow-400' :
+                          table.status === 'billing' ? 'border-blue-200 hover:border-blue-400' :
+                          'border-slate-200 hover:border-slate-400'
+                        }`}
                       >
-                        <span className="text-xl sm:text-2xl font-black text-slate-900 font-brand leading-none">{table.table_number}</span>
-                        <span className="text-[10px] text-slate-600 mt-0.5">{table.seats} seats</span>
-                        <div className={`mt-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded ${colors.badge} text-white`}>
-                          <span className="w-1 h-1 rounded-full bg-white/90" />
-                          <span className="font-bold text-[9px] uppercase">{table.status}</span>
+                        <div className="text-3xl lg:text-4xl font-black text-slate-900 mb-3">
+                          {table.table_number}
                         </div>
+                        <div className="text-xs lg:text-sm text-slate-500 mb-3 font-semibold uppercase">
+                          Table
+                        </div>
+                        <div className="text-base lg:text-lg text-slate-600 font-bold mb-2">
+                          👥 {table.seats} seats
+                        </div>
+                        {table.floor && (
+                          <div className="text-xs text-slate-500 mb-3">
+                            📍 {table.floor.name}
+                          </div>
+                        )}
                         {foodStatus && (
-                          <span className={`mt-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${foodStatus === 'kot' ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'}`}>
-                            {foodStatus === 'kot' ? 'KOT' : 'Table'}
+                          <span className={`mb-2 px-2 py-1 rounded text-xs font-bold uppercase ${foodStatus === 'kot' ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                            {foodStatus === 'kot' ? 'KOT' : 'At Table'}
                           </span>
                         )}
+                        <div className={`px-3 py-2 rounded-lg text-sm lg:text-base font-bold ${
+                          table.status === 'available' ? 'bg-emerald-100 text-emerald-700' :
+                          table.status === 'occupied' ? 'bg-red-100 text-red-700' :
+                          table.status === 'reserved' ? 'bg-yellow-100 text-yellow-700' :
+                          table.status === 'billing' ? 'bg-blue-100 text-blue-700' :
+                          'bg-slate-100 text-slate-600'
+                        }`}>
+                          {table.status === 'available' && '🟢 Available'}
+                          {table.status === 'occupied' && '🔴 Occupied'}
+                          {table.status === 'reserved' && '🟡 Reserved'}
+                          {table.status === 'billing' && '🔵 Billing'}
+                        </div>
                         {pendingBill > 0 && (
-                          <div className="mt-1.5 text-xs font-bold text-emerald-700">৳{pendingBill.toFixed(0)}</div>
+                          <div className="mt-3 pt-3 border-t border-slate-200 w-full">
+                            <div className="text-xs text-slate-500">Pending</div>
+                            <div className="text-lg font-bold text-emerald-700">৳{pendingBill.toFixed(0)}</div>
+                          </div>
                         )}
                       </div>
                     )
