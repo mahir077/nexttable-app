@@ -381,61 +381,63 @@ export default function BillingPage() {
             </div>
           </div>
 
-          {/* Pending Bills - Large Cards */}
+          {/* Pending Bills - Compact Responsive Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {pendingOrders.map((order) => (
               <div
                 key={order.id}
                 onClick={() => handleSelectOrder(order)}
-                className="bg-white rounded-xl p-4 lg:p-6 border-2 border-slate-200 hover:border-emerald-500 cursor-pointer transition-all hover:shadow-lg"
+                className="bg-white rounded-xl p-3 lg:p-4 border-2 border-slate-200 hover:border-emerald-500 cursor-pointer transition-all hover:shadow-lg"
               >
-                {/* Table Number - Large */}
-                <div className="text-center mb-4 p-4 bg-slate-50 rounded-lg">
-                  <div className="text-sm text-slate-500 mb-1">TABLE</div>
-                  <div className="text-5xl font-black text-slate-900">
-                    {order.table?.table_number ?? '—'}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  {/* Left: Table + meta */}
+                  <div className="flex-1 flex items-center gap-3">
+                    <div className="px-3 py-2 rounded-lg bg-slate-50 text-center min-w-[72px]">
+                      <div className="text-[10px] text-slate-500 tracking-wide">TABLE</div>
+                      <div className="text-2xl font-black text-slate-900 leading-tight">
+                        {order.table?.table_number ?? '—'}
+                      </div>
+                      {order.table?.floor && (
+                        <div className="text-[10px] text-slate-500 mt-1">{order.table.floor.name}</div>
+                      )}
+                    </div>
+                    <div className="space-y-1 text-xs">
+                      <div className="flex gap-1">
+                        <span className="text-slate-500">Order:</span>
+                        <span className="font-semibold">{order.order_number}</span>
+                      </div>
+                      <div className="flex gap-1">
+                        <span className="text-slate-500">Type:</span>
+                        <span className="font-semibold capitalize">
+                          {order.order_type || 'dine-in'}
+                        </span>
+                      </div>
+                      <div className="flex gap-1">
+                        <span className="text-slate-500">Items:</span>
+                        <span className="font-semibold">
+                          {order.order_items?.length ?? 0}
+                        </span>
+                      </div>
+                      <div className="flex gap-1">
+                        <span className="text-slate-500">Time:</span>
+                        <span className="font-semibold">
+                          {new Date(order.created_at).toLocaleTimeString()}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  {order.table?.floor && (
-                    <div className="text-xs text-slate-500 mt-1">{order.table.floor.name}</div>
-                  )}
-                </div>
 
-                {/* Order Details */}
-                <div className="space-y-2 mb-4">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">Order:</span>
-                    <span className="font-bold">{order.order_number}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">Type:</span>
-                    <span className="font-semibold capitalize">{order.order_type || 'dine-in'}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">Items:</span>
-                    <span className="font-semibold">{order.order_items?.length ?? 0}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">Time:</span>
-                    <span className="font-semibold">
-                      {new Date(order.created_at).toLocaleTimeString()}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Amount - Highlighted */}
-                <div className="border-t-2 pt-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-bold text-slate-600">TOTAL BILL:</span>
-                    <span className="text-3xl font-black text-emerald-600">
+                  {/* Right: amount + status */}
+                  <div className="sm:text-right border-t sm:border-t-0 sm:border-l border-slate-200 pt-2 sm:pt-0 sm:pl-3">
+                    <div className="text-[11px] font-semibold text-slate-600">TOTAL BILL</div>
+                    <div className="text-2xl font-black text-emerald-600 leading-tight">
                       ৳{(order.total ?? 0).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Status Badge */}
-                <div className="mt-3">
-                  <div className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold text-center">
-                    💳 PENDING PAYMENT
+                    </div>
+                    <div className="mt-1 inline-flex sm:justify-end">
+                      <div className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-[10px] font-bold text-center">
+                        💳 PENDING PAYMENT
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
