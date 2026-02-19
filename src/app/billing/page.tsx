@@ -149,7 +149,7 @@ export default function BillingPage() {
 
       // Build update object with only essential fields
       const updateData: Record<string, unknown> = {
-        status: 'completed',
+        status: 'paid',
         payment_method: selectedPaymentMethod
       }
 
