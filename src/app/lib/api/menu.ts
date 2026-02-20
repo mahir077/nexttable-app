@@ -30,14 +30,17 @@ export interface CartItem extends MenuItem {
   notes?: string
 }
 
-// Fetch all categories
-export async function getCategories(): Promise<Category[]> {
-  const { data, error } = await supabase
+// Fetch categories (optionally scoped to organization)
+export async function getCategories(organizationId?: string | null): Promise<Category[]> {
+  let query = supabase
     .from('categories')
     .select('*')
     .eq('is_active', true)
     .order('display_order')
-  
+  if (organizationId) {
+    query = query.eq('organization_id', organizationId)
+  }
+  const { data, error } = await query
   if (error) throw error
   return data || []
 }
@@ -73,7 +76,7 @@ export async function getAllMenuItems(): Promise<MenuItem[]> {
   return data || []
 }
 
-// Create new menu item (pass organizationId for multi-tenant)
+// Create new menu item (pass organizationId for multi-tenant; required for RLS)
 export async function createMenuItem(
   itemData: {
     category_id: string
@@ -86,22 +89,31 @@ export async function createMenuItem(
   },
   organizationId?: string | null
 ) {
+  const insert: Record<string, unknown> = {
+    category_id: itemData.category_id,
+    name: itemData.name,
+    price: Number(itemData.price),
+    is_available: true,
+    is_active: true,
+    ...(organizationId && { organization_id: organizationId }),
+    ...(itemData.name_bangla != null && itemData.name_bangla !== '' && { name_bangla: itemData.name_bangla }),
+    ...(itemData.description != null && itemData.description !== '' && { description: itemData.description }),
+    ...(itemData.image_url != null && itemData.image_url !== '' && { image_url: itemData.image_url }),
+    // Only send making_cost if column exists and value is set (omit when 0 to avoid "column does not exist" if migration not run)
+    ...(typeof itemData.making_cost === 'number' && !Number.isNaN(itemData.making_cost) && itemData.making_cost > 0 && { making_cost: itemData.making_cost }),
+  }
+
   const { data, error } = await supabase
     .from('menu_items')
-    .insert({
-      ...itemData,
-      ...(organizationId && { organization_id: organizationId }),
-      is_available: true,
-      is_active: true
-    })
+    .insert(insert)
     .select()
     .single()
 
   if (error) {
     console.error('Error creating menu item:', error)
-    return null
+    return { data: null, error }
   }
-  return data
+  return { data, error: null }
 }
 
 // Update menu item

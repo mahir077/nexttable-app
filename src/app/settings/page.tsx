@@ -36,7 +36,7 @@ const defaultInvoiceSettings: InvoiceSettings = {
 }
 
 export default function SettingsPage() {
-  const { organization } = useAuth()
+  const { organization, refreshOrganization } = useAuth()
   const [activeTab, setActiveTab] = useState<'restaurant' | 'tables' | 'printer' | 'invoice'>('restaurant')
   
   // Restaurant info state (synced with restaurant_settings in DB)
@@ -100,51 +100,72 @@ export default function SettingsPage() {
     loadInvoiceSettings()
   }, [])
 
-  // Fetch restaurant settings (first row – single restaurant mode)
-  const fetchRestaurantSettings = async () => {
+  // Load current organization + restaurant_settings into form (run when org is available)
+  const loadSettings = async () => {
+    const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
+    if (!orgId) return
+
     setRestaurantInfoLoading(true)
     try {
-        const { data, error } = await supabase
-          .from('restaurant_settings')
-          .select('*')
-          .limit(1)
-          .maybeSingle()
+      let orgData: { id: string; name: string; display_name?: string | null; slug?: string } | null = null
 
-      if (!error && data) {
-        setRestaurantSettingsId(data.id)
-        setRestaurantInfo({
-          name: (data.display_name as string) ?? 'NextTable Restaurant',
-          address: (data.address as string) ?? '',
-          phone: (data.phone as string) ?? '',
-          email: (data.email as string) ?? ''
-        })
+      // Load organization details first
+      const { data: orgResp, error: orgError } = await supabase
+        .from('organizations')
+        .select('id, name, display_name, slug')
+        .eq('id', orgId)
+        .single()
+
+      if (orgResp && !orgError) {
+        orgData = orgResp
+        setRestaurantInfo(prev => ({
+          ...prev,
+          name: (orgResp.display_name || orgResp.name) ?? prev.name
+        }))
       }
-      if (error || !data) {
+
+      // Load restaurant_settings for this org
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('restaurant_settings')
+        .select('*')
+        .eq('organization_id', orgId)
+        .maybeSingle()
+
+      if (settingsData && !settingsError) {
+        setRestaurantSettingsId(settingsData.id)
+        setRestaurantInfo(prev => ({
+          name: (settingsData.display_name as string) || (orgData?.display_name || orgData?.name) || prev.name,
+          address: (settingsData.address as string) ?? prev.address,
+          phone: (settingsData.phone as string) ?? prev.phone,
+          email: (settingsData.email as string) ?? prev.email
+        }))
+      } else {
+        // No settings row yet – keep org name if we set it
         try {
           const saved = localStorage.getItem('restaurantInfo')
           if (saved) {
             const info = JSON.parse(saved) as { name?: string; address?: string; phone?: string; email?: string }
             setRestaurantInfo(prev => ({
-              name: info.name ?? prev.name,
+              name: info.name ?? (orgData?.display_name || orgData?.name) ?? prev.name,
               address: info.address ?? prev.address,
               phone: info.phone ?? prev.phone,
               email: info.email ?? prev.email
             }))
           }
         } catch {
-          // keep defaults
+          // keep current state
         }
       }
     } catch (e) {
-      console.error('Fetch restaurant settings error:', e)
+      console.error('Load settings error:', e)
     } finally {
       setRestaurantInfoLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchRestaurantSettings()
-  }, [])
+    loadSettings()
+  }, [organization?.id])
 
   const fetchFloors = async () => {
     try {
@@ -181,18 +202,38 @@ export default function SettingsPage() {
     }
   }
 
-  // Save restaurant info – update existing row or insert (handles existing restaurant_settings row)
+  // Save restaurant info – update organization display_name + restaurant_settings, then refresh
   const handleSaveRestaurantInfo = async () => {
     if (!restaurantInfo.name?.trim()) {
       showToast('Please enter restaurant name', 'error')
       return
     }
+    const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
+    if (!orgId) {
+      showToast('No organization selected', 'error')
+      return
+    }
     setRestaurantInfoLoading(true)
     try {
-      // Get any existing settings row (first/only row)
+      const displayName = restaurantInfo.name.trim()
+      const updatedAt = new Date().toISOString()
+
+      // Update organization display_name (so sidebar/dashboard show correct name)
+      const { error: orgError } = await supabase
+        .from('organizations')
+        .update({
+          display_name: displayName,
+          updated_at: updatedAt
+        })
+        .eq('id', orgId)
+
+      if (orgError) throw orgError
+
+      // Update or insert restaurant_settings (scoped to current org)
       const { data: existing } = await supabase
         .from('restaurant_settings')
         .select('id')
+        .eq('organization_id', orgId)
         .limit(1)
         .maybeSingle()
 
@@ -200,39 +241,33 @@ export default function SettingsPage() {
         const { error } = await supabase
           .from('restaurant_settings')
           .update({
-            display_name: restaurantInfo.name.trim(),
+            display_name: displayName,
             address: restaurantInfo.address?.trim() ?? null,
             phone: restaurantInfo.phone?.trim() ?? null,
             email: restaurantInfo.email?.trim() ?? null,
-            ...(organization?.id && { organization_id: organization.id }),
-            updated_at: new Date().toISOString()
+            updated_at: updatedAt
           })
           .eq('id', existing.id)
 
-        if (error) {
-          console.error('Update error:', error)
-          throw error
-        }
+        if (error) throw error
       } else {
         const { error } = await supabase
           .from('restaurant_settings')
           .insert({
-            display_name: restaurantInfo.name.trim(),
+            organization_id: orgId,
+            display_name: displayName,
             address: restaurantInfo.address?.trim() ?? null,
             phone: restaurantInfo.phone?.trim() ?? null,
-            email: restaurantInfo.email?.trim() ?? null,
-            ...(organization?.id && { organization_id: organization.id })
+            email: restaurantInfo.email?.trim() ?? null
           })
 
-        if (error) {
-          console.error('Insert error:', error)
-          throw error
-        }
+        if (error) throw error
       }
 
       localStorage.setItem('restaurantInfo', JSON.stringify(restaurantInfo))
+      await refreshOrganization()
       showToast('Settings saved!', 'success')
-      fetchRestaurantSettings()
+      window.location.reload()
     } catch (error) {
       console.error('Save error:', error)
       showToast('Failed: ' + (error as Error).message, 'error')

@@ -10,6 +10,8 @@ import {
   deleteMenuItem,
   toggleItemAvailability,
   createCategory,
+  updateCategory,
+  deleteCategory,
   Category, 
   MenuItem 
 } from '@/app/lib/api/menu'
@@ -45,14 +47,19 @@ export default function MenuManagementPage() {
   const [newCategoryIcon, setNewCategoryIcon] = useState('🍽️')
   const [newCategory, setNewCategory] = useState('')
   const [showCategoryForm, setShowCategoryForm] = useState(false)
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null)
+  const [editCategoryName, setEditCategoryName] = useState('')
+  const [editCategoryIcon, setEditCategoryIcon] = useState('🍽️')
 
   const { toast, showToast, hideToast } = useToast()
 
-  // Fetch data
+  const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
+
+  // Fetch data (categories + items scoped to current org)
   const fetchData = async () => {
     try {
       const [categoriesData, itemsData] = await Promise.all([
-        getCategories(),
+        getCategories(orgId),
         getAllMenuItems()
       ])
       setCategories(categoriesData)
@@ -68,14 +75,28 @@ export default function MenuManagementPage() {
   }
 
   const fetchCategories = async () => {
-    const { data } = await supabase.from('categories').select('*').order('name')
+    const currentOrgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
+    if (!currentOrgId) return
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('organization_id', currentOrgId)
+      .order('name')
+    if (error) {
+      console.error('Error loading categories:', error)
+      return
+    }
     setCategories((data as Category[]) || [])
   }
 
   useEffect(() => {
-    fetchData()
-    fetchCategories()
-  }, [])
+    if (orgId) {
+      fetchData()
+      fetchCategories()
+    } else {
+      setLoading(false)
+    }
+  }, [orgId])
 
   // Filter items
   const filteredItems = selectedCategory === 'all' 
@@ -104,13 +125,24 @@ export default function MenuManagementPage() {
       image_url: imageUrl || undefined
     }
 
+    const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
+
     let success = false
     if (editingItem) {
       const result = await updateMenuItem(editingItem.id, { ...itemData, image_url: imageUrl ?? undefined })
       success = !!result
     } else {
-      const result = await createMenuItem({ ...itemData, image_url: imageUrl ?? undefined }, organization?.id)
-      success = !!result
+      if (!orgId) {
+        showToast('No organization selected. Please refresh and try again.', 'error')
+        return
+      }
+      const result = await createMenuItem({ ...itemData, image_url: imageUrl ?? undefined }, orgId)
+      if (result?.error) {
+        const msg = result.error.message || result.error.code || 'Failed to create item'
+        showToast(msg, 'error')
+        return
+      }
+      success = !!result?.data
     }
 
     if (success) {
@@ -201,11 +233,15 @@ export default function MenuManagementPage() {
       showToast('Category name required', 'error')
       return
     }
+    if (!orgId) {
+      showToast('No organization selected. Please refresh and try again.', 'error')
+      return
+    }
     const created = await createCategory({
       name: newCategoryName.trim(),
       icon: newCategoryIcon || undefined,
       display_order: categories.length
-    }, organization?.id)
+    }, orgId)
     if (created) {
       setShowCategoryModal(false)
       setNewCategoryName('')
@@ -223,9 +259,15 @@ export default function MenuManagementPage() {
     e.preventDefault()
     const name = newCategory.trim()
     if (!name) return
+    const currentOrgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
+    if (!currentOrgId) {
+      showToast('No organization selected. Please refresh and try again.', 'error')
+      return
+    }
     const { error } = await supabase.from('categories').insert({
       name,
       display_order: categories.length,
+      organization_id: currentOrgId,
       is_active: true
     })
     if (!error) {
@@ -237,6 +279,49 @@ export default function MenuManagementPage() {
       setTimeout(() => setSuccessMessage(null), 3000)
     } else {
       showToast('Failed to add category', 'error')
+    }
+  }
+
+  const openEditCategoryModal = (cat: Category) => {
+    setEditingCategory(cat)
+    setEditCategoryName(cat.name)
+    setEditCategoryIcon(cat.icon ?? '🍽️')
+  }
+
+  const handleSaveEditCategory = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingCategory || !editCategoryName.trim()) return
+    const updated = await updateCategory(editingCategory.id, {
+      name: editCategoryName.trim(),
+      icon: editCategoryIcon || undefined
+    })
+    if (updated) {
+      setEditingCategory(null)
+      fetchCategories()
+      fetchData()
+      setSuccessMessage('Category updated!')
+      setTimeout(() => setSuccessMessage(null), 3000)
+    } else {
+      showToast('Failed to update category', 'error')
+    }
+  }
+
+  const handleDeleteCategory = async (cat: Category) => {
+    const count = menuItems.filter(i => i.category_id === cat.id).length
+    if (count > 0) {
+      showToast(`Cannot delete: ${count} item(s) in this category. Move or delete them first.`, 'error')
+      return
+    }
+    if (!window.confirm(`Delete category "${cat.name}"?`)) return
+    const ok = await deleteCategory(cat.id)
+    if (ok) {
+      if (selectedCategory === cat.id) setSelectedCategory('all')
+      fetchCategories()
+      fetchData()
+      setSuccessMessage('Category deleted!')
+      setTimeout(() => setSuccessMessage(null), 3000)
+    } else {
+      showToast('Failed to delete category', 'error')
     }
   }
 
@@ -387,6 +472,46 @@ export default function MenuManagementPage() {
         </div>
       )}
 
+      {/* Edit Category Modal */}
+      {editingCategory && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setEditingCategory(null)}>
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Edit Category</h3>
+            <form onSubmit={handleSaveEditCategory} className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Name *</label>
+                <input
+                  type="text"
+                  value={editCategoryName}
+                  onChange={e => setEditCategoryName(e.target.value)}
+                  placeholder="e.g. Drinks"
+                  className="w-full px-4 py-3 rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Icon (emoji)</label>
+                <input
+                  type="text"
+                  value={editCategoryIcon}
+                  onChange={e => setEditCategoryIcon(e.target.value)}
+                  placeholder="🍽️"
+                  className="w-full px-4 py-3 rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setEditingCategory(null)} className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold">
+                  Cancel
+                </button>
+                <button type="submit" className="flex-1 py-2.5 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600">
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Category management - before items */}
       <div className="bg-white rounded-xl p-4 border-2 border-slate-200 mb-6">
         <div className="flex items-center justify-between mb-3">
@@ -418,9 +543,27 @@ export default function MenuManagementPage() {
 
         <div className="flex flex-wrap gap-2">
           {categories.map(cat => (
-            <div key={cat.id} className="px-3 py-1 bg-slate-100 rounded-full text-sm text-slate-800">
-              {cat.icon && <span className="mr-1">{cat.icon}</span>}
-              {cat.name}
+            <div key={cat.id} className="flex items-center gap-1 px-3 py-1.5 bg-slate-100 rounded-full text-sm text-slate-800">
+              {cat.icon && <span className="mr-0.5">{cat.icon}</span>}
+              <span>{cat.name}</span>
+              <button
+                type="button"
+                onClick={() => openEditCategoryModal(cat)}
+                className="ml-1 p-1 rounded hover:bg-slate-200 text-slate-600 hover:text-slate-800"
+                title="Edit category"
+                aria-label="Edit category"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteCategory(cat)}
+                className="p-1 rounded hover:bg-red-100 text-slate-500 hover:text-red-600"
+                title="Delete category"
+                aria-label="Delete category"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              </button>
             </div>
           ))}
         </div>
