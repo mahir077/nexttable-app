@@ -153,3 +153,13 @@ Short checklist – ei steps follow korle bujhbe data org-wise alada thakche kin
 
 - **Multi-tenant:** Foundation ready. Sirf Supabase e migration script run koro.
 - **White-label:** Logo upload + color application + powered-by UI korle branding complete hobe.
+
+---
+
+## 🔜 Porer phase: Tenant onboarding & roles (vision)
+
+Tumi jeta bolecho: **notun client ke tumi account khulbe** (client nije sign up korte parbe na); **client = org owner**; owner **staff, manager, role ar user** create korte parbe. Ei flow er detail + ki ki kora lagbe sheta alada doc e:
+
+→ **`docs/TENANT-AND-ROLES.md`**
+
+Summary: (1) Public signup band / invite-only, (2) Tumar admin theke org + owner create, (3) Org er vitore roles (owner/manager/staff) + owner theke user/role create, (4) Permission per page/action. Ekhon implement kora hoy nai – foundation er por ei phase.
