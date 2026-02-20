@@ -42,13 +42,21 @@ export default function ReportsPage() {
         .from('stock_summary')
         .select(`
           *,
-          menu_item:menu_items(name, category)
+          menu_item:menu_items(name, category:categories(name))
         `)
 
-      if (error) throw error
+      if (error) {
+        const msg = (error as { message?: string; code?: string })?.message || (error as { message?: string; code?: string })?.code || String(error)
+        console.warn('Stock data (using fallback):', msg)
+        const { data: fallbackData } = await supabase.from('stock_summary').select('*')
+        setStockData(fallbackData || [])
+        return
+      }
       setStockData(data || [])
-    } catch (error) {
-      console.error('Stock data error:', error)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.warn('Stock data error:', msg)
+      setStockData([])
     }
   }
 
@@ -74,10 +82,17 @@ export default function ReportsPage() {
       }
 
       const { data, error } = await query
-      if (error) throw error
+      if (error) {
+        const msg = (error as { message?: string; code?: string })?.message || String(error)
+        console.warn('Purchases fetch error:', msg)
+        setPurchases([])
+        return
+      }
       setPurchases(data || [])
-    } catch (error) {
-      console.error('Purchases fetch error:', error)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.warn('Purchases fetch error:', msg)
+      setPurchases([])
     }
   }
 
@@ -129,7 +144,8 @@ export default function ReportsPage() {
       const { data, error } = await query
 
       if (error) {
-        console.error('Error:', error)
+        const msg = (error as { message?: string; code?: string })?.message || (error as { message?: string; code?: string })?.code || String(error)
+        console.warn('Orders fetch (using fallback):', msg)
         // Fallback without menu_items join
         let fallback = supabase
           .from('orders')
@@ -158,8 +174,9 @@ export default function ReportsPage() {
       }
 
       setOrders((data || []) as unknown as OrderWithItems[])
-    } catch (error) {
-      console.error('Error:', error)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.warn('Orders fetch error:', msg)
       setOrders([])
     } finally {
       setLoading(false)

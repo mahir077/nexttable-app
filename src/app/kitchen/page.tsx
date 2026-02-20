@@ -10,6 +10,7 @@ import LoadingSpinner from '@/components/LoadingSpinner'
 import EmptyState from '@/components/EmptyState'
 import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface Order {
   id: string
@@ -44,6 +45,7 @@ interface EditLineItem {
 }
 
 export default function KitchenPage() {
+  const { organization } = useAuth()
   const [orders, setOrders] = useState<Order[]>([])
   const [selectedOrder, setSelectedOrder] = useState<{ order: Order; items: OrderItem[] } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -503,7 +505,8 @@ export default function KitchenPage() {
           tax: 0,
           discount: 0,
           total,
-          status: 'pending'
+          status: 'pending',
+          ...(organization?.id && { organization_id: organization.id }),
         })
         .select()
         .single()
@@ -516,7 +519,8 @@ export default function KitchenPage() {
         quantity,
         unit_price: item.price,
         subtotal: item.price * quantity,
-        status: 'pending'
+        status: 'pending',
+        ...(organization?.id && { organization_id: organization.id }),
       }))
       const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
       if (itemsError) throw itemsError
@@ -601,7 +605,8 @@ export default function KitchenPage() {
         quantity: l.quantity,
         unit_price: l.unit_price,
         subtotal: l.unit_price * l.quantity,
-        status: 'pending'
+        status: 'pending',
+        ...(organization?.id && { organization_id: organization.id }),
       })))
       await supabase.from('orders').update({
         subtotal,

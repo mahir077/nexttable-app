@@ -5,6 +5,7 @@ import { supabase } from '@/app/lib/api/tables'
 import BackButton from '@/components/BackButton'
 import { useToast } from '@/hooks/useToast'
 import Toast from '@/components/Toast'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface Supplier {
   id: string
@@ -39,6 +40,7 @@ interface Purchase {
 }
 
 export default function PurchasesPage() {
+  const { organization } = useAuth()
   const [purchases, setPurchases] = useState<Purchase[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
@@ -162,7 +164,8 @@ export default function PurchasesPage() {
           paid_amount: formData.paid_amount,
           payment_status: formData.paid_amount >= totalAmount ? 'paid' :
             formData.paid_amount > 0 ? 'partial' : 'pending',
-          notes: formData.notes
+          notes: formData.notes,
+          ...(organization?.id && { organization_id: organization.id }),
         })
         .select()
         .single()
@@ -175,7 +178,8 @@ export default function PurchasesPage() {
         menu_item_id: item.menu_item_id,
         quantity: item.quantity,
         unit_cost: item.unit_cost,
-        total_cost: item.total_cost
+        total_cost: item.total_cost,
+        ...(organization?.id && { organization_id: organization.id }),
       }))
 
       const { error: itemsError } = await supabase
@@ -193,7 +197,8 @@ export default function PurchasesPage() {
         total_value: item.total_cost,
         reference_type: 'purchase',
         reference_id: purchase.id,
-        notes: `Purchase ${(purchase as Purchase).purchase_number || purchase.id}`
+        notes: `Purchase ${(purchase as Purchase).purchase_number || purchase.id}`,
+        ...(organization?.id && { organization_id: organization.id }),
       }))
 
       const { error: movementsError } = await supabase

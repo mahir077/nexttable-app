@@ -49,7 +49,7 @@ export default function StockLedgerPage() {
         .from('stock_movements')
         .select(`
           *,
-          menu_item:menu_items(name, category)
+          menu_item:menu_items(name, category:categories(name))
         `)
         .order('movement_date', { ascending: false })
         .limit(200)
@@ -62,21 +62,43 @@ export default function StockLedgerPage() {
         query = query.eq('menu_item_id', filterItem)
       }
 
-      const { data, error } = await query
+      let { data, error } = await query
 
-      if (error) throw error
-      setMovements(data || [])
+      if (error) {
+        let fallback = supabase
+          .from('stock_movements')
+          .select('*, menu_item:menu_items(name)')
+          .order('movement_date', { ascending: false })
+          .limit(200)
+        if (filterType !== 'all') fallback = fallback.eq('movement_type', filterType)
+        if (filterItem !== 'all') fallback = fallback.eq('menu_item_id', filterItem)
+        const res = await fallback
+        if (res.error) {
+          // Last resort: load movements without join; item name shown from menuItems in UI
+          let bare = supabase.from('stock_movements').select('*').order('movement_date', { ascending: false }).limit(200)
+          if (filterType !== 'all') bare = bare.eq('movement_type', filterType)
+          if (filterItem !== 'all') bare = bare.eq('menu_item_id', filterItem)
+          const bareRes = await bare
+          if (bareRes.error) throw bareRes.error
+          data = bareRes.data || []
+        } else {
+          data = res.data
+        }
+      }
 
-      // Fetch menu items for filter (only on first load / when filters don't affect it)
+      setMovements((data || []) as StockMovement[])
+
       const { data: itemsData } = await supabase
         .from('menu_items')
         .select('id, name')
         .order('name')
 
       setMenuItems(itemsData || [])
-    } catch (error) {
-      console.error('Error:', error)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.warn('Stock ledger fetch error:', msg)
       showToast('Failed to load movements', 'error')
+      setMovements([])
     } finally {
       setLoading(false)
     }
@@ -185,7 +207,7 @@ export default function StockLedgerPage() {
                       {new Date(movement.movement_date).toLocaleString()}
                     </td>
                     <td className="px-4 py-3 font-semibold">
-                      {movement.menu_item?.name}
+                      {movement.menu_item?.name ?? menuItems.find(m => m.id === movement.menu_item_id)?.name ?? '—'}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-1 rounded text-xs font-bold ${

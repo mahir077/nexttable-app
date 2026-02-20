@@ -32,15 +32,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
-    // Check active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        loadOrganizations(session.user.id)
-      } else {
-        setLoading(false)
-      }
-    })
+    // Check active session (handle invalid/expired refresh token)
+    supabase.auth.getSession()
+      .then(({ data: { session }, error }) => {
+        if (error) {
+          const msg = (error as Error)?.message || ''
+          if (msg.includes('Refresh Token') || msg.includes('refresh_token') || msg.includes('Invalid')) {
+            supabase.auth.signOut().finally(() => {
+              setUser(null)
+              setOrganization(null)
+              setOrganizations([])
+              setLoading(false)
+              if (typeof window !== 'undefined') window.location.href = '/login'
+            })
+            return
+          }
+        }
+        setUser(session?.user ?? null)
+        if (session?.user) {
+          loadOrganizations(session.user.id)
+        } else {
+          setLoading(false)
+        }
+      })
+      .catch((err) => {
+        const msg = (err as Error)?.message || ''
+        if (msg.includes('Refresh Token') || msg.includes('refresh_token') || msg.includes('Invalid')) {
+          supabase.auth.signOut().finally(() => {
+            setUser(null)
+            setOrganization(null)
+            setOrganizations([])
+            setLoading(false)
+            if (typeof window !== 'undefined') window.location.href = '/login'
+          })
+        } else {
+          setLoading(false)
+        }
+      })
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -54,7 +82,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })
 
-    return () => subscription.unsubscribe()
+    // If refresh token error is thrown elsewhere (e.g. during API call), redirect to login
+    const onUnhandled = (e: PromiseRejectionEvent) => {
+      const msg = (e?.reason as Error)?.message || String(e?.reason || '')
+      if (msg.includes('Refresh Token') || msg.includes('refresh_token') || msg.includes('Invalid Refresh Token')) {
+        e.preventDefault()
+        supabase.auth.signOut().finally(() => {
+          setUser(null)
+          setOrganization(null)
+          setOrganizations([])
+          if (typeof window !== 'undefined') window.location.href = '/login'
+        })
+      }
+    }
+    window.addEventListener('unhandledrejection', onUnhandled)
+    return () => {
+      subscription.unsubscribe()
+      window.removeEventListener('unhandledrejection', onUnhandled)
+    }
   }, [])
 
   const loadOrganizations = async (userId: string) => {
@@ -86,14 +131,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signIn = async (email: string, password: string) => {
+    console.log('🔐 Signing in:', email)
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
     })
 
+    console.log('Sign in result:', { user: data?.user?.email, error: error?.message })
+
     if (!error && data.user) {
+      console.log('✅ Login successful')
+
+      // Load organizations
       await loadOrganizations(data.user.id)
-      router.push('/dashboard')
+
+      // Small delay to ensure session is persisted
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      console.log('Redirecting to dashboard...')
+      window.location.href = '/dashboard'
     }
 
     return { data, error }

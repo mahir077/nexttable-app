@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface SidebarProps {
   isOpen?: boolean
@@ -12,6 +13,8 @@ interface SidebarProps {
 export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const pathname = usePathname()
+  const { user, organization, organizations, switchOrganization, signOut } = useAuth()
+  const [showOrgSwitcher, setShowOrgSwitcher] = useState(false)
 
   useEffect(() => {
     const saved = localStorage.getItem('sidebarCollapsed')
@@ -227,6 +230,66 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
             </Link>
           ))}
         </nav>
+
+        {/* Org switcher + Logout - bottom */}
+        <div className="border-t border-slate-800 p-3">
+          {user && (
+            <>
+              {!isCollapsed && organizations.length > 1 && (
+                <div className="mb-2 relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowOrgSwitcher(!showOrgSwitcher)}
+                    className="w-full px-3 py-2 text-left text-xs font-semibold text-emerald-400 bg-slate-800/50 rounded-lg truncate hover:bg-slate-800"
+                    title="Switch restaurant"
+                  >
+                    🏢 {organization?.display_name || organization?.name || 'Restaurant'}
+                  </button>
+                  {showOrgSwitcher && (
+                    <div className="absolute bottom-full left-0 right-0 mb-1 py-1 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 max-h-40 overflow-y-auto">
+                      {organizations.map(org => (
+                        <button
+                          key={org.id}
+                          type="button"
+                          onClick={() => {
+                            switchOrganization(org.id)
+                            setShowOrgSwitcher(false)
+                          }}
+                          className={`w-full px-3 py-2 text-left text-xs font-medium ${
+                            organization?.id === org.id ? 'bg-emerald-500/20 text-emerald-400' : 'text-slate-300 hover:bg-slate-800'
+                          }`}
+                        >
+                          {org.display_name || org.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {!isCollapsed && organizations.length <= 1 && organization && (
+                <div className="px-3 py-2 mb-2 text-xs text-slate-400 truncate" title={organization.display_name || organization.name}>
+                  🏢 {organization.display_name || organization.name}
+                </div>
+              )}
+              {!isCollapsed && (
+                <div className="px-3 py-2 mb-2 text-xs text-slate-500 truncate" title={user.email}>
+                  {user.email}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => signOut()}
+                className={`w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors font-semibold ${isCollapsed ? 'px-3' : ''}`}
+                title="Sign out"
+              >
+                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                {!isCollapsed && <span>Logout</span>}
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </>
   )

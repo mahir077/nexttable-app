@@ -7,6 +7,7 @@ import { getCashDrawerUrl, setCashDrawerUrl as saveCashDrawerUrl } from '@/app/l
 import BackButton from '@/components/BackButton'
 import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
+import { useAuth } from '@/contexts/AuthContext'
 
 type InvoiceSettings = {
   show_logo: boolean
@@ -35,6 +36,7 @@ const defaultInvoiceSettings: InvoiceSettings = {
 }
 
 export default function SettingsPage() {
+  const { organization } = useAuth()
   const [activeTab, setActiveTab] = useState<'restaurant' | 'tables' | 'printer' | 'invoice'>('restaurant')
   
   // Restaurant info state (synced with restaurant_settings in DB)
@@ -202,6 +204,7 @@ export default function SettingsPage() {
             address: restaurantInfo.address?.trim() ?? null,
             phone: restaurantInfo.phone?.trim() ?? null,
             email: restaurantInfo.email?.trim() ?? null,
+            ...(organization?.id && { organization_id: organization.id }),
             updated_at: new Date().toISOString()
           })
           .eq('id', existing.id)
@@ -217,7 +220,8 @@ export default function SettingsPage() {
             display_name: restaurantInfo.name.trim(),
             address: restaurantInfo.address?.trim() ?? null,
             phone: restaurantInfo.phone?.trim() ?? null,
-            email: restaurantInfo.email?.trim() ?? null
+            email: restaurantInfo.email?.trim() ?? null,
+            ...(organization?.id && { organization_id: organization.id })
           })
 
         if (error) {
@@ -258,7 +262,11 @@ export default function SettingsPage() {
         // Add new floor
         const { error } = await supabase
           .from('floors')
-          .insert({ name: floorForm.name, is_active: true })
+          .insert({
+            name: floorForm.name,
+            is_active: true,
+            ...(organization?.id && { organization_id: organization.id })
+          })
 
         if (error) throw error
         showToast('Floor added!', 'success')
@@ -334,7 +342,8 @@ export default function SettingsPage() {
           table_number: tableForm.table_number.trim(),
           seats: parseInt(tableForm.seats, 10) || 4,
           status: 'available',
-          is_active: true
+          is_active: true,
+          ...(organization?.id && { organization_id: organization.id })
         })
         .select()
 
@@ -385,6 +394,7 @@ export default function SettingsPage() {
         .upsert({
           id: 1,
           ...invoiceSettings,
+          ...(organization?.id && { organization_id: organization.id }),
           updated_at: new Date().toISOString()
         })
 
@@ -398,11 +408,13 @@ export default function SettingsPage() {
 
   const loadInvoiceSettings = async () => {
     try {
-      const { data, error } = await supabase
-        .from('invoice_settings')
-        .select('*')
-        .eq('id', 1)
-        .maybeSingle()
+      let query = supabase.from('invoice_settings').select('*')
+      if (organization?.id) {
+        query = query.eq('organization_id', organization.id)
+      } else {
+        query = query.eq('id', 1)
+      }
+      const { data, error } = await query.maybeSingle()
 
       if (!error && data) {
         setInvoiceSettings(prev => ({

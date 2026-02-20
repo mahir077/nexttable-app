@@ -16,8 +16,10 @@ import {
 import BackButton from '@/components/BackButton'
 import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function MenuManagementPage() {
+  const { organization } = useAuth()
   const [categories, setCategories] = useState<Category[]>([])
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
@@ -105,7 +107,7 @@ export default function MenuManagementPage() {
       const result = await updateMenuItem(editingItem.id, { ...itemData, image_url: imageUrl ?? undefined })
       success = !!result
     } else {
-      const result = await createMenuItem({ ...itemData, image_url: imageUrl ?? undefined })
+      const result = await createMenuItem({ ...itemData, image_url: imageUrl ?? undefined }, organization?.id)
       success = !!result
     }
 
@@ -200,7 +202,7 @@ export default function MenuManagementPage() {
       name: newCategoryName.trim(),
       icon: newCategoryIcon || undefined,
       display_order: categories.length
-    })
+    }, organization?.id)
     if (created) {
       setShowCategoryModal(false)
       setNewCategoryName('')

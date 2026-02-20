@@ -5,6 +5,7 @@ import { supabase } from '@/app/lib/api/tables'
 import BackButton from '@/components/BackButton'
 import { useToast } from '@/hooks/useToast'
 import Toast from '@/components/Toast'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface Supplier {
   id: string
@@ -19,6 +20,7 @@ interface Supplier {
 }
 
 export default function SuppliersPage() {
+  const { organization } = useAuth()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -80,7 +82,11 @@ export default function SuppliersPage() {
       } else {
         const { error } = await supabase
           .from('suppliers')
-          .insert({ ...formData, is_active: true })
+          .insert({
+            ...formData,
+            is_active: true,
+            ...(organization?.id && { organization_id: organization.id }),
+          })
 
         if (error) throw error
         showToast('✅ Supplier added!', 'success')

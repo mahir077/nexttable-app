@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase, getAllTables, type Table } from '@/app/lib/api/tables'
 import BackButton from '@/components/BackButton'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface Reservation {
   id: string
@@ -18,6 +19,7 @@ interface Reservation {
 }
 
 export default function ReservationsPage() {
+  const { organization } = useAuth()
   const [reservations, setReservations] = useState<Reservation[]>([])
   const [tables, setTables] = useState<Table[]>([])
   const [showForm, setShowForm] = useState(false)
@@ -64,7 +66,8 @@ export default function ReservationsPage() {
       guest_phone: guestPhone || null,
       guest_count: guestCount ? parseInt(guestCount, 10) : null,
       special_requests: specialRequests || null,
-      status: 'pending'
+      status: 'pending',
+      ...(organization?.id && { organization_id: organization.id }),
     })
 
     if (!error) {

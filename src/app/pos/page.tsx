@@ -7,6 +7,7 @@ import { supabase, getFloors, getTablesByFloor, Floor, Table } from '@/app/lib/a
 import { getCategories, getMenuItemsByCategory, type CartItem, type Category, type MenuItem } from '@/app/lib/api/menu'
 import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
+import { useAuth } from '@/contexts/AuthContext'
 
 const ORDER_TYPES = [
   { id: 'dine-in', label: 'Dine-in', emoji: '🍽️', color: 'emerald', border: 'border-emerald-400', bg: 'bg-emerald-50' },
@@ -20,6 +21,7 @@ type OrderTypeId = typeof ORDER_TYPES[number]['id']
 function POSContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { organization } = useAuth()
   const typeFromUrl = (searchParams?.get('type') as OrderTypeId) || 'dine-in'
 
   const [orderType, setOrderType] = useState<OrderTypeId>(typeFromUrl)
@@ -445,6 +447,7 @@ function POSContent() {
         delivery_time: orderType === 'online' && deliveryTime ? deliveryTime : null,
         guest_count: orderType === 'event' && guestCount ? parseInt(guestCount, 10) : null,
         event_date: orderType === 'event' && eventDate ? eventDate : null,
+        ...(organization?.id && { organization_id: organization.id }),
       }
 
       const { data: order, error: orderError } = await supabase
@@ -464,6 +467,7 @@ function POSContent() {
         unit_price: item.price,
         subtotal: item.price * item.quantity,
         status: 'pending',
+        ...(organization?.id && { organization_id: organization.id }),
       }))
 
       const { error: itemsError } = await supabase.from('order_items').insert(orderItems)

@@ -5,6 +5,7 @@ import { supabase } from '@/app/lib/api/tables'
 import BackButton from '@/components/BackButton'
 import { useToast } from '@/hooks/useToast'
 import Toast from '@/components/Toast'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface Order {
   id: string
@@ -33,6 +34,7 @@ interface Order {
 }
 
 export default function BillingPage() {
+  const { organization } = useAuth()
   const [orders, setOrders] = useState<Order[]>([])
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
@@ -103,23 +105,25 @@ export default function BillingPage() {
             item_name_bangla,
             subtotal,
             menu_item_id,
-            menu_item:menu_items(id, making_cost)
+            menu_item:menu_items(id)
           )
         `)
         .in('status', ['ready', 'preparing', 'kot_sent', 'pending'])
         .order('created_at', { ascending: false })
 
       if (error) {
-        console.error('Supabase error:', error)
-        showToast('Database error: ' + error.message, 'error')
+        const msg = (error as { message?: string })?.message || String(error)
+        console.warn('Billing fetch error:', msg)
+        showToast('Could not load orders. Please refresh.', 'error')
         setOrders([])
         return
       }
 
       console.log('Fetched orders:', data) // Debug log
       setOrders((data || []) as unknown as Order[])
-    } catch (error) {
-      console.error('Catch error:', error)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.warn('Billing fetch error:', msg)
       showToast('Failed to load orders', 'error')
       setOrders([])
     } finally {
@@ -274,7 +278,8 @@ export default function BillingPage() {
               total_value: makingCost * qty,
               reference_type: 'order',
               reference_id: selectedOrder.id,
-              notes: `Sale - Order ${selectedOrder.order_number}`
+              notes: `Sale - Order ${selectedOrder.order_number}`,
+              ...(organization?.id && { organization_id: organization.id }),
             }
           })
         if (stockMovements.length > 0) {

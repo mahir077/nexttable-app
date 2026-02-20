@@ -1,9 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase-client'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-export const supabase = createClient(supabaseUrl, supabaseKey)
+export { supabase }
 
 // Types
 export interface Category {
@@ -75,19 +72,23 @@ export async function getAllMenuItems(): Promise<MenuItem[]> {
   return data || []
 }
 
-// Create new menu item
-export async function createMenuItem(itemData: {
-  category_id: string
-  name: string
-  name_bangla?: string
-  description?: string
-  price: number
-  image_url?: string
-}) {
+// Create new menu item (pass organizationId for multi-tenant)
+export async function createMenuItem(
+  itemData: {
+    category_id: string
+    name: string
+    name_bangla?: string
+    description?: string
+    price: number
+    image_url?: string
+  },
+  organizationId?: string | null
+) {
   const { data, error } = await supabase
     .from('menu_items')
     .insert({
       ...itemData,
+      ...(organizationId && { organization_id: organizationId }),
       is_available: true,
       is_active: true
     })
@@ -150,16 +151,20 @@ export async function toggleItemAvailability(itemId: string, isAvailable: boolea
   return updateMenuItem(itemId, { is_available: isAvailable })
 }
 
-// Create new category
-export async function createCategory(categoryData: {
-  name: string
-  icon?: string
-  display_order: number
-}) {
+// Create new category (pass organizationId for multi-tenant)
+export async function createCategory(
+  categoryData: {
+    name: string
+    icon?: string
+    display_order: number
+  },
+  organizationId?: string | null
+) {
   const { data, error } = await supabase
     .from('categories')
     .insert({
       ...categoryData,
+      ...(organizationId && { organization_id: organizationId }),
       is_active: true
     })
     .select()

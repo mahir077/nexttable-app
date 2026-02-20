@@ -6,6 +6,7 @@ import { supabase } from '@/app/lib/api/tables'
 import BackButton from '@/components/BackButton'
 import { useToast } from '@/hooks/useToast'
 import Toast from '@/components/Toast'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface MenuItem {
   id: string
@@ -27,6 +28,7 @@ interface StockSummary {
 }
 
 export default function StockPage() {
+  const { organization } = useAuth()
   const [stockData, setStockData] = useState<StockSummary[]>([])
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -121,7 +123,8 @@ export default function StockPage() {
           quantity: quantity,
           unit_cost: value / quantity,
           total_value: value,
-          notes: 'Opening stock balance'
+          notes: 'Opening stock balance',
+          ...(organization?.id && { organization_id: organization.id }),
         })
 
       if (movementError) throw movementError
@@ -136,7 +139,8 @@ export default function StockPage() {
           total_in_value: 0,
           total_out_value: 0,
           current_value: value,
-          last_updated: new Date().toISOString()
+          last_updated: new Date().toISOString(),
+          ...(organization?.id && { organization_id: organization.id }),
         }, {
           onConflict: 'menu_item_id'
         })
