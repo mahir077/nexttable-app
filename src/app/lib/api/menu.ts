@@ -18,6 +18,7 @@ export interface MenuItem {
   name_bangla: string | null
   description: string | null
   price: number
+  making_cost?: number | null
   image_url: string | null
   is_available: boolean
   is_active: boolean
@@ -80,6 +81,7 @@ export async function createMenuItem(
     name_bangla?: string
     description?: string
     price: number
+    making_cost?: number
     image_url?: string
   },
   organizationId?: string | null
@@ -110,6 +112,7 @@ export async function updateMenuItem(
     name_bangla: string
     description: string
     price: number
+    making_cost: number
     category_id: string
     image_url: string
     is_available: boolean

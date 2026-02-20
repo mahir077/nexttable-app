@@ -267,8 +267,8 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                 </div>
               )}
               {!isCollapsed && organizations.length <= 1 && organization && (
-                <div className="px-3 py-2 mb-2 text-xs text-slate-400 truncate" title={organization.display_name || organization.name}>
-                  🏢 {organization.display_name || organization.name}
+                <div className="px-3 py-2 mb-2 text-xs text-slate-400 truncate" title={organization?.display_name || organization?.name || 'Restaurant'}>
+                  🏢 {organization?.display_name || organization?.name || 'Restaurant'}
                 </div>
               )}
               {!isCollapsed && (

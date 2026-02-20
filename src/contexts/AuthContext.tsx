@@ -20,6 +20,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, orgName: string) => Promise<any>
   signOut: () => Promise<void>
   switchOrganization: (orgId: string) => void
+  refreshOrganization: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -104,27 +105,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadOrganizations = async (userId: string) => {
     try {
-      // Get user's organizations
-      const { data: userOrgs } = await supabase
+      const { data, error } = await supabase
         .from('user_organizations')
-        .select('organization:organizations(*)')
+        .select(`
+          organization_id,
+          role,
+          organizations (
+            id,
+            name,
+            slug,
+            display_name
+          )
+        `)
         .eq('user_id', userId)
 
-      const orgs = userOrgs?.map((uo: any) => uo.organization).filter(Boolean) || []
+      if (error) {
+        console.error('Error loading organizations:', error)
+        return
+      }
+
+      const orgs = (data ?? [])
+        .filter((uo: any) => uo.organizations)
+        .map((uo: any) => ({
+          id: uo.organization_id,
+          name: uo.organizations.name,
+          display_name: uo.organizations.display_name || uo.organizations.name,
+          slug: uo.organizations.slug
+        }))
+
+      console.log('Loaded organizations:', orgs)
       setOrganizations(orgs)
 
-      // Set current organization
+      // Set current organization - prefer saved, fallback to first
       const savedOrgId = typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null
-      const currentOrg = orgs.find((o: Organization) => o.id === savedOrgId) || orgs[0]
+      let currentOrg: Organization | null = null
 
-      if (currentOrg) {
-        setOrganization(currentOrg)
+      if (savedOrgId) {
+        currentOrg = orgs.find((o: Organization) => o.id === savedOrgId) ?? null
+      }
+
+      if (!currentOrg && orgs.length > 0) {
+        currentOrg = orgs[0]
         if (typeof window !== 'undefined') {
-          localStorage.setItem('current_organization_id', currentOrg.id)
+          localStorage.setItem('current_organization_id', orgs[0].id)
         }
       }
+
+      if (currentOrg) {
+        console.log('Setting current organization:', currentOrg)
+        setOrganization(currentOrg)
+      }
     } catch (error) {
-      console.error('Error loading organizations:', error)
+      console.error('Error in loadOrganizations:', error)
     } finally {
       setLoading(false)
     }
@@ -211,14 +243,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push('/login')
   }
 
+  const refreshOrganization = async () => {
+    if (!user?.id) return
+    if (typeof window === 'undefined') return
+
+    const savedOrgId = localStorage.getItem('current_organization_id')
+    if (!savedOrgId) return
+
+    const { data, error } = await supabase
+      .from('organizations')
+      .select('id, name, slug, display_name')
+      .eq('id', savedOrgId)
+      .single()
+
+    if (data && !error) {
+      setOrganization({
+        id: data.id,
+        name: data.name,
+        display_name: data.display_name || data.name,
+        slug: data.slug
+      })
+    }
+  }
+
   const switchOrganization = (orgId: string) => {
-    const org = organizations.find(o => o.id === orgId)
-    if (org) {
-      setOrganization(org)
+    const newOrg = organizations.find(o => o.id === orgId)
+    if (newOrg) {
+      setOrganization(newOrg)
       if (typeof window !== 'undefined') {
         localStorage.setItem('current_organization_id', orgId)
       }
-      router.refresh()
+      console.log('Switched to organization:', newOrg)
+      window.location.reload()
     }
   }
 
@@ -232,7 +288,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signIn,
         signUp,
         signOut,
-        switchOrganization
+        switchOrganization,
+        refreshOrganization
       }}
     >
       {children}

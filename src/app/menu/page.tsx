@@ -33,6 +33,7 @@ export default function MenuManagementPage() {
     name_bangla: '',
     description: '',
     price: '',
+    making_cost: '0',
     category_id: '',
     image_url: ''
   })
@@ -99,6 +100,7 @@ export default function MenuManagementPage() {
     const itemData = {
       ...formData,
       price: parseFloat(formData.price),
+      making_cost: formData.making_cost ? parseFloat(formData.making_cost) : 0,
       image_url: imageUrl || undefined
     }
 
@@ -185,6 +187,7 @@ export default function MenuManagementPage() {
       name_bangla: '',
       description: '',
       price: '',
+      making_cost: '0',
       category_id: categories[0]?.id || '',
       image_url: ''
     })
@@ -245,6 +248,7 @@ export default function MenuManagementPage() {
       name_bangla: item.name_bangla || '',
       description: item.description || '',
       price: item.price.toString(),
+      making_cost: item.making_cost != null ? String(item.making_cost) : '0',
       category_id: item.category_id,
       image_url: item.image_url || ''
     })
@@ -576,6 +580,29 @@ export default function MenuManagementPage() {
                     className="w-full px-4 py-3 text-base rounded-lg border-2 border-slate-200 focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
                     placeholder="e.g., 250.00"
                   />
+                </div>
+
+                {/* Making Cost */}
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">
+                    Making Cost (৳)
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.making_cost}
+                    onChange={(e) => setFormData({ ...formData, making_cost: e.target.value })}
+                    step="0.01"
+                    min="0"
+                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg text-slate-900 focus:border-emerald-500 focus:outline-none"
+                    placeholder="0.00"
+                  />
+                  {formData.price && formData.making_cost && (
+                    <p className="text-xs text-emerald-600 mt-1">
+                      Profit: ৳{(parseFloat(formData.price) - parseFloat(formData.making_cost)).toFixed(2)}
+                      {' '}
+                      ({(((parseFloat(formData.price) - parseFloat(formData.making_cost)) / parseFloat(formData.price)) * 100).toFixed(1)}% margin)
+                    </p>
+                  )}
                 </div>
 
                 {/* Description - full width */}

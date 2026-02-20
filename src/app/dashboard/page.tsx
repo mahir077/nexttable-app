@@ -9,6 +9,7 @@ import type { Order } from '@/app/lib/api/orders'
 import TableModal from '@/components/TableModal'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import { supabase } from '@/app/lib/api/tables'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface TodayStats {
   totalRevenue: number
@@ -23,6 +24,7 @@ interface TodayStats {
 }
 
 export default function DashboardPage() {
+  const { organization } = useAuth()
   const [currentDate, setCurrentDate] = useState<string>('')
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false)
   const [floors, setFloors] = useState<Floor[]>([])
@@ -413,7 +415,7 @@ export default function DashboardPage() {
               </svg>
             </button>
             <div className="min-w-0">
-              <h1 className="text-base sm:text-lg md:text-xl font-semibold text-slate-800 truncate">{restaurantName}</h1>
+              <h1 className="text-base sm:text-lg md:text-xl font-semibold text-slate-800 truncate">{organization?.display_name || organization?.name || restaurantName || 'Restaurant'}</h1>
               <p className="text-xs text-slate-400 hidden sm:block">{currentDate}</p>
             </div>
           </div>
