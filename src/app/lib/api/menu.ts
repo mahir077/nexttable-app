@@ -45,8 +45,8 @@ export async function getCategories(organizationId?: string | null): Promise<Cat
   return data || []
 }
 
-// Fetch menu items by category
-export async function getMenuItemsByCategory(categoryId: string): Promise<MenuItem[]> {
+// Fetch menu items by category (organizationId required for multi-tenant)
+export async function getMenuItemsByCategory(categoryId: string, organizationId: string): Promise<MenuItem[]> {
   const { data, error } = await supabase
     .from('menu_items')
     .select(`
@@ -54,6 +54,7 @@ export async function getMenuItemsByCategory(categoryId: string): Promise<MenuIt
       category:categories(*)
     `)
     .eq('category_id', categoryId)
+    .eq('organization_id', organizationId)
     .eq('is_active', true)
     .eq('is_available', true)
   
@@ -61,14 +62,15 @@ export async function getMenuItemsByCategory(categoryId: string): Promise<MenuIt
   return data || []
 }
 
-// Fetch all menu items
-export async function getAllMenuItems(): Promise<MenuItem[]> {
+// Fetch all menu items (organizationId required for multi-tenant)
+export async function getAllMenuItems(organizationId: string): Promise<MenuItem[]> {
   const { data, error } = await supabase
     .from('menu_items')
     .select(`
       *,
       category:categories(*)
     `)
+    .eq('organization_id', organizationId)
     .eq('is_active', true)
     .eq('is_available', true)
   

@@ -134,7 +134,8 @@ export default function SettingsPage() {
       if (settingsData && !settingsError) {
         setRestaurantSettingsId(settingsData.id)
         setRestaurantInfo(prev => ({
-          name: (settingsData.display_name as string) || (orgData?.display_name || orgData?.name) || prev.name,
+          // Organization is source of truth for business name (dashboard/sidebar match)
+          name: (orgData?.display_name || orgData?.name) || (settingsData.display_name as string) || prev.name,
           address: (settingsData.address as string) ?? prev.address,
           phone: (settingsData.phone as string) ?? prev.phone,
           email: (settingsData.email as string) ?? prev.email
@@ -146,7 +147,7 @@ export default function SettingsPage() {
           if (saved) {
             const info = JSON.parse(saved) as { name?: string; address?: string; phone?: string; email?: string }
             setRestaurantInfo(prev => ({
-              name: info.name ?? (orgData?.display_name || orgData?.name) ?? prev.name,
+              name: (orgData?.display_name || orgData?.name) ?? info.name ?? prev.name,
               address: info.address ?? prev.address,
               phone: info.phone ?? prev.phone,
               email: info.email ?? prev.email
@@ -169,10 +170,10 @@ export default function SettingsPage() {
 
   const fetchFloors = async () => {
     try {
-      const { data, error } = await supabase
-        .from('floors')
-        .select('*')
-        .order('name')
+      const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
+      let query = supabase.from('floors').select('*').order('name')
+      if (orgId) query = query.eq('organization_id', orgId)
+      const { data, error } = await query
 
       if (error) {
         console.error('Error fetching floors:', error)
@@ -194,8 +195,10 @@ export default function SettingsPage() {
 
   const fetchTables = async () => {
     if (!selectedFloor) return
+    const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
+    if (!orgId) return
     try {
-      const data = await getTablesByFloor(selectedFloor.id)
+      const data = await getTablesByFloor(selectedFloor.id, orgId)
       setTables(data)
     } catch (error) {
       console.error('Error fetching tables:', error)
@@ -295,15 +298,26 @@ export default function SettingsPage() {
         showToast('Floor updated!', 'success')
       } else {
         // Add new floor
+        const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
+        if (!orgId) {
+          showToast('No organization selected. Please refresh and try again.', 'error')
+          return
+        }
         const { error } = await supabase
           .from('floors')
           .insert({
-            name: floorForm.name,
+            name: floorForm.name.trim(),
             is_active: true,
-            ...(organization?.id && { organization_id: organization.id })
+            organization_id: orgId,
+            display_order: floors.length
           })
 
-        if (error) throw error
+        if (error) {
+          console.error('Floor insert error:', error)
+          const errMsg = (error as { message?: string })?.message ?? error?.message ?? JSON.stringify(error)
+          showToast('Failed to save floor: ' + errMsg, 'error')
+          return
+        }
         showToast('Floor added!', 'success')
       }
 
@@ -313,7 +327,8 @@ export default function SettingsPage() {
       fetchFloors()
     } catch (error) {
       console.error('Error saving floor:', error)
-      showToast('Failed to save floor', 'error')
+      const errMsg = error instanceof Error ? error.message : JSON.stringify(error)
+      showToast('Failed to save floor: ' + errMsg, 'error')
     }
   }
 
@@ -369,6 +384,11 @@ export default function SettingsPage() {
       }
 
       // Add new table
+      const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
+      if (!orgId) {
+        showToast('No organization selected. Please refresh and try again.', 'error')
+        return
+      }
       console.log('Creating table:', tableForm)
       const { data: inserted, error } = await supabase
         .from('tables')
@@ -378,13 +398,14 @@ export default function SettingsPage() {
           seats: parseInt(tableForm.seats, 10) || 4,
           status: 'available',
           is_active: true,
-          ...(organization?.id && { organization_id: organization.id })
+          organization_id: orgId
         })
         .select()
 
       if (error) {
         console.error('Table creation error:', error)
-        showToast('Failed to create table: ' + error.message, 'error')
+        const errMsg = (error as { message?: string })?.message ?? error?.message ?? JSON.stringify(error)
+        showToast('Failed to create table: ' + errMsg, 'error')
         return
       }
       console.log('Table created successfully:', inserted)

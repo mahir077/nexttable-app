@@ -57,10 +57,11 @@ export default function MenuManagementPage() {
 
   // Fetch data (categories + items scoped to current org)
   const fetchData = async () => {
+    if (!orgId) return
     try {
       const [categoriesData, itemsData] = await Promise.all([
         getCategories(orgId),
-        getAllMenuItems()
+        getAllMenuItems(orgId)
       ])
       setCategories(categoriesData)
       setMenuItems(itemsData)

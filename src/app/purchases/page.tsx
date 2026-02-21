@@ -41,6 +41,7 @@ interface Purchase {
 
 export default function PurchasesPage() {
   const { organization } = useAuth()
+  const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
   const [purchases, setPurchases] = useState<Purchase[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
@@ -62,35 +63,37 @@ export default function PurchasesPage() {
   const { toast, showToast, hideToast } = useToast()
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    if (orgId) fetchData()
+    else setLoading(false)
+  }, [orgId])
 
   const fetchData = async () => {
+    if (!orgId) return
     try {
       setLoading(true)
 
-      // Fetch purchases
       const { data: purchasesData, error: purchasesError } = await supabase
         .from('purchases')
         .select('*, supplier:suppliers(name)')
+        .eq('organization_id', orgId)
         .order('purchase_date', { ascending: false })
 
       if (purchasesError) throw purchasesError
       setPurchases(purchasesData || [])
 
-      // Fetch suppliers
       const { data: suppliersData } = await supabase
         .from('suppliers')
         .select('id, name')
+        .eq('organization_id', orgId)
         .eq('is_active', true)
         .order('name')
 
       setSuppliers(suppliersData || [])
 
-      // Fetch menu items
       const { data: itemsData } = await supabase
         .from('menu_items')
         .select('id, name, making_cost')
+        .eq('organization_id', orgId)
         .order('name')
 
       setMenuItems(itemsData || [])

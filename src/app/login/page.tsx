@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -103,26 +102,11 @@ export default function LoginPage() {
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
-
-          {/* Signup Link */}
-          <div className="mt-6 text-center text-sm text-slate-600">
-            Don&apos;t have an account?{' '}
-            <Link href="/signup" className="text-emerald-600 font-bold hover:text-emerald-700">
-              Create one
-            </Link>
-          </div>
         </div>
 
-        {/* Demo / First-time use */}
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-center space-y-2">
-          <div className="font-bold text-blue-900">First time?</div>
-          <div className="text-blue-700">
-            No account yet? <Link href="/signup" className="underline font-bold">Sign up</Link> to create your restaurant.
-          </div>
-          <div className="text-blue-600 pt-1 border-t border-blue-200">
-            Demo: Create user <code className="bg-blue-100 px-1 rounded">demo@restaurant.com</code> in Supabase Dashboard → Authentication → Users → Add user, then use password <code className="bg-blue-100 px-1 rounded">demo123</code>.
-          </div>
-        </div>
+        <p className="mt-6 text-center text-sm text-slate-500">
+          Demo: <span className="font-mono font-medium text-slate-700">demo@restaurant.com</span> / <span className="font-mono font-medium text-slate-700">demo123</span>
+        </p>
       </div>
     </div>
   )

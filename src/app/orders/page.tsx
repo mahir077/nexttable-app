@@ -5,6 +5,7 @@ import { supabase } from '@/app/lib/api/tables'
 import { getOrderWithItems } from '@/app/lib/api/orders'
 import { openCashDrawer } from '@/app/lib/cashDrawer'
 import BackButton from '@/components/BackButton'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface Order {
   id: string
@@ -32,6 +33,8 @@ interface OrderWithItems extends Order {
 }
 
 export default function OrdersPage() {
+  const { organization } = useAuth()
+  const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
   const [orders, setOrders] = useState<Order[]>([])
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
@@ -51,8 +54,9 @@ export default function OrdersPage() {
 
   // Fetch orders
   useEffect(() => {
-    fetchOrders()
-  }, [])
+    if (orgId) fetchOrders()
+    else setLoading(false)
+  }, [orgId])
 
   // Apply filters
   useEffect(() => {
@@ -91,10 +95,12 @@ export default function OrdersPage() {
   }, [searchQuery, selectedYear, selectedMonth, selectedDate, orders])
 
   const fetchOrders = async () => {
+    if (!orgId) return
     try {
       const { data, error } = await supabase
         .from('orders')
         .select('*')
+        .eq('organization_id', orgId)
         .eq('status', 'paid')
         .order('created_at', { ascending: false })
         .limit(100)
@@ -110,8 +116,9 @@ export default function OrdersPage() {
   }
 
   const fetchOrderDetails = async (orderId: string) => {
+    if (!orgId) return
     try {
-      const { order, items } = await getOrderWithItems(orderId)
+      const { order, items } = await getOrderWithItems(orgId, orderId)
       const orderItems = (items || []).map((item: { item_name: string; item_name_bangla: string | null; quantity: number; unit_price: number }) => ({
         quantity: item.quantity,
         price: item.unit_price,
@@ -126,12 +133,13 @@ export default function OrdersPage() {
 
   const handleDelete = async (orderId: string, orderNumber: string) => {
     if (!confirm(`Delete Order ${orderNumber}?\n\nThis action cannot be undone.`)) return
-
+    if (!orgId) return
     try {
       const { error } = await supabase
         .from('orders')
         .delete()
         .eq('id', orderId)
+        .eq('organization_id', orgId)
 
       if (error) throw error
       

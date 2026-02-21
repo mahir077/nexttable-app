@@ -163,25 +163,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signIn = async (email: string, password: string) => {
-    console.log('🔐 Signing in:', email)
-
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
     })
 
-    console.log('Sign in result:', { user: data?.user?.email, error: error?.message })
-
     if (!error && data.user) {
-      console.log('✅ Login successful')
-
-      // Load organizations
       await loadOrganizations(data.user.id)
-
-      // Small delay to ensure session is persisted
       await new Promise(resolve => setTimeout(resolve, 500))
-
-      console.log('Redirecting to dashboard...')
       window.location.href = '/dashboard'
     }
 

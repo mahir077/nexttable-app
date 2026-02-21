@@ -21,7 +21,7 @@ type OrderTypeId = typeof ORDER_TYPES[number]['id']
 function POSContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { organization } = useAuth()
+  const { organization, organizations } = useAuth()
   const typeFromUrl = (searchParams?.get('type') as OrderTypeId) || 'dine-in'
 
   const [orderType, setOrderType] = useState<OrderTypeId>(typeFromUrl)
@@ -61,19 +61,23 @@ function POSContent() {
     router.replace(`/pos?type=${type}`, { scroll: false })
   }, [router])
 
-  // Categories
+  const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null) ?? organizations?.[0]?.id ?? null
+
+  // Categories (current org only – avoids duplicates from multiple orgs)
   useEffect(() => {
+    if (!orgId) return
     let cancelled = false
     setLoadingCategories(true)
-    getCategories().then(data => {
+    getCategories(orgId).then(data => {
       if (!cancelled) {
-        setCategories(data)
-        if (data.length > 0 && !selectedCategory) setSelectedCategory(data[0])
+        const unique = data.filter((cat, i, arr) => arr.findIndex(c => c.id === cat.id) === i)
+        setCategories(unique)
+        if (unique.length > 0 && !selectedCategory) setSelectedCategory(unique[0])
       }
       setLoadingCategories(false)
     })
     return () => { cancelled = true }
-  }, [])
+  }, [orgId])
 
   useEffect(() => {
     if (selectedCategory) setSelectedCategory(categories.find(c => c.id === selectedCategory.id) || categories[0] || null)
@@ -81,25 +85,27 @@ function POSContent() {
 
   // Menu items by category
   useEffect(() => {
-    if (!selectedCategory) {
+    if (!orgId || !selectedCategory) {
       setMenuItems([])
+      if (!selectedCategory) setLoadingItems(false)
       return
     }
     setLoadingItems(true)
-    getMenuItemsByCategory(selectedCategory.id).then(data => {
+    getMenuItemsByCategory(selectedCategory.id, orgId).then(data => {
       setMenuItems(data)
       setLoadingItems(false)
     })
-  }, [selectedCategory])
+  }, [orgId, selectedCategory])
 
-  // Floors & tables for dine-in
+  // Floors & tables for dine-in (current org only)
   useEffect(() => {
-    getFloors().then(setFloors)
-  }, [])
+    if (!orgId) return
+    getFloors(orgId).then(setFloors)
+  }, [orgId])
   useEffect(() => {
-    if (!selectedFloor) return
-    getTablesByFloor(selectedFloor.id).then(setTables)
-  }, [selectedFloor])
+    if (!orgId || !selectedFloor) return
+    getTablesByFloor(selectedFloor.id, orgId).then(setTables)
+  }, [orgId, selectedFloor])
   useEffect(() => {
     if (floors.length > 0 && !selectedFloor) setSelectedFloor(floors[0])
   }, [floors, selectedFloor])
@@ -413,6 +419,10 @@ function POSContent() {
   }
 
   const handleSendKOT = async () => {
+    if (!orgId) {
+      showToast('Restaurant not selected. Please go to Dashboard first or refresh the page.', 'error')
+      return
+    }
     try {
       if (orderType === 'dine-in' && selectedTable) {
         const { data: tableCheck } = await supabase
@@ -447,7 +457,7 @@ function POSContent() {
         delivery_time: orderType === 'online' && deliveryTime ? deliveryTime : null,
         guest_count: orderType === 'event' && guestCount ? parseInt(guestCount, 10) : null,
         event_date: orderType === 'event' && eventDate ? eventDate : null,
-        ...(organization?.id && { organization_id: organization.id }),
+        ...(orgId && { organization_id: orgId }),
       }
 
       const { data: order, error: orderError } = await supabase
@@ -458,6 +468,12 @@ function POSContent() {
 
       if (orderError) throw orderError
 
+      console.log('✅ Order created:', {
+        orderId: order.id,
+        status: order.status,
+        organizationId: order.organization_id
+      })
+
       const orderItems = cart.map(item => ({
         order_id: order.id,
         menu_item_id: item.id,
@@ -467,7 +483,7 @@ function POSContent() {
         unit_price: item.price,
         subtotal: item.price * item.quantity,
         status: 'pending',
-        ...(organization?.id && { organization_id: organization.id }),
+        ...(orgId && { organization_id: orgId }),
       }))
 
       const { error: itemsError } = await supabase.from('order_items').insert(orderItems)

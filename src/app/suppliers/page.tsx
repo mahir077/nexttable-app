@@ -21,6 +21,7 @@ interface Supplier {
 
 export default function SuppliersPage() {
   const { organization } = useAuth()
+  const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -38,15 +39,18 @@ export default function SuppliersPage() {
   const { toast, showToast, hideToast } = useToast()
 
   useEffect(() => {
-    fetchSuppliers()
-  }, [])
+    if (orgId) fetchSuppliers()
+    else setLoading(false)
+  }, [orgId])
 
   const fetchSuppliers = async () => {
+    if (!orgId) return
     try {
       setLoading(true)
       const { data, error } = await supabase
         .from('suppliers')
         .select('*')
+        .eq('organization_id', orgId)
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -76,6 +80,7 @@ export default function SuppliersPage() {
             updated_at: new Date().toISOString()
           })
           .eq('id', editingSupplier.id)
+          .eq('organization_id', orgId!)
 
         if (error) throw error
         showToast('✅ Supplier updated!', 'success')
@@ -116,11 +121,13 @@ export default function SuppliersPage() {
   }
 
   const handleToggleActive = async (supplier: Supplier) => {
+    if (!orgId) return
     try {
       const { error } = await supabase
         .from('suppliers')
         .update({ is_active: !supplier.is_active })
         .eq('id', supplier.id)
+        .eq('organization_id', orgId)
 
       if (error) throw error
       showToast(supplier.is_active ? 'Supplier deactivated' : 'Supplier activated', 'success')

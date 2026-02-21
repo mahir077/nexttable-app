@@ -20,6 +20,7 @@ interface Reservation {
 
 export default function ReservationsPage() {
   const { organization } = useAuth()
+  const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
   const [reservations, setReservations] = useState<Reservation[]>([])
   const [tables, setTables] = useState<Table[]>([])
   const [showForm, setShowForm] = useState(false)
@@ -34,15 +35,19 @@ export default function ReservationsPage() {
   const [specialRequests, setSpecialRequests] = useState('')
 
   useEffect(() => {
-    fetchReservations()
-    fetchTables()
-  }, [])
+    if (orgId) {
+      fetchReservations()
+      fetchTables()
+    } else setLoading(false)
+  }, [orgId])
 
   const fetchReservations = async () => {
+    if (!orgId) return
     setLoading(true)
     const { data } = await supabase
       .from('reservations')
       .select('*')
+      .eq('organization_id', orgId)
       .eq('status', 'pending')
       .order('date', { ascending: true })
       .order('time', { ascending: true })
@@ -51,7 +56,8 @@ export default function ReservationsPage() {
   }
 
   const fetchTables = async () => {
-    const data = await getAllTables()
+    if (!orgId) return
+    const data = await getAllTables(orgId)
     setTables(data || [])
   }
 
@@ -87,15 +93,17 @@ export default function ReservationsPage() {
   }
 
   const markAsArrived = async (reservation: Reservation) => {
-    await supabase.from('tables').update({ status: 'occupied' }).eq('id', reservation.table_id)
-    await supabase.from('reservations').update({ status: 'arrived' }).eq('id', reservation.id)
+    if (orgId) {
+      await supabase.from('tables').update({ status: 'occupied' }).eq('id', reservation.table_id).eq('organization_id', orgId)
+      await supabase.from('reservations').update({ status: 'arrived' }).eq('id', reservation.id).eq('organization_id', orgId)
+    }
     alert('✅ Guest arrived!')
     fetchReservations()
   }
 
   const cancelReservation = async (id: string) => {
     if (confirm('Cancel this reservation?')) {
-      await supabase.from('reservations').delete().eq('id', id)
+      if (orgId) await supabase.from('reservations').delete().eq('id', id).eq('organization_id', orgId)
       fetchReservations()
     }
   }

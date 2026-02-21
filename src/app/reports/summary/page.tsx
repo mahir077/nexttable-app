@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/app/lib/api/tables'
 import BackButton from '@/components/BackButton'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface Order {
   id: string
@@ -27,17 +28,21 @@ interface OrderWithItems extends Order {
   order_items: OrderItem[]
 }
 
-export default function ReportsPage() {
+export default function ReportsSummaryPage() {
+  const { organization } = useAuth()
+  const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
   const [activeTab, setActiveTab] = useState('daily-sales')
   const [orders, setOrders] = useState<OrderWithItems[]>([])
   const [loading, setLoading] = useState(true)
   const [dateFilter, setDateFilter] = useState('today')
 
   useEffect(() => {
-    fetchOrders()
-  }, [dateFilter])
+    if (orgId) fetchOrders()
+    else setLoading(false)
+  }, [orgId, dateFilter])
 
   const fetchOrders = async () => {
+    if (!orgId) return
     try {
       setLoading(true)
 
@@ -59,6 +64,7 @@ export default function ReportsPage() {
             )
           )
         `)
+        .eq('organization_id', orgId)
         .order('created_at', { ascending: false })
 
       // Apply date filter
@@ -81,10 +87,10 @@ export default function ReportsPage() {
 
       if (error) {
         console.warn('Reports query with joins failed, trying simple query:', error.message)
-        // Fallback: no menu_items join (use order_items.unit_price, item_name)
         let fallback = supabase
           .from('orders')
           .select('id, total, created_at, payment_method, order_type, order_items (quantity, unit_price, item_name)')
+          .eq('organization_id', orgId)
           .order('created_at', { ascending: false })
         if (dateFilter === 'today') {
           const today = new Date()

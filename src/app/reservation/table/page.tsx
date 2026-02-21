@@ -5,8 +5,11 @@ import Link from 'next/link'
 import Sidebar from '@/components/Sidebar'
 import { getFloors, getTablesByFloor, Floor, Table } from '@/app/lib/api/tables'
 import LoadingSpinner from '@/components/LoadingSpinner'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function ReservationTablePage() {
+  const { organization } = useAuth()
+  const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [floors, setFloors] = useState<Floor[]>([])
   const [selectedFloor, setSelectedFloor] = useState<Floor | null>(null)
@@ -14,20 +17,21 @@ export default function ReservationTablePage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getFloors().then(data => {
+    if (!orgId) return
+    getFloors(orgId).then(data => {
       setFloors(data)
       if (data.length > 0) setSelectedFloor(data[0])
     })
-  }, [])
+  }, [orgId])
 
   useEffect(() => {
-    if (!selectedFloor) return
+    if (!orgId || !selectedFloor) return
     setLoading(true)
-    getTablesByFloor(selectedFloor.id).then(data => {
+    getTablesByFloor(selectedFloor.id, orgId).then(data => {
       setTables(data)
       setLoading(false)
     })
-  }, [selectedFloor])
+  }, [orgId, selectedFloor])
 
   return (
     <div className="flex h-screen bg-white overflow-hidden">

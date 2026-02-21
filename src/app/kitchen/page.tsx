@@ -45,7 +45,7 @@ interface EditLineItem {
 }
 
 export default function KitchenPage() {
-  const { organization } = useAuth()
+  const { organization, organizations } = useAuth()
   const [orders, setOrders] = useState<Order[]>([])
   const [selectedOrder, setSelectedOrder] = useState<{ order: Order; items: OrderItem[] } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -84,12 +84,20 @@ export default function KitchenPage() {
 
   const { toast, showToast, hideToast } = useToast()
 
+  const [mounted, setMounted] = useState(false)
+  const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null) ?? organizations?.[0]?.id ?? null
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   // All tables for showing table number/floor on orders (dine-in)
   const [tablesForLabel, setTablesForLabel] = useState<Table[]>([])
   const [isPrintingKOT, setIsPrintingKOT] = useState(false)
   useEffect(() => {
-    getAllTables().then(setTablesForLabel)
-  }, [])
+    if (!orgId) return
+    getAllTables(orgId).then(setTablesForLabel)
+  }, [orgId])
 
   const getOrderTableLabel = (order: Order) => {
     if (!order.table_id) return order.order_type === 'dine-in' ? '—' : (order.order_type || 'Takeaway')
@@ -106,7 +114,8 @@ export default function KitchenPage() {
     setIsPrintingKOT(true)
 
     try {
-      const data = await getOrderWithItems(order.id)
+      if (!orgId) return
+      const data = await getOrderWithItems(orgId, order.id)
 
       const tableInfo = order.table_id
         ? tablesForLabel.find(t => t.id === order.table_id)
@@ -330,29 +339,30 @@ export default function KitchenPage() {
   }
 
   const fetchOrders = async () => {
+    if (!orgId) return
     try {
-      const data = await getOrders()
-      const activeOrders = data.filter(order =>
-        order.status === 'pending' ||
-        order.status === 'preparing' ||
-        order.status === 'ready' ||
-        order.status === 'served' ||
-        order.status === 'rejected'
-      )
-      setOrders(activeOrders)
+      setLoading(true)
+      const activeStatuses = ['pending', 'preparing', 'ready', 'served', 'rejected']
+      const data = await getOrders(orgId, activeStatuses)
+      setOrders(data ?? [])
+      console.log('✅ Kitchen orders fetched:', { orgId, count: (data ?? []).length, first: (data ?? [])[0] })
     } catch (error) {
-      console.error('Error fetching pending orders (kitchen):', error)
+      console.error('❌ Error fetching kitchen orders:', error)
+      showToast('Could not load orders. Check console.', 'error')
+      setOrders([])
     } finally {
       setLoading(false)
     }
   }
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
+    if (!orgId) return
     try {
       const { error } = await supabase
         .from('orders')
         .update({ status: newStatus })
         .eq('id', orderId)
+        .eq('organization_id', orgId)
 
       if (error) {
         console.error('Error updating status:', error)
@@ -372,14 +382,43 @@ export default function KitchenPage() {
   }
 
   useEffect(() => {
+    if (!orgId) {
+      setLoading(false)
+      setOrders([])
+      return
+    }
     fetchOrders()
     const interval = setInterval(fetchOrders, 5000)
     return () => clearInterval(interval)
-  }, [])
+  }, [orgId])
+
+  // Real-time: new/updated orders for this org (filter by organization_id)
+  useEffect(() => {
+    if (!orgId) return
+    const channel = supabase
+      .channel('kitchen-orders')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `organization_id=eq.${orgId}` // only this tenant's orders
+        },
+        () => {
+          fetchOrders()
+        }
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [orgId])
 
   const viewOrderDetails = async (order: Order) => {
+    if (!orgId) return
     try {
-      const data = await getOrderWithItems(order.id)
+      const data = await getOrderWithItems(orgId, order.id)
       setSelectedOrder(data)
     } catch (error) {
       console.error('Error fetching order details (kitchen):', error)
@@ -438,15 +477,16 @@ export default function KitchenPage() {
 
   // --- Add Order ---
   const openAddModal = async () => {
+    if (!orgId) return
     setShowAddModal(true)
     setAddOrderType('dine-in')
     setAddTableId('')
     setAddItemQty({})
     try {
       const [cats, items, floors] = await Promise.all([
-        getCategories(),
-        getAllMenuItems(),
-        getFloors()
+        getCategories(orgId),
+        getAllMenuItems(orgId),
+        getFloors(orgId)
       ])
       setAddCategories(cats)
       setAddMenuItems(items)
@@ -458,12 +498,12 @@ export default function KitchenPage() {
   }
 
   useEffect(() => {
-    if (!addSelectedFloor) {
+    if (!orgId || !addSelectedFloor) {
       setAddTables([])
       return
     }
-    getTablesByFloor(addSelectedFloor.id).then(setAddTables)
-  }, [addSelectedFloor])
+    getTablesByFloor(addSelectedFloor.id, orgId).then(setAddTables)
+  }, [orgId, addSelectedFloor])
 
   const setAddItemQuantity = (menuItemId: string, qty: number) => {
     setAddItemQty(prev => {
@@ -536,8 +576,9 @@ export default function KitchenPage() {
 
   // --- Edit Order ---
   const openEditModal = async (order: Order) => {
+    if (!orgId) return
     try {
-      const data = await getOrderWithItems(order.id)
+      const data = await getOrderWithItems(orgId, order.id)
       setEditOrder(data)
       setEditLines(data.items.filter(it => it.menu_item_id).map(it => ({
         menu_item_id: it.menu_item_id!,
@@ -547,7 +588,7 @@ export default function KitchenPage() {
         quantity: it.quantity
       })))
       setEditReason('')
-      const allItems = await getAllMenuItems()
+      const allItems = await getAllMenuItems(orgId)
       setEditAllMenuItems(allItems)
       setShowEditModal(true)
     } catch (e) {
@@ -596,7 +637,8 @@ export default function KitchenPage() {
     setEditLoading(true)
     try {
       const subtotal = editLines.reduce((s, l) => s + l.unit_price * l.quantity, 0)
-      await supabase.from('order_items').delete().eq('order_id', editOrder.order.id)
+      const oId = organization?.id ?? orgId
+      await supabase.from('order_items').delete().eq('order_id', editOrder.order.id).eq('organization_id', oId!)
       await supabase.from('order_items').insert(editLines.map(l => ({
         order_id: editOrder.order.id,
         menu_item_id: l.menu_item_id,
@@ -606,13 +648,13 @@ export default function KitchenPage() {
         unit_price: l.unit_price,
         subtotal: l.unit_price * l.quantity,
         status: 'pending',
-        ...(organization?.id && { organization_id: organization.id }),
+        ...(oId && { organization_id: oId }),
       })))
       await supabase.from('orders').update({
         subtotal,
         total: subtotal,
         updated_at: new Date().toISOString()
-      }).eq('id', editOrder.order.id)
+      }).eq('id', editOrder.order.id).eq('organization_id', oId!)
       console.log('[Kitchen] Order edited', {
         orderId: editOrder.order.id,
         order_number: editOrder.order.order_number,
@@ -645,8 +687,14 @@ export default function KitchenPage() {
     }
     setDeleteLoading(true)
     try {
-      await supabase.from('order_items').delete().eq('order_id', deleteOrder.id)
-      await supabase.from('orders').delete().eq('id', deleteOrder.id)
+      const oId = organization?.id ?? orgId
+      if (oId) {
+        await supabase.from('order_items').delete().eq('order_id', deleteOrder.id).eq('organization_id', oId)
+        await supabase.from('orders').delete().eq('id', deleteOrder.id).eq('organization_id', oId)
+      } else {
+        await supabase.from('order_items').delete().eq('order_id', deleteOrder.id)
+        await supabase.from('orders').delete().eq('id', deleteOrder.id)
+      }
       setShowDeleteModal(false)
       setDeleteOrder(null)
       setSelectedOrder(null)
@@ -660,7 +708,7 @@ export default function KitchenPage() {
   }
 
   const handleRejectOrder = async () => {
-    if (!rejectOrderId) return
+    if (!rejectOrderId || !orgId) return
 
     if (!rejectReason.trim()) {
       showToast('Please provide a reason for rejection', 'error')
@@ -677,6 +725,7 @@ export default function KitchenPage() {
           rejection_reason: rejectReason
         })
         .eq('id', rejectOrderId)
+        .eq('organization_id', orgId)
 
       if (error) throw error
 
@@ -842,7 +891,17 @@ export default function KitchenPage() {
         </button>
       </div>
 
-      {loading ? (
+      {!mounted ? (
+        <div className="flex items-center justify-center h-64">
+          <LoadingSpinner size="lg" />
+        </div>
+      ) : !orgId ? (
+        <EmptyState
+          icon="🏪"
+          title="Restaurant not selected"
+          description="Go to Dashboard and select a restaurant, or refresh the page. Then orders from POS will appear here."
+        />
+      ) : loading ? (
         <div className="flex items-center justify-center h-64">
           <LoadingSpinner size="lg" />
         </div>

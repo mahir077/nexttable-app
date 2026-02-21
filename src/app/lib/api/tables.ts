@@ -21,20 +21,23 @@ export interface Table {
   location?: string
 }
 
-// Fetch all floors
-export async function getFloors(): Promise<Floor[]> {
-  const { data, error } = await supabase
+// Fetch floors (optionally scoped to organization)
+export async function getFloors(organizationId?: string | null): Promise<Floor[]> {
+  let query = supabase
     .from('floors')
     .select('*')
     .eq('is_active', true)
     .order('display_order')
-  
+  if (organizationId) {
+    query = query.eq('organization_id', organizationId)
+  }
+  const { data, error } = await query
   if (error) throw error
   return data || []
 }
 
-// Fetch tables by floor
-export async function getTablesByFloor(floorId: string): Promise<Table[]> {
+// Fetch tables by floor (organizationId required for multi-tenant)
+export async function getTablesByFloor(floorId: string, organizationId: string): Promise<Table[]> {
   const { data, error } = await supabase
     .from('tables')
     .select(`
@@ -42,6 +45,7 @@ export async function getTablesByFloor(floorId: string): Promise<Table[]> {
       floor:floors(*)
     `)
     .eq('floor_id', floorId)
+    .eq('organization_id', organizationId)
     .eq('is_active', true)
     .order('table_number')
   
@@ -49,14 +53,15 @@ export async function getTablesByFloor(floorId: string): Promise<Table[]> {
   return data || []
 }
 
-// Fetch all tables
-export async function getAllTables(): Promise<Table[]> {
+// Fetch all tables (organizationId required for multi-tenant)
+export async function getAllTables(organizationId: string): Promise<Table[]> {
   const { data, error } = await supabase
     .from('tables')
     .select(`
       *,
       floor:floors(*)
     `)
+    .eq('organization_id', organizationId)
     .eq('is_active', true)
     .order('table_number')
   

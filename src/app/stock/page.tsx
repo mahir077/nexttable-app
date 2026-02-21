@@ -29,6 +29,7 @@ interface StockSummary {
 
 export default function StockPage() {
   const { organization } = useAuth()
+  const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
   const [stockData, setStockData] = useState<StockSummary[]>([])
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -40,17 +41,19 @@ export default function StockPage() {
   const { toast, showToast, hideToast } = useToast()
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    if (orgId) fetchData()
+    else setLoading(false)
+  }, [orgId])
 
   const fetchData = async () => {
+    if (!orgId) return
     try {
       setLoading(true)
 
-      // Fetch stock summary - simplified query
       const { data: stockDataRes, error: stockError } = await supabase
         .from('stock_summary')
         .select('*')
+        .eq('organization_id', orgId)
         .order('last_updated', { ascending: false })
 
       if (stockError) {
@@ -67,12 +70,32 @@ export default function StockPage() {
       if (menuItemIds.length > 0) {
         const { data: itemsData, error: itemsError } = await supabase
           .from('menu_items')
-          .select('id, name, making_cost, category')
+          .select(`
+            id,
+            name,
+            making_cost,
+            category:categories (
+              name
+            )
+          `)
+          .eq('organization_id', orgId)
           .in('id', menuItemIds)
 
+        if (itemsError) {
+          const errMsg = (itemsError as { message?: string })?.message ?? JSON.stringify(itemsError)
+          console.error('Error fetching menu items for stock:', errMsg)
+        }
         if (!itemsError && itemsData) {
-          itemsMap = itemsData.reduce((acc, item) => {
-            acc[item.id] = item
+          itemsMap = itemsData.reduce((acc, row: unknown) => {
+            const item = row as { id: string; name: string; making_cost?: number; category?: { name: string } | { name: string }[] | null }
+            const cat = item.category
+            const catName = Array.isArray(cat) ? cat[0]?.name : cat?.name
+            acc[item.id] = {
+              id: item.id,
+              name: item.name,
+              making_cost: item.making_cost ?? 0,
+              category: catName ?? 'Uncategorized'
+            }
             return acc
           }, {} as Record<string, { id: string; name: string; making_cost: number; category: string }>)
         }
@@ -86,13 +109,46 @@ export default function StockPage() {
 
       setStockData(combinedData)
 
-      // Fetch all menu items for opening balance dropdown
-      const { data: allItems } = await supabase
+      let menuData: unknown[] | null = null
+      const { data: menuDataWithCat, error: menuError } = await supabase
         .from('menu_items')
-        .select('id, name, making_cost, category')
+        .select(`
+          id,
+          name,
+          making_cost,
+          category:categories (
+            name
+          )
+        `)
+        .eq('organization_id', orgId)
         .order('name')
 
-      setMenuItems(allItems || [])
+      if (menuError) {
+        const errMsg = (menuError as { message?: string })?.message ?? (menuError as { code?: string })?.code ?? JSON.stringify(menuError)
+        console.error('Error fetching menu items (with category join):', errMsg, menuError)
+        // Fallback: fetch without join so page still loads
+        const { data: fallbackData } = await supabase
+          .from('menu_items')
+          .select('id, name, making_cost')
+          .eq('organization_id', orgId)
+          .order('name')
+        menuData = fallbackData
+      } else {
+        menuData = menuDataWithCat
+      }
+
+      const normalizedItems = (menuData || []).map((row: unknown) => {
+        const item = row as { id: string; name: string; making_cost?: number; category?: { name: string } | { name: string }[] | null }
+        const cat = item.category
+        const catName = Array.isArray(cat) ? cat[0]?.name : cat?.name
+        return {
+          id: item.id,
+          name: item.name,
+          making_cost: item.making_cost ?? 0,
+          category: catName ?? 'Uncategorized'
+        }
+      })
+      setMenuItems(normalizedItems)
     } catch (error) {
       console.error('Error:', error)
       showToast('Failed to load stock data: ' + (error as Error).message, 'error')

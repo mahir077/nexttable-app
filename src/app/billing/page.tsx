@@ -70,17 +70,20 @@ export default function BillingPage() {
 
   const { toast, showToast, hideToast } = useToast()
 
+  const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
+
   useEffect(() => {
+    if (!orgId) return
     fetchOrders()
     fetchRestaurantInfo()
     fetchInvoiceSettings()
-  }, [])
+  }, [orgId])
 
   const fetchOrders = async () => {
+    if (!orgId) return
     try {
       setLoading(true)
 
-      // Fetch orders with proper error handling
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -108,6 +111,7 @@ export default function BillingPage() {
             menu_item:menu_items(id)
           )
         `)
+        .eq('organization_id', orgId)
         .in('status', ['ready', 'preparing', 'kot_sent', 'pending'])
         .order('created_at', { ascending: false })
 
@@ -132,12 +136,14 @@ export default function BillingPage() {
   }
 
   const fetchRestaurantInfo = async () => {
+    if (!orgId) return
     try {
       const { data, error } = await supabase
         .from('restaurant_settings')
         .select('display_name, address, phone, email')
+        .eq('organization_id', orgId)
         .limit(1)
-        .single()
+        .maybeSingle()
 
       if (data) {
         setRestaurantInfo({
@@ -153,11 +159,13 @@ export default function BillingPage() {
   }
 
   const fetchInvoiceSettings = async () => {
+    if (!orgId) return
     try {
       const { data } = await supabase
         .from('invoice_settings')
         .select('*')
-        .eq('id', 1)
+        .eq('organization_id', orgId)
+        .limit(1)
         .maybeSingle()
 
       if (data) {
@@ -222,17 +230,13 @@ export default function BillingPage() {
     try {
       console.log('Completing payment for:', selectedOrder.id)
 
-      // Build update object with only essential fields
+      const now = new Date().toISOString()
+      // Build update object – paid_at is required for dashboard Daily Sale / Weekly stats
       const updateData: Record<string, unknown> = {
         status: 'paid',
-        payment_method: selectedPaymentMethod
-      }
-
-      // Add optional fields only if they make sense
-      try {
-        updateData.completed_at = new Date().toISOString()
-      } catch {
-        console.log('completed_at not available')
+        payment_method: selectedPaymentMethod,
+        paid_at: now,
+        updated_at: now
       }
 
       // Add discount if applied
@@ -253,6 +257,7 @@ export default function BillingPage() {
         .from('orders')
         .update(updateData)
         .eq('id', selectedOrder.id)
+        .eq('organization_id', orgId!)
 
       if (orderError) {
         console.error('Order update error:', orderError)
@@ -294,11 +299,12 @@ export default function BillingPage() {
       }
 
       // Update table status if dine-in
-      if (selectedOrder.table_id) {
+      if (selectedOrder.table_id && orgId) {
         const { error: tableError } = await supabase
           .from('tables')
           .update({ status: 'available' })
           .eq('id', selectedOrder.table_id)
+          .eq('organization_id', orgId)
 
         if (tableError) {
           console.error('Table update warning:', tableError)

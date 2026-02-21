@@ -5,6 +5,7 @@ import { supabase } from '@/app/lib/api/tables'
 import BackButton from '@/components/BackButton'
 import { useToast } from '@/hooks/useToast'
 import Toast from '@/components/Toast'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface StockMovement {
   id: string
@@ -29,6 +30,8 @@ interface MenuItemOption {
 }
 
 export default function StockLedgerPage() {
+  const { organization } = useAuth()
+  const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
   const [movements, setMovements] = useState<StockMovement[]>([])
   const [loading, setLoading] = useState(true)
   const [filterType, setFilterType] = useState('all')
@@ -38,10 +41,12 @@ export default function StockLedgerPage() {
   const { toast, showToast, hideToast } = useToast()
 
   useEffect(() => {
-    fetchData()
-  }, [filterType, filterItem])
+    if (orgId) fetchData()
+    else setMovements([])
+  }, [orgId, filterType, filterItem])
 
   const fetchData = async () => {
+    if (!orgId) return
     try {
       setLoading(true)
 
@@ -51,6 +56,7 @@ export default function StockLedgerPage() {
           *,
           menu_item:menu_items(name, category:categories(name))
         `)
+        .eq('organization_id', orgId)
         .order('movement_date', { ascending: false })
         .limit(200)
 
@@ -68,14 +74,14 @@ export default function StockLedgerPage() {
         let fallback = supabase
           .from('stock_movements')
           .select('*, menu_item:menu_items(name)')
+          .eq('organization_id', orgId)
           .order('movement_date', { ascending: false })
           .limit(200)
         if (filterType !== 'all') fallback = fallback.eq('movement_type', filterType)
         if (filterItem !== 'all') fallback = fallback.eq('menu_item_id', filterItem)
         const res = await fallback
         if (res.error) {
-          // Last resort: load movements without join; item name shown from menuItems in UI
-          let bare = supabase.from('stock_movements').select('*').order('movement_date', { ascending: false }).limit(200)
+          let bare = supabase.from('stock_movements').select('*').eq('organization_id', orgId).order('movement_date', { ascending: false }).limit(200)
           if (filterType !== 'all') bare = bare.eq('movement_type', filterType)
           if (filterItem !== 'all') bare = bare.eq('menu_item_id', filterItem)
           const bareRes = await bare
@@ -91,6 +97,7 @@ export default function StockLedgerPage() {
       const { data: itemsData } = await supabase
         .from('menu_items')
         .select('id, name')
+        .eq('organization_id', orgId)
         .order('name')
 
       setMenuItems(itemsData || [])

@@ -1,10 +1,7 @@
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase-client'
 import { CartItem } from './menu'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-export const supabase = createClient(supabaseUrl, supabaseKey)
+export { supabase }
 
 // Types
 export interface Order {
@@ -48,6 +45,7 @@ export interface OrderItem {
 }
 
 export interface CreateOrderData {
+  organization_id: string
   table_id?: string
   order_type: 'dine-in' | 'takeaway' | 'online' | 'event'
   items: CartItem[]
@@ -82,10 +80,12 @@ export async function createOrder(orderData: CreateOrderData): Promise<Order | n
     // Generate order number
     const orderNumber = await generateOrderNumber()
 
+    const orgId = orderData.organization_id
     // Create order
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
+        organization_id: orgId,
         order_number: orderNumber,
         table_id: orderData.table_id || null,
         order_type: orderData.order_type,
@@ -105,6 +105,7 @@ export async function createOrder(orderData: CreateOrderData): Promise<Order | n
 
     // Create order items
     const orderItems = orderData.items.map(item => ({
+      organization_id: orgId,
       order_id: order.id,
       menu_item_id: item.id,
       item_name: item.name,
@@ -129,15 +130,20 @@ export async function createOrder(orderData: CreateOrderData): Promise<Order | n
   }
 }
 
-// Get all orders
-export async function getOrders(status?: string): Promise<Order[]> {
+// Get all orders (organizationId required for multi-tenant). status can be single or array for active kitchen list.
+export async function getOrders(organizationId: string, status?: string | string[]): Promise<Order[]> {
   let query = supabase
     .from('orders')
     .select('*')
+    .eq('organization_id', organizationId)
     .order('created_at', { ascending: false })
 
-  if (status) {
-    query = query.eq('status', status)
+  if (status != null) {
+    if (Array.isArray(status)) {
+      if (status.length > 0) query = query.in('status', status)
+    } else {
+      query = query.eq('status', status)
+    }
   }
 
   const { data, error } = await query
@@ -146,12 +152,13 @@ export async function getOrders(status?: string): Promise<Order[]> {
   return data || []
 }
 
-// Get order with items
-export async function getOrderWithItems(orderId: string) {
+// Get order with items (organizationId required for multi-tenant)
+export async function getOrderWithItems(organizationId: string, orderId: string) {
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .select('*')
     .eq('id', orderId)
+    .eq('organization_id', organizationId)
     .single()
 
   if (orderError) throw orderError
@@ -160,18 +167,20 @@ export async function getOrderWithItems(orderId: string) {
     .from('order_items')
     .select('*')
     .eq('order_id', orderId)
+    .eq('organization_id', organizationId)
 
   if (itemsError) throw itemsError
 
   return { order, items }
 }
 
-// Update order status
-export async function updateOrderStatus(orderId: string, status: string): Promise<boolean> {
+// Update order status (organizationId for defense-in-depth)
+export async function updateOrderStatus(organizationId: string, orderId: string, status: string): Promise<boolean> {
   const { error } = await supabase
     .from('orders')
     .update({ status, updated_at: new Date().toISOString() })
     .eq('id', orderId)
+    .eq('organization_id', organizationId)
 
   if (error) {
     console.error('Error updating order status:', error)
@@ -181,10 +190,11 @@ export async function updateOrderStatus(orderId: string, status: string): Promis
 }
 
 // Get orders ready for billing (ready or served)
-export async function getOrdersForBilling(): Promise<Order[]> {
+export async function getOrdersForBilling(organizationId: string): Promise<Order[]> {
   const { data, error } = await supabase
     .from('orders')
     .select('*')
+    .eq('organization_id', organizationId)
     .in('status', ['ready', 'served'])
     .order('created_at', { ascending: false })
 
@@ -199,7 +209,7 @@ export interface OrderForBilling extends Order {
 }
 
 // Get orders ready for billing with table and floor info
-export async function getOrdersForBillingWithDetails(): Promise<OrderForBilling[]> {
+export async function getOrdersForBillingWithDetails(organizationId: string): Promise<OrderForBilling[]> {
   const { data, error } = await supabase
     .from('orders')
     .select(`
@@ -210,6 +220,7 @@ export async function getOrdersForBillingWithDetails(): Promise<OrderForBilling[
       ),
       order_items (id)
     `)
+    .eq('organization_id', organizationId)
     .in('status', ['ready', 'served'])
     .order('created_at', { ascending: false })
 
@@ -255,10 +266,11 @@ export async function processPayment(orderId: string, paymentMethod: string): Pr
 }
 
 // Get paid orders (for history/reports)
-export async function getPaidOrders(): Promise<Order[]> {
+export async function getPaidOrders(organizationId: string): Promise<Order[]> {
   const { data, error } = await supabase
     .from('orders')
     .select('*')
+    .eq('organization_id', organizationId)
     .eq('status', 'paid')
     .order('paid_at', { ascending: false })
     .limit(50)
@@ -302,7 +314,7 @@ function getStartOfDaysAgoISO(days: number): string {
 }
 
 // Today's statistics (paid orders only)
-export async function getTodayStats(): Promise<TodayStats> {
+export async function getTodayStats(organizationId: string): Promise<TodayStats> {
   const empty: TodayStats = {
     totalRevenue: 0,
     totalOrders: 0,
@@ -315,20 +327,33 @@ export async function getTodayStats(): Promise<TodayStats> {
     const startOfToday = getStartOfTodayISO()
     const endOfToday = getEndOfTodayISO()
 
-    const { data: orders, error: ordersError } = await supabase
+    const { data: ordersWithPaidAt, error: ordersError } = await supabase
       .from('orders')
       .select('*')
+      .eq('organization_id', organizationId)
       .eq('status', 'paid')
       .gte('paid_at', startOfToday)
       .lte('paid_at', endOfToday)
       .order('paid_at', { ascending: false })
+
+    const { data: ordersNullPaidAt } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .eq('status', 'paid')
+      .is('paid_at', null)
+      .gte('updated_at', startOfToday)
+      .lte('updated_at', endOfToday)
 
     if (ordersError) {
       console.error('Error fetching today orders:', ordersError)
       return empty
     }
 
-    const orderList = orders || []
+    const orderList = [
+      ...(ordersWithPaidAt || []),
+      ...(ordersNullPaidAt || []).filter((o: { id: string }) => !(ordersWithPaidAt || []).some((p: { id: string }) => p.id === o.id))
+    ]
 
     const totalRevenue = orderList.reduce((sum, o) => sum + o.total, 0)
     const totalOrders = orderList.length
@@ -345,6 +370,7 @@ export async function getTodayStats(): Promise<TodayStats> {
       const { data: items, error: itemsError } = await supabase
         .from('order_items')
         .select('item_name, item_name_bangla, quantity, subtotal')
+        .eq('organization_id', organizationId)
         .in('order_id', orderIds)
 
       if (!itemsError && items?.length) {
@@ -384,7 +410,7 @@ export async function getTodayStats(): Promise<TodayStats> {
 }
 
 // Last 7 days statistics (paid orders only)
-export async function getWeeklyStats(): Promise<WeeklyStats> {
+export async function getWeeklyStats(organizationId: string): Promise<WeeklyStats> {
   const empty: WeeklyStats = {
     totalRevenue: 0,
     totalOrders: 0,
@@ -395,27 +421,39 @@ export async function getWeeklyStats(): Promise<WeeklyStats> {
     const startOfWeek = getStartOfDaysAgoISO(7)
     const endOfToday = getEndOfTodayISO()
 
-    const { data: orders, error } = await supabase
+    const { data: ordersWithPaidAt, error } = await supabase
       .from('orders')
-      .select('total, paid_at')
+      .select('id, total, paid_at, updated_at')
+      .eq('organization_id', organizationId)
       .eq('status', 'paid')
       .gte('paid_at', startOfWeek)
       .lte('paid_at', endOfToday)
+
+    const { data: ordersNullPaidAt } = await supabase
+      .from('orders')
+      .select('id, total, paid_at, updated_at')
+      .eq('organization_id', organizationId)
+      .eq('status', 'paid')
+      .is('paid_at', null)
+      .gte('updated_at', startOfWeek)
+      .lte('updated_at', endOfToday)
 
     if (error) {
       console.error('Error fetching weekly orders:', error)
       return empty
     }
 
-    const orderList = orders || []
+    const idsWithPaidAt = new Set((ordersWithPaidAt || []).map((o: { id: string }) => o.id))
+    const extra = (ordersNullPaidAt || []).filter((o: { id: string }) => !idsWithPaidAt.has(o.id))
+    const orderList = [...(ordersWithPaidAt || []), ...extra]
 
-    const totalRevenue = orderList.reduce((sum, o) => sum + o.total, 0)
+    const totalRevenue = orderList.reduce((sum, o: { total: number }) => sum + o.total, 0)
     const totalOrders = orderList.length
 
     const dailyRevenue: Record<string, number> = {}
-    for (const o of orderList) {
-      const dateStr = o.paid_at ? o.paid_at.slice(0, 10) : new Date().toISOString().slice(0, 10)
-      dailyRevenue[dateStr] = (dailyRevenue[dateStr] || 0) + o.total
+    for (const o of orderList as { total: number; paid_at?: string | null; updated_at?: string }[]) {
+      const dateStr = (o.paid_at || o.updated_at || '').slice(0, 10)
+      if (dateStr) dailyRevenue[dateStr] = (dailyRevenue[dateStr] || 0) + o.total
     }
 
     return {

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/app/lib/api/tables'
 import BackButton from '@/components/BackButton'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface Order {
   id: string
@@ -29,6 +30,8 @@ interface OrderWithItems extends Order {
 }
 
 export default function ReportsPage() {
+  const { organization } = useAuth()
+  const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
   const [activeTab, setActiveTab] = useState('daily-sales')
   const [orders, setOrders] = useState<OrderWithItems[]>([])
   const [stockData, setStockData] = useState<{ opening_value?: number; total_in_value?: number; total_out_value?: number; current_value?: number; menu_item?: { name?: string; category?: string } }[]>([])
@@ -37,18 +40,22 @@ export default function ReportsPage() {
   const [dateFilter, setDateFilter] = useState('today')
 
   const fetchStockData = async () => {
+    if (!orgId) return
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('stock_summary')
         .select(`
           *,
           menu_item:menu_items(name, category:categories(name))
         `)
+        .eq('organization_id', orgId)
+
+      const { data, error } = await query
 
       if (error) {
         const msg = (error as { message?: string; code?: string })?.message || (error as { message?: string; code?: string })?.code || String(error)
         console.warn('Stock data (using fallback):', msg)
-        const { data: fallbackData } = await supabase.from('stock_summary').select('*')
+        const { data: fallbackData } = await supabase.from('stock_summary').select('*').eq('organization_id', orgId)
         setStockData(fallbackData || [])
         return
       }
@@ -61,10 +68,12 @@ export default function ReportsPage() {
   }
 
   const fetchPurchases = async () => {
+    if (!orgId) return
     try {
       let query = supabase
         .from('purchases')
         .select('total_amount, purchase_date')
+        .eq('organization_id', orgId)
         .order('purchase_date', { ascending: false })
 
       if (dateFilter === 'today') {
@@ -97,12 +106,14 @@ export default function ReportsPage() {
   }
 
   useEffect(() => {
+    if (!orgId) return
     fetchOrders()
     fetchStockData()
     fetchPurchases()
-  }, [dateFilter])
+  }, [orgId, dateFilter])
 
   const fetchOrders = async () => {
+    if (!orgId) return
     try {
       setLoading(true)
 
@@ -125,6 +136,7 @@ export default function ReportsPage() {
             )
           )
         `)
+        .eq('organization_id', orgId)
         .order('created_at', { ascending: false })
 
       if (dateFilter === 'today') {
@@ -150,6 +162,7 @@ export default function ReportsPage() {
         let fallback = supabase
           .from('orders')
           .select('id, total, created_at, payment_method, order_type, order_items (quantity, unit_price, item_name)')
+          .eq('organization_id', orgId)
           .order('created_at', { ascending: false })
         if (dateFilter === 'today') {
           const today = new Date()

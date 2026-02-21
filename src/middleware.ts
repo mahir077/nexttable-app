@@ -33,12 +33,6 @@ export async function middleware(req: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession()
 
-  console.log('Middleware check:', {
-    path: req.nextUrl.pathname,
-    hasSession: !!session,
-    user: session?.user?.email
-  })
-
   // Auth callback route - always allow
   if (req.nextUrl.pathname.startsWith('/auth/callback')) {
     return response
@@ -47,8 +41,15 @@ export async function middleware(req: NextRequest) {
   // Auth routes (login, signup) - redirect to dashboard if logged in
   if (req.nextUrl.pathname === '/login' || req.nextUrl.pathname === '/signup') {
     if (session) {
-      console.log('Already logged in, redirecting to dashboard')
       return NextResponse.redirect(new URL('/dashboard', req.url))
+    }
+    return response
+  }
+
+  // Admin routes - require login (e.g. /admin/create-client)
+  if (req.nextUrl.pathname.startsWith('/admin')) {
+    if (!session) {
+      return NextResponse.redirect(new URL('/login', req.url))
     }
     return response
   }
@@ -73,7 +74,6 @@ export async function middleware(req: NextRequest) {
   )
 
   if (isProtectedRoute && !session) {
-    console.log('No session, redirecting to login')
     return NextResponse.redirect(new URL('/login', req.url))
   }
 

@@ -68,12 +68,16 @@ export default function DashboardPage() {
   // Available tables count (for Dine-in quick action)
   const [availableTablesCount, setAvailableTablesCount] = useState<number>(0)
 
+  const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
+
   useEffect(() => {
     const fetchRestaurantInfo = async () => {
+      if (!orgId) return
       try {
         const { data, error } = await supabase
           .from('restaurant_settings')
           .select('display_name')
+          .eq('organization_id', orgId)
           .limit(1)
           .maybeSingle()
 
@@ -95,7 +99,7 @@ export default function DashboardPage() {
       }
     }
     fetchRestaurantInfo()
-  }, [])
+  }, [orgId])
 
   // Set current date
   useEffect(() => {
@@ -109,11 +113,12 @@ export default function DashboardPage() {
     setCurrentDate(today.toLocaleDateString('en-US', options).toUpperCase())
   }, [])
 
-  // Fetch floors
+  // Fetch floors for current org
   useEffect(() => {
+    if (!orgId) return
     async function loadFloors() {
       try {
-        const floorsData = await getFloors()
+        const floorsData = await getFloors(orgId)
         setFloors(floorsData)
         if (floorsData.length > 0) {
           setSelectedFloor(floorsData[0])
@@ -123,15 +128,17 @@ export default function DashboardPage() {
       }
     }
     loadFloors()
-  }, [])
+  }, [orgId])
 
   // Fetch tables when floor changes
   useEffect(() => {
+    if (!orgId || !selectedFloor) return
+    const floor = selectedFloor
+    const oid = orgId
     async function loadTables() {
-      if (!selectedFloor) return
       setLoading(true)
       try {
-        const tablesData = await getTablesByFloor(selectedFloor.id)
+        const tablesData = await getTablesByFloor(floor.id, oid)
         setTables(tablesData)
       } catch (error) {
         console.error('Error loading tables:', error)
@@ -140,15 +147,16 @@ export default function DashboardPage() {
       }
     }
     loadTables()
-  }, [selectedFloor])
+  }, [orgId, selectedFloor])
 
   // Fetch available tables count (for Dine-in link)
   useEffect(() => {
-    getAllTables().then(data => {
+    if (!orgId) return
+    getAllTables(orgId).then(data => {
       const count = data.filter(t => t.status === 'available').length
       setAvailableTablesCount(count)
     })
-  }, [])
+  }, [orgId])
 
   // Fetch order/food status per table (KOT vs At table) + pending bill per table
   useEffect(() => {
@@ -159,10 +167,12 @@ export default function DashboardPage() {
     }
     const tableIds = tables.map(t => t.id)
     async function fetchFoodStatusAndBills() {
+      if (!orgId) return
       try {
         const { data } = await supabase
           .from('orders')
           .select('table_id, status, total')
+          .eq('organization_id', orgId)
           .in('table_id', tableIds)
           .in('status', ['pending', 'preparing', 'ready', 'served'])
         const statusMap: Record<string, 'kot' | 'table'> = {}
@@ -183,15 +193,17 @@ export default function DashboardPage() {
       }
     }
     fetchFoodStatusAndBills()
-  }, [tables])
+  }, [orgId, tables])
 
   // Fetch analytics
   useEffect(() => {
+    if (!orgId) return
+    const oid = orgId
     async function loadAnalytics() {
       try {
         const [today, weekly] = await Promise.all([
-          getTodayStats(),
-          getWeeklyStats()
+          getTodayStats(oid),
+          getWeeklyStats(oid)
         ])
         setTodayStats(today)
         setWeeklyRevenue(weekly.totalRevenue)
@@ -202,7 +214,7 @@ export default function DashboardPage() {
     loadAnalytics()
     const interval = setInterval(loadAnalytics, 30000) // Refresh every 30s
     return () => clearInterval(interval)
-  }, [])
+  }, [orgId])
 
   // Handle table click
   const handleTableClick = (table: Table) => {
@@ -235,11 +247,12 @@ export default function DashboardPage() {
 
   // Open Merge Table modal: load all tables
   const openMergeModal = async () => {
+    if (!orgId) return
     setShowMergeModal(true)
     setMergeSelectedIds(new Set())
     setMergePrimaryId('')
     try {
-      const tables = await getAllTables()
+      const tables = await getAllTables(orgId)
       setAllTables(tables)
     } catch (e) {
       console.error(e)
@@ -272,20 +285,22 @@ export default function DashboardPage() {
       const { data: ordersToMove } = await supabase
         .from('orders')
         .select('id')
+        .eq('organization_id', orgId)
         .in('table_id', otherIds)
         .in('status', ['pending', 'preparing', 'ready', 'served'])
       if (ordersToMove && ordersToMove.length > 0) {
         await supabase
           .from('orders')
           .update({ table_id: mergePrimaryId, updated_at: new Date().toISOString() })
+          .eq('organization_id', orgId)
           .in('id', ordersToMove.map(o => o.id))
       }
       for (const id of otherIds) {
         await supabase.from('tables').update({ status: 'available' }).eq('id', id)
       }
       setShowMergeModal(false)
-      if (selectedFloor) {
-        const tablesData = await getTablesByFloor(selectedFloor.id)
+      if (selectedFloor && orgId) {
+        const tablesData = await getTablesByFloor(selectedFloor.id, orgId)
         setTables(tablesData)
       }
       alert('Tables merged successfully. All orders are now on the primary table.')
@@ -299,6 +314,7 @@ export default function DashboardPage() {
 
   // Open Change Table modal: load active dine-in orders and available tables
   const openChangeModal = async () => {
+    if (!orgId) return
     setShowChangeModal(true)
     setChangeOrderId('')
     setChangeNewTableId('')
@@ -307,11 +323,12 @@ export default function DashboardPage() {
         supabase
           .from('orders')
           .select('*')
+          .eq('organization_id', orgId)
           .eq('order_type', 'dine-in')
           .not('table_id', 'is', null)
           .in('status', ['pending', 'preparing', 'ready', 'served'])
           .order('created_at', { ascending: false }),
-        getAllTables()
+        getAllTables(orgId)
       ])
       const tablesList = tablesRes || []
       setActiveDineInOrders((ordersRes.data as Order[]) || [])
@@ -344,8 +361,8 @@ export default function DashboardPage() {
       await supabase.from('tables').update({ status: 'available' }).eq('id', oldTableId)
       await supabase.from('tables').update({ status: 'occupied' }).eq('id', changeNewTableId)
       setShowChangeModal(false)
-      if (selectedFloor) {
-        const tablesData = await getTablesByFloor(selectedFloor.id)
+      if (selectedFloor && orgId) {
+        const tablesData = await getTablesByFloor(selectedFloor.id, orgId)
         setTables(tablesData)
       }
       alert('Order moved to new table successfully.')
