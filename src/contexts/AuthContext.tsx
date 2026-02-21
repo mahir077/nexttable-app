@@ -64,17 +64,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // Initial load: get session first so user + Logout show immediately (no AbortError flash)
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
+    // Initial load: use getUser() so session is validated with server (fixes Vercel where getSession() can be stale/missing)
+    const loadInitialSession = async (retry = false) => {
+      const { data: { user }, error } = await supabase.auth.getUser()
       if (!mounted) return
-      if (error?.message?.includes('Refresh')) {
+      if (error?.message?.includes('Refresh') || error?.message?.includes('JWT')) {
         supabase.auth.signOut().then(() => {
           if (typeof window !== 'undefined') window.location.href = '/login'
         })
         return
       }
-      applySession(session ?? null)
-    })
+      if (user) {
+        await applySession({ user } as { user: { id: string } })
+        return
+      }
+      // On Vercel, cookie might not be ready on first paint; retry once
+      if (!retry && typeof window !== 'undefined') {
+        setTimeout(() => loadInitialSession(true), 800)
+      } else {
+        setLoading(false)
+      }
+    }
+    loadInitialSession()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
