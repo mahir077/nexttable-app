@@ -7,7 +7,6 @@ import { getCashDrawerUrl, setCashDrawerUrl as saveCashDrawerUrl } from '@/app/l
 import BackButton from '@/components/BackButton'
 import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
-import { useAuth } from '@/contexts/AuthContext'
 
 type InvoiceSettings = {
   show_logo: boolean
@@ -36,23 +35,27 @@ const defaultInvoiceSettings: InvoiceSettings = {
 }
 
 export default function SettingsPage() {
-  const { refreshOrganization, organization } = useAuth()
-  // Primary source: localStorage. Fallback: AuthContext when org is restored (e.g. after redirect on Vercel)
   const [orgId, setOrgId] = useState<string | null>(null)
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setOrgId(localStorage.getItem('current_organization_id'))
-    }
-  }, [])
+    const fetchOrg = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
 
-  // When AuthContext has organization but we have no orgId (localStorage was empty), sync from context
-  useEffect(() => {
-    if (organization?.id && !orgId && typeof window !== 'undefined') {
-      localStorage.setItem('current_organization_id', organization.id)
-      setOrgId(organization.id)
+      const { data } = await supabase
+        .from('user_organizations')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle()
+
+      if (data?.organization_id) {
+        localStorage.setItem('current_organization_id', data.organization_id)
+        setOrgId(data.organization_id)
+      }
     }
-  }, [organization?.id, orgId])
+    fetchOrg()
+  }, [])
 
   const [activeTab, setActiveTab] = useState<'restaurant' | 'tables' | 'printer' | 'invoice'>('restaurant')
   
@@ -288,14 +291,6 @@ export default function SettingsPage() {
         }
 
         localStorage.setItem('restaurantInfo', JSON.stringify(restaurantInfo))
-        try {
-          await Promise.race([
-            refreshOrganization(),
-            new Promise(resolve => setTimeout(resolve, 3000))
-          ])
-        } catch {
-          // ignore refresh error
-        }
       })()
 
       await Promise.race([savePromise, timeoutPromise])
