@@ -546,7 +546,7 @@ export default function KitchenPage() {
           discount: 0,
           total,
           status: 'pending',
-          ...(organization?.id && { organization_id: organization.id }),
+          ...(orgId && { organization_id: orgId }),
         })
         .select()
         .single()
@@ -560,7 +560,7 @@ export default function KitchenPage() {
         unit_price: item.price,
         subtotal: item.price * quantity,
         status: 'pending',
-        ...(organization?.id && { organization_id: organization.id }),
+        ...(orgId && { organization_id: orgId }),
       }))
       const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
       if (itemsError) throw itemsError
@@ -681,20 +681,18 @@ export default function KitchenPage() {
 
   const handleDeleteOrder = async () => {
     if (!deleteOrder) return
+    if (!orgId) {
+      showToast('No organization selected.', 'error')
+      return
+    }
     if (!deleteReason.trim()) {
       showToast('Reason is required.', 'error')
       return
     }
     setDeleteLoading(true)
     try {
-      const oId = organization?.id ?? orgId
-      if (oId) {
-        await supabase.from('order_items').delete().eq('order_id', deleteOrder.id).eq('organization_id', oId)
-        await supabase.from('orders').delete().eq('id', deleteOrder.id).eq('organization_id', oId)
-      } else {
-        await supabase.from('order_items').delete().eq('order_id', deleteOrder.id)
-        await supabase.from('orders').delete().eq('id', deleteOrder.id)
-      }
+      await supabase.from('order_items').delete().eq('order_id', deleteOrder.id).eq('organization_id', orgId)
+      await supabase.from('orders').delete().eq('id', deleteOrder.id).eq('organization_id', orgId)
       setShowDeleteModal(false)
       setDeleteOrder(null)
       setSelectedOrder(null)

@@ -489,8 +489,8 @@ function POSContent() {
       const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
       if (itemsError) throw itemsError
 
-      if (orderType === 'dine-in' && selectedTable) {
-        await supabase.from('tables').update({ status: 'occupied' }).eq('id', selectedTable)
+      if (orderType === 'dine-in' && selectedTable && orgId) {
+        await supabase.from('tables').update({ status: 'occupied' }).eq('id', selectedTable).eq('organization_id', orgId)
       }
 
       const tableLabel = orderType === 'dine-in' && selectedTable

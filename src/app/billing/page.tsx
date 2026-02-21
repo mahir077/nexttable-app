@@ -112,7 +112,7 @@ export default function BillingPage() {
           )
         `)
         .eq('organization_id', orgId)
-        .in('status', ['ready', 'preparing', 'kot_sent', 'pending'])
+        .in('status', ['pending', 'preparing', 'kot_sent', 'ready', 'served'])
         .order('created_at', { ascending: false })
 
       if (error) {

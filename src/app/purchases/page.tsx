@@ -168,7 +168,7 @@ export default function PurchasesPage() {
           payment_status: formData.paid_amount >= totalAmount ? 'paid' :
             formData.paid_amount > 0 ? 'partial' : 'pending',
           notes: formData.notes,
-          ...(organization?.id && { organization_id: organization.id }),
+          ...(orgId && { organization_id: orgId }),
         })
         .select()
         .single()
@@ -182,7 +182,7 @@ export default function PurchasesPage() {
         quantity: item.quantity,
         unit_cost: item.unit_cost,
         total_cost: item.total_cost,
-        ...(organization?.id && { organization_id: organization.id }),
+        ...(orgId && { organization_id: orgId }),
       }))
 
       const { error: itemsError } = await supabase
@@ -201,7 +201,7 @@ export default function PurchasesPage() {
         reference_type: 'purchase',
         reference_id: purchase.id,
         notes: `Purchase ${(purchase as Purchase).purchase_number || purchase.id}`,
-        ...(organization?.id && { organization_id: organization.id }),
+        ...(orgId && { organization_id: orgId }),
       }))
 
       const { error: movementsError } = await supabase

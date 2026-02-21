@@ -180,7 +180,7 @@ export default function StockPage() {
           unit_cost: value / quantity,
           total_value: value,
           notes: 'Opening stock balance',
-          ...(organization?.id && { organization_id: organization.id }),
+          ...(orgId && { organization_id: orgId }),
         })
 
       if (movementError) throw movementError
@@ -196,7 +196,7 @@ export default function StockPage() {
           total_out_value: 0,
           current_value: value,
           last_updated: new Date().toISOString(),
-          ...(organization?.id && { organization_id: organization.id }),
+          ...(orgId && { organization_id: orgId }),
         }, {
           onConflict: 'menu_item_id'
         })

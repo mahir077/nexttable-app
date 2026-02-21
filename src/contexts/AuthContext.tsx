@@ -33,73 +33,77 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
-    // Check active session (handle invalid/expired refresh token)
-    supabase.auth.getSession()
-      .then(({ data: { session }, error }) => {
-        if (error) {
-          const msg = (error as Error)?.message || ''
-          if (msg.includes('Refresh Token') || msg.includes('refresh_token') || msg.includes('Invalid')) {
-            supabase.auth.signOut().finally(() => {
-              setUser(null)
-              setOrganization(null)
-              setOrganizations([])
-              setLoading(false)
-              if (typeof window !== 'undefined') window.location.href = '/login'
-            })
-            return
-          }
-        }
-        setUser(session?.user ?? null)
-        if (session?.user) {
-          loadOrganizations(session.user.id)
-        } else {
-          setLoading(false)
-        }
-      })
-      .catch((err) => {
-        const msg = (err as Error)?.message || ''
-        if (msg.includes('Refresh Token') || msg.includes('refresh_token') || msg.includes('Invalid')) {
-          supabase.auth.signOut().finally(() => {
-            setUser(null)
-            setOrganization(null)
-            setOrganizations([])
-            setLoading(false)
-            if (typeof window !== 'undefined') window.location.href = '/login'
-          })
-        } else {
-          setLoading(false)
-        }
-      })
+    let mounted = true
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        loadOrganizations(session.user.id)
-      } else {
+    const applySession = async (session: { user: { id: string } } | null) => {
+      if (!session?.user) {
+        setUser(null)
         setOrganization(null)
         setOrganizations([])
         setLoading(false)
+        return
       }
-    })
-
-    // If refresh token error is thrown elsewhere (e.g. during API call), redirect to login
-    const onUnhandled = (e: PromiseRejectionEvent) => {
-      const msg = (e?.reason as Error)?.message || String(e?.reason || '')
-      if (msg.includes('Refresh Token') || msg.includes('refresh_token') || msg.includes('Invalid Refresh Token')) {
-        e.preventDefault()
-        supabase.auth.signOut().finally(() => {
-          setUser(null)
+      setUser(session.user)
+      try {
+        const { data: adminData } = await supabase
+          .from('super_admins')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .maybeSingle()
+        if (!mounted) return
+        if (adminData) {
           setOrganization(null)
           setOrganizations([])
-          if (typeof window !== 'undefined') window.location.href = '/login'
-        })
+          setLoading(false)
+          return
+        }
+        await loadOrganizations(session.user.id)
+      } catch (e) {
+        if (mounted) setLoading(false)
       }
     }
-    window.addEventListener('unhandledrejection', onUnhandled)
+
+    // Initial load: get session first so user + Logout show immediately (no AbortError flash)
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (!mounted) return
+      if (error?.message?.includes('Refresh')) {
+        supabase.auth.signOut().then(() => {
+          if (typeof window !== 'undefined') window.location.href = '/login'
+        })
+        return
+      }
+      applySession(session ?? null)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!mounted) return
+        try {
+          if (event === 'SIGNED_IN' && session?.user) {
+            if (typeof window !== 'undefined') localStorage.removeItem('current_organization_id')
+            await applySession(session)
+          } else if (event === 'INITIAL_SESSION' && session?.user) {
+            await applySession(session)
+          } else if (event === 'SIGNED_OUT' || !session) {
+            setUser(null)
+            setOrganization(null)
+            setOrganizations([])
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('current_organization_id')
+              localStorage.removeItem('restaurantInfo')
+            }
+            setLoading(false)
+          }
+        } catch (e) {
+          if (e instanceof Error && e.name === 'AbortError') return
+          if (mounted) setLoading(false)
+        }
+      }
+    )
+
     return () => {
+      mounted = false
       subscription.unsubscribe()
-      window.removeEventListener('unhandledrejection', onUnhandled)
     }
   }, [])
 
@@ -120,55 +124,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('user_id', userId)
 
       if (error) {
-        console.error('Error loading organizations:', error)
+        setLoading(false)
+        return
+      }
+
+      if (!data || data.length === 0) {
+        setOrganizations([])
+        setOrganization(null)
+        setLoading(false)
         return
       }
 
       type OrgShape = { name: string; display_name?: string; slug: string }
-      const rows = (data ?? []) as unknown as Array<{ organization_id: string; role?: string; organizations: OrgShape | OrgShape[] | null }>
-      const withRole = rows
+      const rows = data as unknown as Array<{ organization_id: string; organizations: OrgShape | OrgShape[] | null }>
+      const orgs: Organization[] = rows
         .filter((uo) => uo.organizations)
         .map((uo) => {
           const raw = uo.organizations
-          const org: OrgShape | undefined = Array.isArray(raw) ? raw[0] : raw ?? undefined
+          const org = Array.isArray(raw) ? raw[0] : raw
           if (!org) return null
           return {
             id: uo.organization_id,
             name: org.name,
             display_name: org.display_name || org.name,
-            slug: org.slug,
-            _role: (uo.role || '').toLowerCase()
+            slug: org.slug
           }
         })
-        .filter((o): o is NonNullable<typeof o> => o != null)
-
-      // Owner's org first so demo/restaurant users see their own restaurant, not another org
-      const orgs = withRole
-        .sort((a, b) => (a._role === 'owner' ? -1 : b._role === 'owner' ? 1 : 0))
-        .map(({ _role: _, ...o }) => o)
+        .filter((o): o is Organization => o != null)
 
       setOrganizations(orgs)
-
-      // Set current organization - prefer saved (if it belongs to this user), else first (owner's org)
-      const savedOrgId = typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null
-      let currentOrg: Organization | null = null
-
-      if (savedOrgId) {
-        currentOrg = orgs.find((o: Organization) => o.id === savedOrgId) ?? null
+      const currentOrg = orgs[0]
+      setOrganization(currentOrg)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('current_organization_id', currentOrg.id)
       }
-
-      if (!currentOrg && orgs.length > 0) {
-        currentOrg = orgs[0]
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('current_organization_id', orgs[0].id)
-        }
-      }
-
-      if (currentOrg) {
-        setOrganization(currentOrg)
-      }
-    } catch (error) {
-      console.error('Error in loadOrganizations:', error)
+    } catch {
+      // ignore (e.g. AbortError)
     } finally {
       setLoading(false)
     }
@@ -240,11 +231,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    try {
+      await supabase.auth.signOut()
+    } catch {
+      // ignore – still redirect
+    }
+    setUser(null)
+    setOrganization(null)
+    setOrganizations([])
     if (typeof window !== 'undefined') {
       localStorage.removeItem('current_organization_id')
+      localStorage.removeItem('restaurantInfo')
+      window.location.href = '/login'
+    } else {
+      router.push('/login')
     }
-    router.push('/login')
   }
 
   const refreshOrganization = async () => {

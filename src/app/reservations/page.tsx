@@ -73,7 +73,7 @@ export default function ReservationsPage() {
       guest_count: guestCount ? parseInt(guestCount, 10) : null,
       special_requests: specialRequests || null,
       status: 'pending',
-      ...(organization?.id && { organization_id: organization.id }),
+      ...(orgId && { organization_id: orgId }),
     })
 
     if (!error) {

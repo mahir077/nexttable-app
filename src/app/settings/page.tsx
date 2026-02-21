@@ -36,7 +36,9 @@ const defaultInvoiceSettings: InvoiceSettings = {
 }
 
 export default function SettingsPage() {
-  const { organization, refreshOrganization } = useAuth()
+  const { organization, organizations, loading: authLoading, refreshOrganization } = useAuth()
+  // Resolve org: context first, then localStorage, then first org (so we never show "No organization selected" when user has orgs)
+  const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null) ?? organizations?.[0]?.id ?? null
   const [activeTab, setActiveTab] = useState<'restaurant' | 'tables' | 'printer' | 'invoice'>('restaurant')
   
   // Restaurant info state (synced with restaurant_settings in DB) – start empty so we don't show another org's data
@@ -81,10 +83,10 @@ export default function SettingsPage() {
 
   const { toast, showToast, hideToast } = useToast()
 
-  // Fetch data
+  // Fetch data when org is available
   useEffect(() => {
-    fetchFloors()
-  }, [])
+    if (orgId) fetchFloors()
+  }, [orgId])
 
   useEffect(() => {
     if (selectedFloor) {
@@ -98,11 +100,10 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadInvoiceSettings()
-  }, [])
+  }, [orgId])
 
   // Load current organization + restaurant_settings into form (run when org is available)
   const loadSettings = async () => {
-    const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
     if (!orgId) return
 
     setRestaurantInfoLoading(true)
@@ -141,21 +142,23 @@ export default function SettingsPage() {
           email: (settingsData.email as string) ?? prev.email
         }))
       } else {
-        // No settings row yet – keep org name if we set it
+        // No settings row yet – show org name so Settings is never fully empty
+        let address = '', phone = '', email = ''
         try {
           const saved = localStorage.getItem('restaurantInfo')
           if (saved) {
             const info = JSON.parse(saved) as { name?: string; address?: string; phone?: string; email?: string }
-            setRestaurantInfo(prev => ({
-              name: (orgData?.display_name || orgData?.name) ?? info.name ?? prev.name,
-              address: info.address ?? prev.address,
-              phone: info.phone ?? prev.phone,
-              email: info.email ?? prev.email
-            }))
+            address = info.address ?? ''
+            phone = info.phone ?? ''
+            email = info.email ?? ''
           }
-        } catch {
-          // keep current state
-        }
+        } catch { /* ignore */ }
+        setRestaurantInfo(prev => ({
+          name: (orgData?.display_name || orgData?.name) ?? prev.name,
+          address,
+          phone,
+          email
+        }))
       }
     } catch (e) {
       console.error('Load settings error:', e)
@@ -166,10 +169,9 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadSettings()
-  }, [organization?.id])
+  }, [orgId])
 
   const fetchFloors = async () => {
-    const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
     if (!orgId) return
     try {
       const { data, error } = await supabase
@@ -197,9 +199,7 @@ export default function SettingsPage() {
   }
 
   const fetchTables = async () => {
-    if (!selectedFloor) return
-    const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
-    if (!orgId) return
+    if (!selectedFloor || !orgId) return
     try {
       const data = await getTablesByFloor(selectedFloor.id, orgId)
       setTables(data)
@@ -214,9 +214,8 @@ export default function SettingsPage() {
       showToast('Please enter restaurant name', 'error')
       return
     }
-    const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
     if (!orgId) {
-      showToast('No organization selected', 'error')
+      showToast('No organization selected. Please wait or refresh.', 'error')
       return
     }
     setRestaurantInfoLoading(true)
@@ -288,9 +287,8 @@ export default function SettingsPage() {
       showToast('Please enter floor name', 'error')
       return
     }
-    const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
     if (!orgId) {
-      showToast('No organization selected', 'error')
+      showToast('No organization selected. Please wait or refresh.', 'error')
       return
     }
     try {
@@ -337,7 +335,6 @@ export default function SettingsPage() {
   // Delete Floor
   const handleDeleteFloor = async (floor: Floor) => {
     if (!confirm(`Delete floor "${floor.name}"? This will delete all tables on this floor.`)) return
-    const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
     if (!orgId) return
     try {
       const { error } = await supabase
@@ -388,9 +385,8 @@ export default function SettingsPage() {
       }
 
       // Add new table
-      const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
       if (!orgId) {
-        showToast('No organization selected. Please refresh and try again.', 'error')
+        showToast('No organization selected. Please wait or refresh.', 'error')
         return
       }
       console.log('Creating table:', tableForm)
@@ -454,7 +450,7 @@ export default function SettingsPage() {
         .upsert({
           id: 1,
           ...invoiceSettings,
-          ...(organization?.id && { organization_id: organization.id }),
+          ...(orgId && { organization_id: orgId }),
           updated_at: new Date().toISOString()
         })
 
@@ -469,8 +465,8 @@ export default function SettingsPage() {
   const loadInvoiceSettings = async () => {
     try {
       let query = supabase.from('invoice_settings').select('*')
-      if (organization?.id) {
-        query = query.eq('organization_id', organization.id)
+      if (orgId) {
+        query = query.eq('organization_id', orgId)
       } else {
         query = query.eq('id', 1)
       }
@@ -498,6 +494,12 @@ export default function SettingsPage() {
           <p className="text-slate-600 text-sm">Manage your restaurant configuration</p>
         </div>
       </div>
+
+      {authLoading && !orgId && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-800 text-sm mb-6">
+          Loading your organization…
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="bg-white rounded-xl border-2 border-slate-200 mb-6 overflow-x-auto">

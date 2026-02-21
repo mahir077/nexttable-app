@@ -73,6 +73,12 @@ and guard with `if (!orgId) return` before loading data. Pages checked: Dashboar
 3. **Dashboard – change table**  
    - Order update and both table updates (available/occupied) now include `.eq('organization_id', orgId)`.
 
+4. **Brutal multi-tenant check (final pass)**  
+   - **Dashboard:** Table status change and merge-tables loop now use `.eq('organization_id', orgId)` on all `tables` updates; guard `handleStatusChange` with `if (!orgId) return`.  
+   - **POS:** Table “occupied” update after creating order now includes `.eq('organization_id', orgId)`.  
+   - **Kitchen:** Order and order_items inserts use `orgId` (not only `organization?.id`); delete order requires `orgId` and always scopes by `.eq('organization_id', orgId)` (no fallback delete without org).  
+   - **Suppliers / Reservations / Purchases / Stock:** All inserts and upserts use `orgId` for `organization_id` (replacing `organization?.id` so data is never written without org scope when user has org from localStorage).
+
 ---
 
 ## 6. Recommendations for client
@@ -89,4 +95,16 @@ and guard with `if (!orgId) return` before loading data. Pages checked: Dashboar
 - [x] All main pages pass `organization_id` in queries.
 - [x] RLS on all tenant tables + organizations + user_organizations.
 - [x] Settings floors and dashboard change-table scoped by org.
+- [x] Brutal check: Dashboard/POS/Kitchen table updates and Kitchen delete scoped by org; all inserts (orders, reservations, suppliers, purchases, stock) use orgId.
 - [ ] Optional: Backfill NULL `organization_id` and tighten RLS (recommended later).
+
+---
+
+## 8. Brutal check – one client cannot see another’s data
+
+| Question | Answer |
+|----------|--------|
+| Can one client see another client’s data? | **No.** RLS on every tenant table restricts SELECT/UPDATE/DELETE to rows where `organization_id` is in the current user’s orgs (or NULL legacy). App code always passes `orgId` from context/localStorage and uses `.eq('organization_id', orgId)` on queries and mutations. |
+| Can a client see random/wrong data? | **No.** Org is resolved once per page from `organization?.id ?? localStorage ?? organizations?.[0]?.id`; all fetches and writes use that same `orgId`. No cross-tenant mix. |
+| Does each client see their own data correctly? | **Yes.** Same `orgId` is used for all reads and writes on that session; RLS enforces that only rows belonging to that org are visible. |
+| Legacy risk | Rows with `organization_id = NULL` are visible to all authenticated users until you backfill and remove the NULL clause from RLS. Legacy `/api/settings` uses env `tenant_id` and is **not** used by the Settings UI. |

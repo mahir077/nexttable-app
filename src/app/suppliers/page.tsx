@@ -90,7 +90,7 @@ export default function SuppliersPage() {
           .insert({
             ...formData,
             is_active: true,
-            ...(organization?.id && { organization_id: organization.id }),
+            ...(orgId && { organization_id: orgId }),
           })
 
         if (error) throw error

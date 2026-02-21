@@ -62,13 +62,20 @@ export default function DashboardPage() {
   const [changeNewTableId, setChangeNewTableId] = useState<string>('')
   const [changeLoading, setChangeLoading] = useState(false)
 
-  // Restaurant name from settings (DB first, then localStorage fallback)
-  const [restaurantName, setRestaurantName] = useState<string>('NextTable')
+  // Restaurant name: org first (no wrong-tenant default), then DB, then fallback
+  const [restaurantName, setRestaurantName] = useState<string>('')
 
   // Available tables count (for Dine-in quick action)
   const [availableTablesCount, setAvailableTablesCount] = useState<number>(0)
 
   const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
+
+  // Set name from current org immediately (correct tenant), then refine from DB
+  useEffect(() => {
+    if (organization?.display_name || organization?.name) {
+      setRestaurantName(organization.display_name || organization.name)
+    }
+  }, [organization?.id, organization?.display_name, organization?.name])
 
   useEffect(() => {
     const fetchRestaurantInfo = async () => {
@@ -88,14 +95,16 @@ export default function DashboardPage() {
       } catch (e) {
         console.error('Error fetching restaurant info:', e)
       }
-      try {
-        const saved = localStorage.getItem('restaurantInfo')
-        if (saved) {
-          const info = JSON.parse(saved) as { name?: string }
-          if (info.name && typeof info.name === 'string') setRestaurantName(info.name)
+      if (!restaurantName) {
+        try {
+          const saved = localStorage.getItem('restaurantInfo')
+          if (saved) {
+            const info = JSON.parse(saved) as { name?: string }
+            if (info.name && typeof info.name === 'string') setRestaurantName(info.name)
+          }
+        } catch {
+          // keep current
         }
-      } catch {
-        // keep default
       }
     }
     fetchRestaurantInfo()
@@ -224,11 +233,13 @@ export default function DashboardPage() {
 
   // Handle status change
   const handleStatusChange = async (tableId: string, newStatus: string) => {
+    if (!orgId) return
     try {
       const { error } = await supabase
         .from('tables')
         .update({ status: newStatus })
         .eq('id', tableId)
+        .eq('organization_id', orgId)
 
       if (error) throw error
 
@@ -296,7 +307,7 @@ export default function DashboardPage() {
           .in('id', ordersToMove.map(o => o.id))
       }
       for (const id of otherIds) {
-        await supabase.from('tables').update({ status: 'available' }).eq('id', id)
+        await supabase.from('tables').update({ status: 'available' }).eq('id', id).eq('organization_id', orgId)
       }
       setShowMergeModal(false)
       if (selectedFloor && orgId) {
@@ -433,7 +444,7 @@ export default function DashboardPage() {
               </svg>
             </button>
             <div className="min-w-0">
-              <h1 className="text-base sm:text-lg md:text-xl font-semibold text-slate-800 truncate">{organization?.display_name || organization?.name || restaurantName || 'Restaurant'}</h1>
+              <h1 className="text-base sm:text-lg md:text-xl font-semibold text-slate-800 truncate">{organization ? (organization.display_name || organization.name || restaurantName || 'Restaurant') : 'NextTable'}</h1>
               <p className="text-xs text-slate-400 hidden sm:block">{currentDate}</p>
             </div>
           </div>

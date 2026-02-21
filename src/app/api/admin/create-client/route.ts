@@ -176,6 +176,56 @@ export async function POST(request: Request) {
       console.log('✅ Client subscription record created')
     }
 
+    // Seed default restaurant_settings so Settings page shows restaurant name (not empty)
+    const { error: rsError } = await supabaseAdmin.from('restaurant_settings').insert({
+      organization_id: org.id,
+      display_name: restaurantName,
+      address: address || null,
+      primary_color: '#10b981',
+      secondary_color: '#0f172a',
+      vat_rate: 0,
+      vat_type: 'exclusive',
+      show_nexttable_branding: true,
+      currency_code: 'BDT',
+      currency_symbol: '৳',
+    })
+    if (rsError) {
+      console.warn('⚠️ restaurant_settings seed skipped:', rsError.message)
+    } else {
+      console.log('✅ Default restaurant_settings created')
+    }
+
+    // Seed one floor + 5 tables so Dashboard shows tables (not loading forever)
+    const { data: floorRow, error: floorError } = await supabaseAdmin
+      .from('floors')
+      .insert({
+        organization_id: org.id,
+        name: 'Ground Floor',
+        is_active: true,
+        display_order: 0,
+      })
+      .select('id')
+      .single()
+    if (floorError) {
+      console.warn('⚠️ Default floor skipped:', floorError.message)
+    } else if (floorRow?.id) {
+      console.log('✅ Default floor created')
+      const tableInserts = [1, 2, 3, 4, 5].map((n) => ({
+        organization_id: org.id,
+        floor_id: floorRow.id,
+        table_number: n,
+        seats: 4,
+        status: 'available',
+        is_active: true,
+      }))
+      const { error: tablesError } = await supabaseAdmin.from('tables').insert(tableInserts)
+      if (tablesError) {
+        console.warn('⚠️ Default tables skipped:', tablesError.message)
+      } else {
+        console.log('✅ Default tables (5) created')
+      }
+    }
+
     console.log('🎉 CLIENT ACCOUNT CREATED SUCCESSFULLY!')
 
     return NextResponse.json({
