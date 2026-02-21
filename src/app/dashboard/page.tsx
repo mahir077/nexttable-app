@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import { getFloors, getTablesByFloor, getAllTables, Floor, Table } from '@/app/lib/api/tables'
 import { getTodayStats, getWeeklyStats } from '@/app/lib/api/orders'
@@ -24,6 +25,7 @@ interface TodayStats {
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
   const { organization } = useAuth()
   const [currentDate, setCurrentDate] = useState<string>('')
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false)
@@ -124,16 +126,24 @@ export default function DashboardPage() {
 
   // Fetch floors for current org
   useEffect(() => {
-    if (!orgId) return
+    if (!orgId) {
+      setLoading(false)
+      return
+    }
     async function loadFloors() {
       try {
         const floorsData = await getFloors(orgId)
         setFloors(floorsData)
         if (floorsData.length > 0) {
           setSelectedFloor(floorsData[0])
+        } else {
+          setSelectedFloor(null)
+          setTables([])
+          setLoading(false)
         }
       } catch (error) {
         console.error('Error loading floors:', error)
+        setLoading(false)
       }
     }
     loadFloors()
@@ -141,7 +151,10 @@ export default function DashboardPage() {
 
   // Fetch tables when floor changes
   useEffect(() => {
-    if (!orgId || !selectedFloor) return
+    if (!orgId || !selectedFloor) {
+      if (!orgId) setLoading(false)
+      return
+    }
     const floor = selectedFloor
     const oid = orgId
     async function loadTables() {
@@ -161,10 +174,17 @@ export default function DashboardPage() {
   // Fetch available tables count (for Dine-in link)
   useEffect(() => {
     if (!orgId) return
-    getAllTables(orgId).then(data => {
-      const count = data.filter(t => t.status === 'available').length
-      setAvailableTablesCount(count)
-    })
+    const oid = orgId
+    async function loadAvailableCount() {
+      try {
+        const data = await getAllTables(oid)
+        const count = data.filter(t => t.status === 'available').length
+        setAvailableTablesCount(count)
+      } catch (error) {
+        console.error('Error loading tables count:', error)
+      }
+    }
+    loadAvailableCount()
   }, [orgId])
 
   // Fetch order/food status per table (KOT vs At table) + pending bill per table
@@ -225,10 +245,9 @@ export default function DashboardPage() {
     return () => clearInterval(interval)
   }, [orgId])
 
-  // Handle table click
+  // Handle table click — go to POS for that table
   const handleTableClick = (table: Table) => {
-    setSelectedTable(table)
-    setIsModalOpen(true)
+    router.push(`/pos?type=dine-in&tableId=${table.id}&floorId=${table.floor_id}`)
   }
 
   // Handle status change

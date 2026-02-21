@@ -278,7 +278,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (typeof window !== 'undefined') {
         localStorage.setItem('current_organization_id', orgId)
       }
-      console.log('Switched to organization:', newOrg)
       window.location.reload()
     }
   }

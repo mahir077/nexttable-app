@@ -345,7 +345,6 @@ export default function KitchenPage() {
       const activeStatuses = ['pending', 'preparing', 'ready', 'served', 'rejected']
       const data = await getOrders(orgId, activeStatuses)
       setOrders(data ?? [])
-      console.log('✅ Kitchen orders fetched:', { orgId, count: (data ?? []).length, first: (data ?? [])[0] })
     } catch (error) {
       console.error('❌ Error fetching kitchen orders:', error)
       showToast('Could not load orders. Check console.', 'error')
@@ -655,12 +654,6 @@ export default function KitchenPage() {
         total: subtotal,
         updated_at: new Date().toISOString()
       }).eq('id', editOrder.order.id).eq('organization_id', oId!)
-      console.log('[Kitchen] Order edited', {
-        orderId: editOrder.order.id,
-        order_number: editOrder.order.order_number,
-        reason: editReason.trim(),
-        newItems: editLines
-      })
       setShowEditModal(false)
       setSelectedOrder(null)
       fetchOrders()

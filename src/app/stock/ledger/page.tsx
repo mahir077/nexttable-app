@@ -102,8 +102,6 @@ export default function StockLedgerPage() {
 
       setMenuItems(itemsData || [])
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      console.warn('Stock ledger fetch error:', msg)
       showToast('Failed to load movements', 'error')
       setMovements([])
     } finally {

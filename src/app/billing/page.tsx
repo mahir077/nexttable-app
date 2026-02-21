@@ -116,18 +116,13 @@ export default function BillingPage() {
         .order('created_at', { ascending: false })
 
       if (error) {
-        const msg = (error as { message?: string })?.message || String(error)
-        console.warn('Billing fetch error:', msg)
         showToast('Could not load orders. Please refresh.', 'error')
         setOrders([])
         return
       }
 
-      console.log('Fetched orders:', data) // Debug log
       setOrders((data || []) as unknown as Order[])
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      console.warn('Billing fetch error:', msg)
       showToast('Failed to load orders', 'error')
       setOrders([])
     } finally {
@@ -154,7 +149,7 @@ export default function BillingPage() {
         })
       }
     } catch {
-      console.log('Could not fetch restaurant info')
+      // use default restaurant info
     }
   }
 
@@ -182,7 +177,7 @@ export default function BillingPage() {
         }))
       }
     } catch {
-      console.log('Using default invoice settings')
+      // use default invoice settings
     }
   }
 
@@ -228,8 +223,6 @@ export default function BillingPage() {
     }
 
     try {
-      console.log('Completing payment for:', selectedOrder.id)
-
       const now = new Date().toISOString()
       // Build update object – paid_at is required for dashboard Daily Sale / Weekly stats
       const updateData: Record<string, unknown> = {
@@ -247,11 +240,9 @@ export default function BillingPage() {
           updateData.discount_amount = discountAmount
           updateData.final_total = finalTotal
         } catch {
-          console.log('Discount fields not available')
+          // discount fields not available
         }
       }
-
-      console.log('Update data:', updateData)
 
       const { error: orderError } = await supabase
         .from('orders')
@@ -263,8 +254,6 @@ export default function BillingPage() {
         console.error('Order update error:', orderError)
         throw new Error(orderError.message)
       }
-
-      console.log('Order updated successfully')
 
       // Auto-deduct stock value on sale
       const items = selectedOrder.order_items || []
@@ -556,11 +545,8 @@ export default function BillingPage() {
         // Open cash drawer ONLY if toggle is ON and payment method is CASH
         if (cashDrawerEnabled && selectedPaymentMethod === 'cash') {
           setTimeout(() => {
-            console.log('Opening cash drawer...')
             openCashDrawerCommand()
           }, 500)
-        } else {
-          console.log('Cash drawer disabled or not cash payment')
         }
 
         setTimeout(() => {
@@ -606,8 +592,6 @@ export default function BillingPage() {
           }
         }, 2000)
       }
-
-      console.log('Cash drawer command sent')
     } catch (error) {
       console.error('Cash drawer error:', error)
     }

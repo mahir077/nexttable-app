@@ -110,6 +110,20 @@ function POSContent() {
     if (floors.length > 0 && !selectedFloor) setSelectedFloor(floors[0])
   }, [floors, selectedFloor])
 
+  // Preselect floor & table from URL (e.g. from dashboard table click)
+  const urlTableId = searchParams?.get('tableId')
+  const urlFloorId = searchParams?.get('floorId')
+  useEffect(() => {
+    if (orderType !== 'dine-in' || !urlFloorId || !urlTableId || floors.length === 0) return
+    const floor = floors.find(f => f.id === urlFloorId)
+    if (floor) setSelectedFloor(floor)
+  }, [orderType, urlFloorId, urlTableId, floors])
+  useEffect(() => {
+    if (orderType !== 'dine-in' || !urlTableId || tables.length === 0) return
+    const table = tables.find(t => t.id === urlTableId)
+    if (table) setSelectedTable(urlTableId)
+  }, [orderType, urlTableId, tables])
+
   const addToCart = (item: MenuItem, qty = 1) => {
     setCart(prev => {
       const existing = prev.find(i => i.id === item.id)
@@ -429,6 +443,7 @@ function POSContent() {
           .from('tables')
           .select('status')
           .eq('id', selectedTable)
+          .eq('organization_id', orgId)
           .single()
 
         if (tableCheck && tableCheck.status !== 'available') {
@@ -468,12 +483,6 @@ function POSContent() {
 
       if (orderError) throw orderError
 
-      console.log('✅ Order created:', {
-        orderId: order.id,
-        status: order.status,
-        organizationId: order.organization_id
-      })
-
       const orderItems = cart.map(item => ({
         order_id: order.id,
         menu_item_id: item.id,
@@ -510,6 +519,7 @@ function POSContent() {
       setDeliveryTime('')
       setGuestCount('')
       setEventDate('')
+      router.push('/billing')
     } catch (err) {
       console.error(err)
       showToast('Failed to create order', 'error')

@@ -59,8 +59,6 @@ export default function CreateClientPage() {
     setMessage('')
 
     try {
-      console.log('📤 Sending request to API...')
-
       const response = await fetch('/api/admin/create-client', {
         method: 'POST',
         headers: {
@@ -76,10 +74,7 @@ export default function CreateClientPage() {
         })
       })
 
-      console.log('📥 API Response status:', response.status)
-
       const data = await response.json()
-      console.log('📥 API Response:', data)
 
       if (!response.ok) {
         throw new Error(data.error || `Server error: ${response.status}`)

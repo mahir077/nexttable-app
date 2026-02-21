@@ -54,7 +54,6 @@ export default function ReportsPage() {
 
       if (error) {
         const msg = (error as { message?: string; code?: string })?.message || (error as { message?: string; code?: string })?.code || String(error)
-        console.warn('Stock data (using fallback):', msg)
         const { data: fallbackData } = await supabase.from('stock_summary').select('*').eq('organization_id', orgId)
         setStockData(fallbackData || [])
         return
@@ -62,7 +61,6 @@ export default function ReportsPage() {
       setStockData(data || [])
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      console.warn('Stock data error:', msg)
       setStockData([])
     }
   }
@@ -93,14 +91,11 @@ export default function ReportsPage() {
       const { data, error } = await query
       if (error) {
         const msg = (error as { message?: string; code?: string })?.message || String(error)
-        console.warn('Purchases fetch error:', msg)
         setPurchases([])
         return
       }
       setPurchases(data || [])
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      console.warn('Purchases fetch error:', msg)
       setPurchases([])
     }
   }
@@ -157,7 +152,6 @@ export default function ReportsPage() {
 
       if (error) {
         const msg = (error as { message?: string; code?: string })?.message || (error as { message?: string; code?: string })?.code || String(error)
-        console.warn('Orders fetch (using fallback):', msg)
         // Fallback without menu_items join
         let fallback = supabase
           .from('orders')
@@ -189,7 +183,6 @@ export default function ReportsPage() {
       setOrders((data || []) as unknown as OrderWithItems[])
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      console.warn('Orders fetch error:', msg)
       setOrders([])
     } finally {
       setLoading(false)

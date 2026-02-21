@@ -37,9 +37,16 @@ const defaultInvoiceSettings: InvoiceSettings = {
 
 export default function SettingsPage() {
   const { organization, organizations, loading: authLoading, refreshOrganization } = useAuth()
-  // Resolve org: context first, then localStorage, then first org (so we never show "No organization selected" when user has orgs)
-  const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null) ?? organizations?.[0]?.id ?? null
+  const [mounted, setMounted] = useState(false)
+  // Resolve org after mount to avoid hydration mismatch (server has no localStorage)
+  const orgId = mounted
+    ? (organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null) ?? organizations?.[0]?.id ?? null)
+    : (organization?.id ?? organizations?.[0]?.id ?? null)
   const [activeTab, setActiveTab] = useState<'restaurant' | 'tables' | 'printer' | 'invoice'>('restaurant')
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
   
   // Restaurant info state (synced with restaurant_settings in DB) – start empty so we don't show another org's data
   const [restaurantInfo, setRestaurantInfo] = useState({
@@ -185,7 +192,6 @@ export default function SettingsPage() {
         showToast('Failed to load floors', 'error')
         return
       }
-      console.log('Floors loaded:', data)
       setFloors(data || [])
       if (data && data.length > 0 && !selectedFloor) {
         setSelectedFloor(data[0])
@@ -219,63 +225,87 @@ export default function SettingsPage() {
       return
     }
     setRestaurantInfoLoading(true)
+    const timeoutMs = 20000
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Save timed out. Please try again.')), timeoutMs)
+    )
     try {
       const displayName = restaurantInfo.name.trim()
       const updatedAt = new Date().toISOString()
 
-      // Update organization display_name (so sidebar/dashboard show correct name)
-      const { error: orgError } = await supabase
-        .from('organizations')
-        .update({
-          display_name: displayName,
-          updated_at: updatedAt
-        })
-        .eq('id', orgId)
-
-      if (orgError) throw orgError
-
-      // Update or insert restaurant_settings (scoped to current org)
-      const { data: existing } = await supabase
-        .from('restaurant_settings')
-        .select('id')
-        .eq('organization_id', orgId)
-        .limit(1)
-        .maybeSingle()
-
-      if (existing) {
-        const { error } = await supabase
+      const savePromise = (async () => {
+        // 1) Save restaurant_settings first (name, address, phone, email) – this is what Settings shows
+        const { data: existing } = await supabase
           .from('restaurant_settings')
-          .update({
-            display_name: displayName,
-            address: restaurantInfo.address?.trim() ?? null,
-            phone: restaurantInfo.phone?.trim() ?? null,
-            email: restaurantInfo.email?.trim() ?? null,
-            updated_at: updatedAt
-          })
-          .eq('id', existing.id)
+          .select('id')
+          .eq('organization_id', orgId)
+          .limit(1)
+          .maybeSingle()
 
-        if (error) throw error
-      } else {
-        const { error } = await supabase
-          .from('restaurant_settings')
-          .insert({
-            organization_id: orgId,
-            display_name: displayName,
-            address: restaurantInfo.address?.trim() ?? null,
-            phone: restaurantInfo.phone?.trim() ?? null,
-            email: restaurantInfo.email?.trim() ?? null
-          })
+        if (existing) {
+          const { error } = await supabase
+            .from('restaurant_settings')
+            .update({
+              display_name: displayName,
+              address: restaurantInfo.address?.trim() ?? null,
+              phone: restaurantInfo.phone?.trim() ?? null,
+              email: restaurantInfo.email?.trim() ?? null,
+              updated_at: updatedAt
+            })
+            .eq('id', existing.id)
 
-        if (error) throw error
-      }
+          if (error) throw error
+        } else {
+          const { error } = await supabase
+            .from('restaurant_settings')
+            .insert({
+              organization_id: orgId,
+              display_name: displayName,
+              address: restaurantInfo.address?.trim() ?? null,
+              phone: restaurantInfo.phone?.trim() ?? null,
+              email: restaurantInfo.email?.trim() ?? null
+            })
 
-      localStorage.setItem('restaurantInfo', JSON.stringify(restaurantInfo))
-      await refreshOrganization()
+          if (error) throw error
+        }
+
+        // 2) Try to update organization display_name — skip silently if RLS blocks it
+        try {
+          const { error: orgError } = await supabase
+            .from('organizations')
+            .update({ display_name: displayName, updated_at: updatedAt })
+            .eq('id', orgId)
+          if (orgError) throw orgError
+        } catch {
+          // Org update is optional — restaurant_settings is source of truth
+        }
+
+        localStorage.setItem('restaurantInfo', JSON.stringify(restaurantInfo))
+        try {
+          await Promise.race([
+            refreshOrganization(),
+            new Promise(resolve => setTimeout(resolve, 3000))
+          ])
+        } catch {
+          // ignore refresh error
+        }
+      })()
+
+      await Promise.race([savePromise, timeoutPromise])
+
       showToast('Settings saved!', 'success')
       window.location.reload()
     } catch (error) {
       console.error('Save error:', error)
-      showToast('Failed: ' + (error as Error).message, 'error')
+      const msg = String((error as Error)?.message || (error as { message?: string })?.message || 'Unknown error')
+      const isPermissionError = /app\.current_tenant_id|current_tenant_id|row-level security|policy|permission denied|violates row-level security/i.test(msg)
+      if (msg.includes('timed out')) {
+        showToast(msg, 'error')
+      } else if (isPermissionError) {
+        showToast(`Failed: ${msg.slice(0, 80)}${msg.length > 80 ? '…' : ''}. Already ran RUN_ONCE_settings_fix.sql? Try Save again.`, 'error')
+      } else {
+        showToast('Failed: ' + msg, 'error')
+      }
     } finally {
       setRestaurantInfoLoading(false)
     }
@@ -291,8 +321,8 @@ export default function SettingsPage() {
       showToast('No organization selected. Please wait or refresh.', 'error')
       return
     }
-    try {
-      if (editingFloor) {
+    if (editingFloor) {
+      try {
         const { error } = await supabase
           .from('floors')
           .update({ name: floorForm.name })
@@ -301,41 +331,69 @@ export default function SettingsPage() {
 
         if (error) throw error
         showToast('Floor updated!', 'success')
-      } else {
-        // Add new floor
-        const { error } = await supabase
-          .from('floors')
-          .insert({
-            name: floorForm.name.trim(),
-            is_active: true,
-            organization_id: orgId,
-            display_order: floors.length
-          })
-
-        if (error) {
-          console.error('Floor insert error:', error)
-          const errMsg = (error as { message?: string })?.message ?? error?.message ?? JSON.stringify(error)
-          showToast('Failed to save floor: ' + errMsg, 'error')
-          return
-        }
-        showToast('Floor added!', 'success')
+        setShowFloorModal(false)
+        setEditingFloor(null)
+        setFloorForm({ name: '' })
+        setFloors(prev => prev.map(f => f.id === editingFloor.id ? { ...f, name: floorForm.name.trim() } : f))
+      } catch (error) {
+        console.error('Error saving floor:', error)
+        const errMsg = error instanceof Error ? error.message : JSON.stringify(error)
+        showToast('Failed to save floor: ' + errMsg, 'error')
       }
+      return
+    }
 
-      setShowFloorModal(false)
-      setEditingFloor(null)
-      setFloorForm({ name: '' })
-      fetchFloors()
+    // Add new floor — optimistic UI
+    const tempId = `temp-floor-${Date.now()}`
+    const optimisticFloor: Floor = {
+      id: tempId,
+      name: floorForm.name.trim(),
+      display_order: floors.length,
+      is_active: true
+    }
+    setFloors(prev => [...prev, optimisticFloor])
+    setShowFloorModal(false)
+    setEditingFloor(null)
+    setFloorForm({ name: '' })
+
+    try {
+      const { data, error } = await supabase
+        .from('floors')
+        .insert({
+          name: optimisticFloor.name,
+          is_active: true,
+          organization_id: orgId,
+          display_order: optimisticFloor.display_order
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+      showToast('Floor added!', 'success')
+      setFloors(prev => prev.map(f => f.id === tempId ? (data as Floor) : f))
     } catch (error) {
-      console.error('Error saving floor:', error)
-      const errMsg = error instanceof Error ? error.message : JSON.stringify(error)
+      console.error('Floor insert error:', error)
+      setFloors(prev => prev.filter(f => f.id !== tempId))
+      const errMsg = (error as { message?: string })?.message ?? (error instanceof Error ? error.message : JSON.stringify(error))
       showToast('Failed to save floor: ' + errMsg, 'error')
     }
   }
 
-  // Delete Floor
+  // Delete Floor — optimistic UI
   const handleDeleteFloor = async (floor: Floor) => {
     if (!confirm(`Delete floor "${floor.name}"? This will delete all tables on this floor.`)) return
     if (!orgId) return
+    if (floor.id.startsWith('temp-')) {
+      setFloors(prev => prev.filter(f => f.id !== floor.id))
+      return
+    }
+    const prevFloors = floors
+    setFloors(prev => prev.filter(f => f.id !== floor.id))
+    if (selectedFloor?.id === floor.id) {
+      const next = prevFloors.find(f => f.id !== floor.id)
+      setSelectedFloor(next ?? null)
+      setTables([])
+    }
     try {
       const { error } = await supabase
         .from('floors')
@@ -345,9 +403,10 @@ export default function SettingsPage() {
 
       if (error) throw error
       showToast('Floor deleted!', 'success')
-      fetchFloors()
     } catch (error) {
       console.error('Error deleting floor:', error)
+      setFloors(prevFloors)
+      if (selectedFloor?.id === floor.id) setSelectedFloor(floor)
       showToast('Failed to delete floor', 'error')
     }
   }
@@ -364,9 +423,8 @@ export default function SettingsPage() {
       return
     }
 
-    try {
-      if (editingTable) {
-        // Update table
+    if (editingTable) {
+      try {
         const { error } = await supabase
           .from('tables')
           .update({
@@ -380,53 +438,79 @@ export default function SettingsPage() {
         setShowTableModal(false)
         setEditingTable(null)
         setTableForm({ table_number: '', floor_id: '', seats: '4' })
-        fetchTables()
-        return
+        setTables(prev => prev.map(t => t.id === editingTable.id
+          ? { ...t, table_number: parseInt(tableForm.table_number, 10) || t.table_number, seats: parseInt(tableForm.seats, 10) || 4 }
+          : t))
+      } catch (error) {
+        console.error('Error saving table:', error)
+        showToast('Failed to save table', 'error')
       }
+      return
+    }
 
-      // Add new table
-      if (!orgId) {
-        showToast('No organization selected. Please wait or refresh.', 'error')
-        return
-      }
-      console.log('Creating table:', tableForm)
-      const { data: inserted, error } = await supabase
+    // Add new table — optimistic UI
+    if (!orgId) {
+      showToast('No organization selected. Please wait or refresh.', 'error')
+      return
+    }
+    const floorId = tableForm.floor_id
+    const floor = floors.find(f => f.id === floorId)
+    const tableNum = parseInt(tableForm.table_number, 10) || 0
+    const seats = parseInt(tableForm.seats, 10) || 4
+    const tempId = `temp-table-${Date.now()}`
+    const optimisticTable: Table = {
+      id: tempId,
+      floor_id: floorId,
+      table_number: tableNum,
+      seats,
+      status: 'available',
+      is_active: true,
+      floor: floor ?? undefined
+    }
+    setShowTableModal(false)
+    setEditingTable(null)
+    setTableForm({ table_number: '', floor_id: '', seats: '4' })
+    if (floor) setSelectedFloor(floor)
+    if (floorId === selectedFloor?.id) {
+      setTables(prev => [...prev, optimisticTable])
+    }
+
+    try {
+      const { data, error } = await supabase
         .from('tables')
         .insert({
-          floor_id: tableForm.floor_id,
-          table_number: tableForm.table_number.trim(),
-          seats: parseInt(tableForm.seats, 10) || 4,
+          floor_id: floorId,
+          table_number: String(tableNum),
+          seats,
           status: 'available',
           is_active: true,
           organization_id: orgId
         })
-        .select()
+        .select(`
+          *,
+          floor:floors(*)
+        `)
+        .single()
 
-      if (error) {
-        console.error('Table creation error:', error)
-        const errMsg = (error as { message?: string })?.message ?? error?.message ?? JSON.stringify(error)
-        showToast('Failed to create table: ' + errMsg, 'error')
-        return
-      }
-      console.log('Table created successfully:', inserted)
+      if (error) throw error
       showToast('Table created successfully!', 'success')
-      setShowTableModal(false)
-      setEditingTable(null)
-      setTableForm({ table_number: '', floor_id: '', seats: '4' })
-      fetchFloors()
-      const floorId = tableForm.floor_id
-      const floor = floors.find(f => f.id === floorId)
-      if (floor) setSelectedFloor(floor)
-      if (floorId === selectedFloor?.id) fetchTables()
+      setTables(prev => prev.map(t => t.id === tempId ? (data as Table) : t))
     } catch (error) {
-      console.error('Error saving table:', error)
-      showToast('Failed to save table', 'error')
+      console.error('Table creation error:', error)
+      setTables(prev => prev.filter(t => t.id !== tempId))
+      const errMsg = (error as { message?: string })?.message ?? (error instanceof Error ? error.message : JSON.stringify(error))
+      showToast('Failed to create table: ' + errMsg, 'error')
     }
   }
 
-  // Delete Table
+  // Delete Table — optimistic UI
   const handleDeleteTable = async (table: Table) => {
     if (!confirm(`Delete Table ${table.table_number}?`)) return
+
+    const prevTables = tables
+    setTables(prev => prev.filter(t => t.id !== table.id))
+
+    if (table.id.startsWith('temp-')) return
 
     try {
       const { error } = await supabase
@@ -436,25 +520,39 @@ export default function SettingsPage() {
 
       if (error) throw error
       showToast('Table deleted!', 'success')
-      fetchTables()
     } catch (error) {
       console.error('Error deleting table:', error)
+      setTables(prevTables)
       showToast('Failed to delete table', 'error')
     }
   }
 
   const saveInvoiceSettings = async () => {
+    if (!orgId) {
+      showToast('No organization selected. Please wait or refresh.', 'error')
+      return
+    }
     try {
-      const { error } = await supabase
+      const updatedAt = new Date().toISOString()
+      const { data: existing } = await supabase
         .from('invoice_settings')
-        .upsert({
-          id: 1,
-          ...invoiceSettings,
-          ...(orgId && { organization_id: orgId }),
-          updated_at: new Date().toISOString()
-        })
+        .select('id')
+        .eq('organization_id', orgId)
+        .maybeSingle()
 
-      if (error) throw error
+      if (existing) {
+        const { error } = await supabase
+          .from('invoice_settings')
+          .update({ ...invoiceSettings, updated_at: updatedAt })
+          .eq('id', existing.id)
+          .eq('organization_id', orgId)
+        if (error) throw error
+      } else {
+        const { error } = await supabase
+          .from('invoice_settings')
+          .insert({ ...invoiceSettings, organization_id: orgId, updated_at: updatedAt })
+        if (error) throw error
+      }
       showToast('✅ Invoice settings saved!', 'success')
     } catch (error) {
       console.error('Save error:', error)
@@ -463,14 +561,13 @@ export default function SettingsPage() {
   }
 
   const loadInvoiceSettings = async () => {
+    if (!orgId) return
     try {
-      let query = supabase.from('invoice_settings').select('*')
-      if (orgId) {
-        query = query.eq('organization_id', orgId)
-      } else {
-        query = query.eq('id', 1)
-      }
-      const { data, error } = await query.maybeSingle()
+      const { data, error } = await supabase
+        .from('invoice_settings')
+        .select('*')
+        .eq('organization_id', orgId)
+        .maybeSingle()
 
       if (!error && data) {
         setInvoiceSettings(prev => ({
@@ -480,7 +577,7 @@ export default function SettingsPage() {
         }))
       }
     } catch {
-      console.log('Using default invoice settings')
+      // keep default invoice settings
     }
   }
 
@@ -495,7 +592,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {authLoading && !orgId && (
+      {mounted && authLoading && !orgId && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-800 text-sm mb-6">
           Loading your organization…
         </div>
@@ -601,10 +698,10 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={handleSaveRestaurantInfo}
-            disabled={restaurantInfoLoading}
+            disabled={restaurantInfoLoading || authLoading || !orgId}
             className="mt-6 px-8 py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors disabled:opacity-60"
           >
-            {restaurantInfoLoading ? 'Saving…' : '💾 Save Restaurant Info'}
+            {!orgId ? 'Loading org...' : restaurantInfoLoading ? 'Saving…' : '💾 Save Restaurant Info'}
           </button>
         </div>
       )}

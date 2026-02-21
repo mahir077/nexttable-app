@@ -61,8 +61,6 @@ export default function StockPage() {
         throw stockError
       }
 
-      console.log('Stock data fetched:', stockDataRes?.length)
-
       // Fetch menu items separately
       const menuItemIds = stockDataRes?.map((s: { menu_item_id?: string }) => s.menu_item_id).filter(Boolean) || []
 

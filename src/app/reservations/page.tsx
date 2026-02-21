@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { supabase, getAllTables, type Table } from '@/app/lib/api/tables'
 import BackButton from '@/components/BackButton'
 import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/hooks/useToast'
+import Toast from '@/components/Toast'
 
 interface Reservation {
   id: string
@@ -33,6 +35,7 @@ export default function ReservationsPage() {
   const [guestPhone, setGuestPhone] = useState('')
   const [guestCount, setGuestCount] = useState('')
   const [specialRequests, setSpecialRequests] = useState('')
+  const { toast, showToast, hideToast } = useToast()
 
   useEffect(() => {
     if (orgId) {
@@ -57,8 +60,13 @@ export default function ReservationsPage() {
 
   const fetchTables = async () => {
     if (!orgId) return
-    const data = await getAllTables(orgId)
-    setTables(data || [])
+    try {
+      const data = await getAllTables(orgId)
+      setTables(data || [])
+    } catch (error) {
+      console.error('Error fetching tables:', error)
+      showToast('Failed to load tables', 'error')
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -327,6 +335,7 @@ export default function ReservationsPage() {
           </>
         )}
       </div>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
     </div>
   )
 }

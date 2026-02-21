@@ -38,6 +38,12 @@ export async function middleware(req: NextRequest) {
     return response
   }
 
+  // Root: redirect to dashboard if logged in, otherwise to login
+  if (req.nextUrl.pathname === '/') {
+    if (session) return NextResponse.redirect(new URL('/dashboard', req.url))
+    return NextResponse.redirect(new URL('/login', req.url))
+  }
+
   // Auth routes (login, signup) - redirect to dashboard if logged in
   if (req.nextUrl.pathname === '/login' || req.nextUrl.pathname === '/signup') {
     if (session) {
@@ -57,6 +63,7 @@ export async function middleware(req: NextRequest) {
   // Protected routes - redirect to login if not logged in
   const protectedRoutes = [
     '/dashboard',
+    '/pos',
     '/menu',
     '/orders',
     '/kitchen',
