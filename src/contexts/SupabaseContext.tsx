@@ -12,14 +12,8 @@ const SupabaseContext = createContext<SupabaseClient | null>(null)
 
 export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => {
-    const client = createBrowserClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      }
-    })
+    // No custom storage: @supabase/ssr uses cookies so middleware sees session on Vercel
+    const client = createBrowserClient(supabaseUrl, supabaseAnonKey)
     setSupabaseClient(client)
     return client
   }, [])

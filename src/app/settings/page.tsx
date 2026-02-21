@@ -36,8 +36,8 @@ const defaultInvoiceSettings: InvoiceSettings = {
 }
 
 export default function SettingsPage() {
-  const { refreshOrganization } = useAuth()
-  // Primary source: localStorage. Don't wait for AuthContext — fixes "Loading org..." on Vercel
+  const { refreshOrganization, organization } = useAuth()
+  // Primary source: localStorage. Fallback: AuthContext when org is restored (e.g. after redirect on Vercel)
   const [orgId, setOrgId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -45,6 +45,14 @@ export default function SettingsPage() {
       setOrgId(localStorage.getItem('current_organization_id'))
     }
   }, [])
+
+  // When AuthContext has organization but we have no orgId (localStorage was empty), sync from context
+  useEffect(() => {
+    if (organization?.id && !orgId && typeof window !== 'undefined') {
+      localStorage.setItem('current_organization_id', organization.id)
+      setOrgId(organization.id)
+    }
+  }, [organization?.id, orgId])
 
   const [activeTab, setActiveTab] = useState<'restaurant' | 'tables' | 'printer' | 'invoice'>('restaurant')
   

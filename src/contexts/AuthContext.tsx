@@ -118,6 +118,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  // When user exists but organization is null (e.g. loadOrganizations failed after redirect), restore from localStorage
+  useEffect(() => {
+    if (!user || organization || typeof window === 'undefined') return
+    const savedId = localStorage.getItem('current_organization_id')
+    if (!savedId) return
+    let cancelled = false
+    supabase
+      .from('organizations')
+      .select('id, name, slug, display_name')
+      .eq('id', savedId)
+      .single()
+      .then(({ data: orgRow, error }) => {
+        if (cancelled || error || !orgRow) return
+        setOrganization({
+          id: orgRow.id,
+          name: orgRow.name,
+          display_name: orgRow.display_name || orgRow.name,
+          slug: orgRow.slug
+        })
+        setOrganizations([{
+          id: orgRow.id,
+          name: orgRow.name,
+          display_name: orgRow.display_name || orgRow.name,
+          slug: orgRow.slug
+        }])
+      })
+    return () => { cancelled = true }
+  }, [user, organization])
+
   const loadOrganizations = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -284,16 +313,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await supabase.auth.signOut()
     } catch {
       // ignore – still redirect
-    }
-    setUser(null)
-    setOrganization(null)
-    setOrganizations([])
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('current_organization_id')
-      localStorage.removeItem('restaurantInfo')
-      window.location.href = '/login'
-    } else {
-      router.push('/login')
+    } finally {
+      setUser(null)
+      setOrganization(null)
+      setOrganizations([])
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('current_organization_id')
+        localStorage.removeItem('restaurantInfo')
+        window.location.href = '/login'
+      } else {
+        router.push('/login')
+      }
     }
   }
 

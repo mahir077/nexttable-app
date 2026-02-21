@@ -281,7 +281,9 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
               )}
               <button
                 type="button"
-                onClick={() => signOut()}
+                onClick={async () => {
+                  await signOut()
+                }}
                 className={`w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors font-semibold ${isCollapsed ? 'px-3' : ''}`}
                 title="Sign out"
               >

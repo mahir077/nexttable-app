@@ -13,14 +13,8 @@ export function setSupabaseClient(client: SupabaseClient) {
 function getSupabase(): SupabaseClient | null {
   if (typeof window === 'undefined') return null
   if (!browserClient) {
-    browserClient = createBrowserClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        storage: window.localStorage,
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      }
-    })
+    // Don't pass storage: so @supabase/ssr uses cookies (document.cookie). Middleware reads cookies, so session works on Vercel.
+    browserClient = createBrowserClient(supabaseUrl, supabaseAnonKey)
   }
   return browserClient
 }
