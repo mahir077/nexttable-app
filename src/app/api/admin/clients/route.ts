@@ -71,13 +71,14 @@ export async function GET() {
 
     const subscriptions = subs ?? []
 
+    type OrgRow = { id: string; name?: string; owner_id?: string; created_at?: string }
     const { data: orgs } = await supabaseAdmin
       .from('organizations')
       .select('id, name, owner_id, created_at')
       .in('id', subscriptions.map((s: { organization_id: string }) => s.organization_id))
 
-    const orgMap = new Map((orgs ?? []).map((o: { id: string }) => [o.id, o]))
-    const ownerIds = [...new Set((orgs ?? []).map((o: { owner_id?: string }) => o.owner_id).filter(Boolean))] as string[]
+    const orgMap = new Map<string, OrgRow>((orgs ?? []).map((o: OrgRow) => [o.id, o]))
+    const ownerIds = [...new Set((orgs ?? []).map((o: OrgRow) => o.owner_id).filter(Boolean))] as string[]
 
     const ownerMap = new Map<string, { email: string; name: string }>()
     for (const uid of ownerIds) {
