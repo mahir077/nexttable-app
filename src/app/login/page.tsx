@@ -103,10 +103,6 @@ export default function LoginPage() {
             </button>
           </form>
         </div>
-
-        <p className="mt-6 text-center text-sm text-slate-500">
-          Demo: <span className="font-mono font-medium text-slate-700">demo@restaurant.com</span> / <span className="font-mono font-medium text-slate-700">demo123</span>
-        </p>
       </div>
     </div>
   )

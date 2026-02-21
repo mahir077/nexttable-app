@@ -169,17 +169,20 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
         {/* Header */}
         <div className={`border-b border-slate-800 flex items-center justify-between ${isCollapsed ? 'p-3 justify-center' : 'p-6'}`}>
           {!isCollapsed && (
-            <div>
-              <h1 className="text-2xl font-brand font-black">
-                <span className="text-white">Next</span>
-                <span className="text-emerald-500">Table</span>
+            <div className="min-w-0">
+              <h1 className="text-xl font-brand font-black truncate text-white" title={organization?.display_name || organization?.name || 'Restaurant'}>
+                {organization?.display_name || organization?.name || 'Restaurant'}
               </h1>
               <p className="text-xs text-slate-400 mt-1 font-semibold tracking-wide">
-                CLOUD POS SYSTEM
+                NextTable POS
               </p>
             </div>
           )}
-          {isCollapsed && <div className="text-xl font-black text-emerald-500">NT</div>}
+          {isCollapsed && (
+            <div className="text-lg font-black text-emerald-500 truncate max-w-[3rem]" title={organization?.display_name || organization?.name || 'Restaurant'}>
+              {(organization?.display_name || organization?.name || 'R').slice(0, 2)}
+            </div>
+          )}
           <div className="flex items-center gap-1">
             {onClose && (
               <button

@@ -463,7 +463,7 @@ export default function DashboardPage() {
               </svg>
             </button>
             <div className="min-w-0">
-              <h1 className="text-base sm:text-lg md:text-xl font-semibold text-slate-800 truncate">{organization ? (organization.display_name || organization.name || restaurantName || 'Restaurant') : 'NextTable'}</h1>
+              <h1 className="text-base sm:text-lg md:text-xl font-semibold text-slate-800 truncate">{organization ? (organization.display_name || organization.name || restaurantName || 'Restaurant') : (restaurantName || 'Restaurant')}</h1>
               <p className="text-xs text-slate-400 hidden sm:block">{currentDate}</p>
             </div>
           </div>

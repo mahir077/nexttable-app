@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase-client'
 import { getTablesByFloor, Floor, Table } from '@/app/lib/api/tables'
 import { getCashDrawerUrl, setCashDrawerUrl as saveCashDrawerUrl } from '@/app/lib/cashDrawer'
@@ -38,15 +38,31 @@ const defaultInvoiceSettings: InvoiceSettings = {
 export default function SettingsPage() {
   const { organization, organizations, loading: authLoading, refreshOrganization } = useAuth()
   const [mounted, setMounted] = useState(false)
+  const stableOrgIdRef = useRef<string | null>(null)
+
   // Resolve org after mount to avoid hydration mismatch (server has no localStorage)
   const orgId = mounted
     ? (organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null) ?? organizations?.[0]?.id ?? null)
     : (organization?.id ?? organizations?.[0]?.id ?? null)
+
+  // Keep a stable orgId so form stays usable if auth revalidates (e.g. on Vercel). Once we have orgId, don't lose it.
+  const effectiveOrgId = orgId ?? stableOrgIdRef.current ?? (mounted && typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
+
   const [activeTab, setActiveTab] = useState<'restaurant' | 'tables' | 'printer' | 'invoice'>('restaurant')
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // As soon as we have an orgId (from context or localStorage), remember it so Settings stays usable if auth revalidates
+  useEffect(() => {
+    if (orgId) stableOrgIdRef.current = orgId
+  }, [orgId])
+  useEffect(() => {
+    if (!mounted || typeof window === 'undefined') return
+    const saved = localStorage.getItem('current_organization_id')
+    if (saved && !stableOrgIdRef.current) stableOrgIdRef.current = saved
+  }, [mounted])
   
   // Restaurant info state (synced with restaurant_settings in DB) – start empty so we don't show another org's data
   const [restaurantInfo, setRestaurantInfo] = useState({
@@ -90,10 +106,10 @@ export default function SettingsPage() {
 
   const { toast, showToast, hideToast } = useToast()
 
-  // Fetch data when org is available
+  // Fetch data when org is available (use effectiveOrgId so we load even with stable ref)
   useEffect(() => {
-    if (orgId) fetchFloors()
-  }, [orgId])
+    if (effectiveOrgId) fetchFloors()
+  }, [effectiveOrgId])
 
   useEffect(() => {
     if (selectedFloor) {
@@ -107,11 +123,12 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadInvoiceSettings()
-  }, [orgId])
+  }, [effectiveOrgId])
 
   // Load current organization + restaurant_settings into form (run when org is available)
   const loadSettings = async () => {
-    if (!orgId) return
+    const oid = effectiveOrgId ?? orgId
+    if (!oid) return
 
     setRestaurantInfoLoading(true)
     try {
@@ -121,7 +138,7 @@ export default function SettingsPage() {
       const { data: orgResp, error: orgError } = await supabase
         .from('organizations')
         .select('id, name, display_name, slug')
-        .eq('id', orgId)
+        .eq('id', oid)
         .single()
 
       if (orgResp && !orgError) {
@@ -136,7 +153,7 @@ export default function SettingsPage() {
       const { data: settingsData, error: settingsError } = await supabase
         .from('restaurant_settings')
         .select('*')
-        .eq('organization_id', orgId)
+        .eq('organization_id', oid)
         .maybeSingle()
 
       if (settingsData && !settingsError) {
@@ -176,16 +193,17 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadSettings()
-  }, [orgId])
+  }, [effectiveOrgId])
 
   const fetchFloors = async () => {
-    if (!orgId) return
+    const oid = effectiveOrgId ?? orgId
+    if (!oid) return
     try {
       const { data, error } = await supabase
         .from('floors')
         .select('*')
         .order('name')
-        .eq('organization_id', orgId)
+        .eq('organization_id', oid)
 
       if (error) {
         console.error('Error fetching floors:', error)
@@ -205,9 +223,10 @@ export default function SettingsPage() {
   }
 
   const fetchTables = async () => {
-    if (!selectedFloor || !orgId) return
+    const oid = effectiveOrgId ?? orgId
+    if (!selectedFloor || !oid) return
     try {
-      const data = await getTablesByFloor(selectedFloor.id, orgId)
+      const data = await getTablesByFloor(selectedFloor.id, oid)
       setTables(data)
     } catch (error) {
       console.error('Error fetching tables:', error)
@@ -220,7 +239,8 @@ export default function SettingsPage() {
       showToast('Please enter restaurant name', 'error')
       return
     }
-    if (!orgId) {
+    const oid = effectiveOrgId ?? orgId
+    if (!oid) {
       showToast('No organization selected. Please wait or refresh.', 'error')
       return
     }
@@ -238,7 +258,7 @@ export default function SettingsPage() {
         const { data: existing } = await supabase
           .from('restaurant_settings')
           .select('id')
-          .eq('organization_id', orgId)
+          .eq('organization_id', oid)
           .limit(1)
           .maybeSingle()
 
@@ -259,7 +279,7 @@ export default function SettingsPage() {
           const { error } = await supabase
             .from('restaurant_settings')
             .insert({
-              organization_id: orgId,
+              organization_id: oid,
               display_name: displayName,
               address: restaurantInfo.address?.trim() ?? null,
               phone: restaurantInfo.phone?.trim() ?? null,
@@ -274,7 +294,7 @@ export default function SettingsPage() {
           const { error: orgError } = await supabase
             .from('organizations')
             .update({ display_name: displayName, updated_at: updatedAt })
-            .eq('id', orgId)
+            .eq('id', oid)
           if (orgError) throw orgError
         } catch {
           // Org update is optional — restaurant_settings is source of truth
@@ -318,7 +338,8 @@ export default function SettingsPage() {
       showToast('Please enter floor name', 'error')
       return
     }
-    if (!orgId) {
+    const oid = effectiveOrgId ?? orgId
+    if (!oid) {
       showToast('No organization selected. Please wait or refresh.', 'error')
       return
     }
@@ -328,7 +349,7 @@ export default function SettingsPage() {
           .from('floors')
           .update({ name: floorForm.name })
           .eq('id', editingFloor.id)
-          .eq('organization_id', orgId)
+          .eq('organization_id', oid)
 
         if (error) throw error
         showToast('Floor updated!', 'success')
@@ -363,7 +384,7 @@ export default function SettingsPage() {
         .insert({
           name: optimisticFloor.name,
           is_active: true,
-          organization_id: orgId,
+          organization_id: oid,
           display_order: optimisticFloor.display_order
         })
         .select()
@@ -383,7 +404,8 @@ export default function SettingsPage() {
   // Delete Floor — optimistic UI
   const handleDeleteFloor = async (floor: Floor) => {
     if (!confirm(`Delete floor "${floor.name}"? This will delete all tables on this floor.`)) return
-    if (!orgId) return
+    const oid = effectiveOrgId ?? orgId
+    if (!oid) return
     if (floor.id.startsWith('temp-')) {
       setFloors(prev => prev.filter(f => f.id !== floor.id))
       return
@@ -400,7 +422,7 @@ export default function SettingsPage() {
         .from('floors')
         .delete()
         .eq('id', floor.id)
-        .eq('organization_id', orgId)
+        .eq('organization_id', oid)
 
       if (error) throw error
       showToast('Floor deleted!', 'success')
@@ -450,7 +472,8 @@ export default function SettingsPage() {
     }
 
     // Add new table — optimistic UI
-    if (!orgId) {
+    const oidTable = effectiveOrgId ?? orgId
+    if (!oidTable) {
       showToast('No organization selected. Please wait or refresh.', 'error')
       return
     }
@@ -485,7 +508,7 @@ export default function SettingsPage() {
           seats,
           status: 'available',
           is_active: true,
-          organization_id: orgId
+          organization_id: oidTable
         })
         .select(`
           *,
@@ -529,7 +552,8 @@ export default function SettingsPage() {
   }
 
   const saveInvoiceSettings = async () => {
-    if (!orgId) {
+    const oidInv = effectiveOrgId ?? orgId
+    if (!oidInv) {
       showToast('No organization selected. Please wait or refresh.', 'error')
       return
     }
@@ -538,7 +562,7 @@ export default function SettingsPage() {
       const { data: existing } = await supabase
         .from('invoice_settings')
         .select('id')
-        .eq('organization_id', orgId)
+        .eq('organization_id', oidInv)
         .maybeSingle()
 
       if (existing) {
@@ -546,12 +570,12 @@ export default function SettingsPage() {
           .from('invoice_settings')
           .update({ ...invoiceSettings, updated_at: updatedAt })
           .eq('id', existing.id)
-          .eq('organization_id', orgId)
+          .eq('organization_id', oidInv)
         if (error) throw error
       } else {
         const { error } = await supabase
           .from('invoice_settings')
-          .insert({ ...invoiceSettings, organization_id: orgId, updated_at: updatedAt })
+          .insert({ ...invoiceSettings, organization_id: oidInv, updated_at: updatedAt })
         if (error) throw error
       }
       showToast('✅ Invoice settings saved!', 'success')
@@ -562,12 +586,13 @@ export default function SettingsPage() {
   }
 
   const loadInvoiceSettings = async () => {
-    if (!orgId) return
+    const oidInv = effectiveOrgId ?? orgId
+    if (!oidInv) return
     try {
       const { data, error } = await supabase
         .from('invoice_settings')
         .select('*')
-        .eq('organization_id', orgId)
+        .eq('organization_id', oidInv)
         .maybeSingle()
 
       if (!error && data) {
@@ -593,7 +618,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {mounted && authLoading && !orgId && (
+      {mounted && authLoading && !effectiveOrgId && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-800 text-sm mb-6">
           Loading your organization…
         </div>
@@ -699,10 +724,10 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={handleSaveRestaurantInfo}
-            disabled={restaurantInfoLoading || authLoading || !orgId}
+            disabled={restaurantInfoLoading || authLoading || !effectiveOrgId}
             className="mt-6 px-8 py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors disabled:opacity-60"
           >
-            {!orgId ? 'Loading org...' : restaurantInfoLoading ? 'Saving…' : '💾 Save Restaurant Info'}
+            {!effectiveOrgId ? 'Loading org...' : restaurantInfoLoading ? 'Saving…' : '💾 Save Restaurant Info'}
           </button>
         </div>
       )}

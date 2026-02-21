@@ -379,7 +379,7 @@ export default function OrdersPage() {
           <div className="bg-white rounded-3xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             {/* Receipt Header */}
             <div className="text-center mb-6 pb-6 border-b-2 border-slate-200">
-              <h1 className="text-3xl font-brand font-black text-slate-900 mb-2">NextTable</h1>
+              <h1 className="text-3xl font-brand font-black text-slate-900 mb-2">{organization?.display_name || organization?.name || 'Orders'}</h1>
               <p className="text-sm text-slate-600">Restaurant POS System</p>
             </div>
 
