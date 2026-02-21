@@ -358,8 +358,9 @@ export default function DashboardPage() {
         .from('orders')
         .update({ table_id: changeNewTableId, updated_at: new Date().toISOString() })
         .eq('id', changeOrderId)
-      await supabase.from('tables').update({ status: 'available' }).eq('id', oldTableId)
-      await supabase.from('tables').update({ status: 'occupied' }).eq('id', changeNewTableId)
+        .eq('organization_id', orgId)
+      await supabase.from('tables').update({ status: 'available' }).eq('id', oldTableId).eq('organization_id', orgId)
+      await supabase.from('tables').update({ status: 'occupied' }).eq('id', changeNewTableId).eq('organization_id', orgId)
       setShowChangeModal(false)
       if (selectedFloor && orgId) {
         const tablesData = await getTablesByFloor(selectedFloor.id, orgId)

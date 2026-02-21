@@ -124,19 +124,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      const orgs = (data ?? [])
-        .filter((uo: any) => uo.organizations)
-        .map((uo: any) => ({
+      const withRole = (data ?? [])
+        .filter((uo: { organizations?: unknown }) => uo.organizations)
+        .map((uo: { organization_id: string; role?: string; organizations: { name: string; display_name?: string; slug: string } }) => ({
           id: uo.organization_id,
           name: uo.organizations.name,
           display_name: uo.organizations.display_name || uo.organizations.name,
-          slug: uo.organizations.slug
+          slug: uo.organizations.slug,
+          _role: (uo.role || '').toLowerCase()
         }))
 
-      console.log('Loaded organizations:', orgs)
+      // Owner's org first so demo/restaurant users see their own restaurant, not another org
+      const orgs = withRole
+        .sort((a, b) => (a._role === 'owner' ? -1 : b._role === 'owner' ? 1 : 0))
+        .map(({ _role: _, ...o }) => o)
+
       setOrganizations(orgs)
 
-      // Set current organization - prefer saved, fallback to first
+      // Set current organization - prefer saved (if it belongs to this user), else first (owner's org)
       const savedOrgId = typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null
       let currentOrg: Organization | null = null
 
@@ -152,7 +157,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (currentOrg) {
-        console.log('Setting current organization:', currentOrg)
         setOrganization(currentOrg)
       }
     } catch (error) {
@@ -169,6 +173,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
 
     if (!error && data.user) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('current_organization_id')
+      }
       await loadOrganizations(data.user.id)
       await new Promise(resolve => setTimeout(resolve, 500))
       window.location.href = '/dashboard'

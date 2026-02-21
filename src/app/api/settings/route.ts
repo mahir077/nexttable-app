@@ -1,3 +1,8 @@
+/**
+ * Legacy settings API: uses tenant_id + NEXT_PUBLIC_DEMO_TENANT_ID (single-tenant).
+ * The app Settings page does NOT call this API; it uses Supabase client with organization_id from AuthContext.
+ * For multi-tenant use, either deprecate this route or refactor to use session + organization_id.
+ */
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/app/lib/supabase'
 

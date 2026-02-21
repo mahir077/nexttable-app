@@ -39,12 +39,12 @@ export default function SettingsPage() {
   const { organization, refreshOrganization } = useAuth()
   const [activeTab, setActiveTab] = useState<'restaurant' | 'tables' | 'printer' | 'invoice'>('restaurant')
   
-  // Restaurant info state (synced with restaurant_settings in DB)
+  // Restaurant info state (synced with restaurant_settings in DB) – start empty so we don't show another org's data
   const [restaurantInfo, setRestaurantInfo] = useState({
-    name: 'NextTable Restaurant',
-    address: 'Dhaka, Bangladesh',
-    phone: '+880 1234-567890',
-    email: 'info@nexttable.com'
+    name: '',
+    address: '',
+    phone: '',
+    email: ''
   })
   const [restaurantSettingsId, setRestaurantSettingsId] = useState<string | null>(null)
   const [restaurantInfoLoading, setRestaurantInfoLoading] = useState(false)
@@ -169,11 +169,14 @@ export default function SettingsPage() {
   }, [organization?.id])
 
   const fetchFloors = async () => {
+    const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
+    if (!orgId) return
     try {
-      const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
-      let query = supabase.from('floors').select('*').order('name')
-      if (orgId) query = query.eq('organization_id', orgId)
-      const { data, error } = await query
+      const { data, error } = await supabase
+        .from('floors')
+        .select('*')
+        .order('name')
+        .eq('organization_id', orgId)
 
       if (error) {
         console.error('Error fetching floors:', error)
@@ -285,24 +288,23 @@ export default function SettingsPage() {
       showToast('Please enter floor name', 'error')
       return
     }
-
+    const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
+    if (!orgId) {
+      showToast('No organization selected', 'error')
+      return
+    }
     try {
       if (editingFloor) {
-        // Update floor
         const { error } = await supabase
           .from('floors')
           .update({ name: floorForm.name })
           .eq('id', editingFloor.id)
+          .eq('organization_id', orgId)
 
         if (error) throw error
         showToast('Floor updated!', 'success')
       } else {
         // Add new floor
-        const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
-        if (!orgId) {
-          showToast('No organization selected. Please refresh and try again.', 'error')
-          return
-        }
         const { error } = await supabase
           .from('floors')
           .insert({
@@ -335,12 +337,14 @@ export default function SettingsPage() {
   // Delete Floor
   const handleDeleteFloor = async (floor: Floor) => {
     if (!confirm(`Delete floor "${floor.name}"? This will delete all tables on this floor.`)) return
-
+    const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
+    if (!orgId) return
     try {
       const { error } = await supabase
         .from('floors')
         .delete()
         .eq('id', floor.id)
+        .eq('organization_id', orgId)
 
       if (error) throw error
       showToast('Floor deleted!', 'success')
