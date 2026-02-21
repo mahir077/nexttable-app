@@ -38,34 +38,40 @@ export default function SettingsPage() {
   const [orgId, setOrgId] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
+
     const fetchOrg = async () => {
-      // Try localStorage first (fastest)
       const savedId = typeof window !== 'undefined'
         ? localStorage.getItem('current_organization_id')
         : null
 
       if (savedId) {
-        setOrgId(savedId)
+        if (!cancelled) setOrgId(savedId)
         return
       }
 
-      // Fallback: get from Supabase
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user || cancelled) return
 
-      const { data } = await supabase
-        .from('user_organizations')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle()
+        const { data } = await supabase
+          .from('user_organizations')
+          .select('organization_id')
+          .eq('user_id', user.id)
+          .limit(1)
+          .maybeSingle()
 
-      if (data?.organization_id) {
-        localStorage.setItem('current_organization_id', data.organization_id)
-        setOrgId(data.organization_id)
+        if (data?.organization_id && !cancelled) {
+          localStorage.setItem('current_organization_id', data.organization_id)
+          setOrgId(data.organization_id)
+        }
+      } catch (e: unknown) {
+        if (e instanceof Error && e.name === 'AbortError') return
       }
     }
+
     fetchOrg()
+    return () => { cancelled = true }
   }, [])
 
   const [activeTab, setActiveTab] = useState<'restaurant' | 'tables' | 'printer' | 'invoice'>('restaurant')
