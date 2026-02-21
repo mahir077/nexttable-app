@@ -222,11 +222,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
 
     if (!error && data.user) {
+      // Wait for session to be ready
+      await new Promise(resolve => setTimeout(resolve, 1000))
       await loadOrganizations(data.user.id)
-      if (typeof window !== 'undefined') {
-        console.log('Org set:', localStorage.getItem('current_organization_id'))
-      }
-      // Use router.push so we keep React state + session (fixes Vercel where full reload loses session before cookies are ready)
+      await new Promise(resolve => setTimeout(resolve, 500))
       window.location.href = '/dashboard'
     }
 
