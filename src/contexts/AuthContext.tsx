@@ -227,7 +227,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('Org set:', localStorage.getItem('current_organization_id'))
       }
       // Use router.push so we keep React state + session (fixes Vercel where full reload loses session before cookies are ready)
-      router.push('/dashboard')
+      window.location.href = '/dashboard'
     }
 
     return { data, error }
