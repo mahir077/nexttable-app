@@ -37,14 +37,16 @@ const defaultInvoiceSettings: InvoiceSettings = {
 
 export default function SettingsPage() {
   const { organization } = useAuth()
-  const [orgId, setOrgId] = useState<string | null>(null)
+  const [orgId, setOrgId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('current_organization_id')
+    }
+    return null
+  })
 
   useEffect(() => {
-    if (organization?.id) {
+    if (organization?.id && organization.id !== orgId) {
       setOrgId(organization.id)
-    } else if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('current_organization_id')
-      if (saved) setOrgId(saved)
     }
   }, [organization])
 
