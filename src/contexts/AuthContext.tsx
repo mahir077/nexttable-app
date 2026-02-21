@@ -92,7 +92,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!mounted) return
         try {
           if (event === 'SIGNED_IN' && session?.user) {
-            if (typeof window !== 'undefined') localStorage.removeItem('current_organization_id')
             await applySession(session)
           } else if (event === 'INITIAL_SESSION' && session?.user) {
             await applySession(session)
@@ -197,9 +196,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setOrganizations(orgs)
       const currentOrg = orgs[0]
       setOrganization(currentOrg)
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('current_organization_id', currentOrg.id)
-      }
+      localStorage.setItem('current_organization_id', currentOrg.id)
     } catch {
       if (typeof window !== 'undefined') {
         const savedId = localStorage.getItem('current_organization_id')
@@ -225,10 +222,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
 
     if (!error && data.user) {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('current_organization_id')
-      }
       await loadOrganizations(data.user.id)
+      if (typeof window !== 'undefined') {
+        console.log('Org set:', localStorage.getItem('current_organization_id'))
+      }
       // Use router.push so we keep React state + session (fixes Vercel where full reload loses session before cookies are ready)
       router.push('/dashboard')
     }
