@@ -1,7 +1,5 @@
 import { supabase } from '@/lib/supabase-client'
 
-export { supabase }
-
 // Types
 export interface Floor {
   id: string

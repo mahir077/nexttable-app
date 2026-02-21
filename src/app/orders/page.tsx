@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/app/lib/api/tables'
+import { supabase } from '@/lib/supabase-client'
 import { getOrderWithItems } from '@/app/lib/api/orders'
 import { openCashDrawer } from '@/app/lib/cashDrawer'
 import BackButton from '@/components/BackButton'

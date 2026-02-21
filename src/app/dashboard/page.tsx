@@ -4,12 +4,12 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
+import { supabase } from '@/lib/supabase-client'
 import { getFloors, getTablesByFloor, getAllTables, Floor, Table } from '@/app/lib/api/tables'
 import { getTodayStats, getWeeklyStats } from '@/app/lib/api/orders'
 import type { Order } from '@/app/lib/api/orders'
 import TableModal from '@/components/TableModal'
 import LoadingSpinner from '@/components/LoadingSpinner'
-import { supabase } from '@/app/lib/api/tables'
 import { useAuth } from '@/contexts/AuthContext'
 
 interface TodayStats {

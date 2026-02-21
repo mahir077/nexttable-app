@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getOrders, getOrderWithItems } from '@/app/lib/api/orders'
-import { supabase } from '@/app/lib/api/orders'
+import { supabase } from '@/lib/supabase-client'
 import { getFloors, getTablesByFloor, getAllTables, type Floor, type Table } from '@/app/lib/api/tables'
 import { getCategories, getMenuItemsByCategory, getAllMenuItems, type MenuItem } from '@/app/lib/api/menu'
 import BackButton from '@/components/BackButton'

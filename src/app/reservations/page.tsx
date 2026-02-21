@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase, getAllTables, type Table } from '@/app/lib/api/tables'
+import { supabase } from '@/lib/supabase-client'
+import { getAllTables, type Table } from '@/app/lib/api/tables'
 import BackButton from '@/components/BackButton'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/hooks/useToast'

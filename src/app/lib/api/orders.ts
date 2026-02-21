@@ -1,8 +1,6 @@
 import { supabase } from '@/lib/supabase-client'
 import { CartItem } from './menu'
 
-export { supabase }
-
 // Types
 export interface Order {
   id: string

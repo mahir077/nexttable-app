@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/app/lib/api/tables'
+import { supabase } from '@/lib/supabase-client'
 import BackButton from '@/components/BackButton'
 import { useToast } from '@/hooks/useToast'
 import Toast from '@/components/Toast'

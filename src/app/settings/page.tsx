@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase-client'
 import { getTablesByFloor, Floor, Table } from '@/app/lib/api/tables'
-import { supabase } from '@/app/lib/api/tables'
 import { getCashDrawerUrl, setCashDrawerUrl as saveCashDrawerUrl } from '@/app/lib/cashDrawer'
 import BackButton from '@/components/BackButton'
 import Toast from '@/components/Toast'
