@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Outfit } from "next/font/google";
+import { SupabaseProvider } from "@/contexts/SupabaseContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import "./globals.css";
 
@@ -29,9 +30,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} ${outfit.variable} font-sans antialiased min-h-screen`}>
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+        <SupabaseProvider>
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+        </SupabaseProvider>
       </body>
     </html>
   );

@@ -2,11 +2,17 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+// Copy session cookies from one response to another (required so redirects keep the refreshed session)
+function copySessionCookies(from: NextResponse, to: NextResponse) {
+  from.cookies.getAll().forEach(({ name, value, ...opts }) => {
+    to.cookies.set(name, value, opts)
+  })
+  return to
+}
+
 export async function middleware(req: NextRequest) {
   let response = NextResponse.next({
-    request: {
-      headers: req.headers,
-    },
+    request: { headers: req.headers },
   })
 
   const supabase = createServerClient(
@@ -28,33 +34,32 @@ export async function middleware(req: NextRequest) {
     }
   )
 
-  // Refresh session if expired
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  // IMPORTANT: Use getUser() to refresh the session and revalidate the token.
+  // getSession() does NOT revalidate and can cause session loss in production.
+  const { data: { user } } = await supabase.auth.getUser()
 
-  // Auth callback route - always allow
+  // Auth callback route - always allow; return response so cookies are sent
   if (req.nextUrl.pathname.startsWith('/auth/callback')) {
     return response
   }
 
   // Root: redirect to dashboard if logged in, otherwise to login
   if (req.nextUrl.pathname === '/') {
-    if (session) return NextResponse.redirect(new URL('/dashboard', req.url))
+    if (user) return copySessionCookies(response, NextResponse.redirect(new URL('/dashboard', req.url)))
     return NextResponse.redirect(new URL('/login', req.url))
   }
 
   // Auth routes (login, signup) - redirect to dashboard if logged in
   if (req.nextUrl.pathname === '/login' || req.nextUrl.pathname === '/signup') {
-    if (session) {
-      return NextResponse.redirect(new URL('/dashboard', req.url))
+    if (user) {
+      return copySessionCookies(response, NextResponse.redirect(new URL('/dashboard', req.url)))
     }
     return response
   }
 
-  // Admin routes - require login (e.g. /admin/create-client)
+  // Admin routes - require login
   if (req.nextUrl.pathname.startsWith('/admin')) {
-    if (!session) {
+    if (!user) {
       return NextResponse.redirect(new URL('/login', req.url))
     }
     return response
@@ -62,25 +67,12 @@ export async function middleware(req: NextRequest) {
 
   // Protected routes - redirect to login if not logged in
   const protectedRoutes = [
-    '/dashboard',
-    '/pos',
-    '/menu',
-    '/orders',
-    '/kitchen',
-    '/billing',
-    '/reports',
-    '/stock',
-    '/suppliers',
-    '/purchases',
-    '/reservations',
-    '/settings'
+    '/dashboard', '/pos', '/menu', '/orders', '/kitchen', '/billing',
+    '/reports', '/stock', '/suppliers', '/purchases', '/reservations', '/settings'
   ]
+  const isProtectedRoute = protectedRoutes.some(route => req.nextUrl.pathname.startsWith(route))
 
-  const isProtectedRoute = protectedRoutes.some(route =>
-    req.nextUrl.pathname.startsWith(route)
-  )
-
-  if (isProtectedRoute && !session) {
+  if (isProtectedRoute && !user) {
     return NextResponse.redirect(new URL('/login', req.url))
   }
 

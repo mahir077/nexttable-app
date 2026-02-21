@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase-client'
+import { useSupabase } from '@/contexts/SupabaseContext'
 import { useRouter } from 'next/navigation'
 
 interface Organization {
@@ -26,6 +26,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const supabase = useSupabase()
   const [user, setUser] = useState<any>(null)
   const [organization, setOrganization] = useState<Organization | null>(null)
   const [organizations, setOrganizations] = useState<Organization[]>([])
