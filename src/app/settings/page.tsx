@@ -37,7 +37,16 @@ const defaultInvoiceSettings: InvoiceSettings = {
 
 export default function SettingsPage() {
   const { organization } = useAuth()
-  const orgId = organization?.id ?? null
+  const [orgId, setOrgId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (organization?.id) {
+      setOrgId(organization.id)
+    } else if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('current_organization_id')
+      if (saved) setOrgId(saved)
+    }
+  }, [organization])
 
   const [activeTab, setActiveTab] = useState<'restaurant' | 'tables' | 'printer' | 'invoice'>('restaurant')
   

@@ -358,6 +358,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('current_organization_id')
       localStorage.removeItem('restaurantInfo')
+      // Clear all Supabase auth cookies
+      document.cookie.split(';').forEach(c => {
+        const name = c.trim().split('=')[0]
+        if (name.startsWith('sb-') || name.includes('supabase')) {
+          document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/'
+        }
+      })
     }
     try {
       await Promise.race([
@@ -365,12 +372,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
       ])
     } catch {
-      // ignore - redirect anyway
+      // ignore
     }
     if (typeof window !== 'undefined') {
       window.location.href = '/login'
-    } else {
-      router.push('/login')
     }
   }
 
