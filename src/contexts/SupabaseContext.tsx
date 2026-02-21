@@ -12,7 +12,14 @@ const SupabaseContext = createContext<SupabaseClient | null>(null)
 
 export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => {
-    const client = createBrowserClient(supabaseUrl, supabaseAnonKey)
+    const client = createBrowserClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      }
+    })
     setSupabaseClient(client)
     return client
   }, [])
