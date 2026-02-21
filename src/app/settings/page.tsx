@@ -39,6 +39,17 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const fetchOrg = async () => {
+      // Try localStorage first (fastest)
+      const savedId = typeof window !== 'undefined'
+        ? localStorage.getItem('current_organization_id')
+        : null
+
+      if (savedId) {
+        setOrgId(savedId)
+        return
+      }
+
+      // Fallback: get from Supabase
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
