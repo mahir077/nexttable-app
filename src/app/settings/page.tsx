@@ -294,7 +294,8 @@ export default function SettingsPage() {
       await Promise.race([savePromise, timeoutPromise])
 
       showToast('Settings saved!', 'success')
-      window.location.reload()
+      // Re-fetch form data so UI stays in sync; avoid full page reload so auth/org loading doesn't get stuck
+      await loadSettings()
     } catch (error) {
       console.error('Save error:', error)
       const msg = String((error as Error)?.message || (error as { message?: string })?.message || 'Unknown error')
