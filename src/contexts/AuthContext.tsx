@@ -149,6 +149,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadOrganizations = async (userId: string) => {
     try {
+      // Verify session before querying
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      if (!currentUser) {
+        setLoading(false)
+        return
+      }
+
       const { data, error } = await supabase
         .from('user_organizations')
         .select(`
@@ -161,7 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             display_name
           )
         `)
-        .eq('user_id', userId)
+        .eq('user_id', currentUser.id)
 
       if (error) {
         setLoading(false)
