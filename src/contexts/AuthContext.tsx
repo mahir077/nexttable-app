@@ -147,13 +147,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true }
   }, [user, organization])
 
-  const loadOrganizations = async (userId: string) => {
+  const loadOrganizations = async (userId: string): Promise<string | null> => {
+    const log = (msg: string, extra?: unknown) => {
+      if (typeof window !== 'undefined') {
+        console.log('[loadOrganizations]', msg, extra ?? '')
+      }
+    }
     try {
+      log('start', { userId })
       // Verify session before querying
       const { data: { user: currentUser } } = await supabase.auth.getUser()
+      log('getUser result', { hasUser: !!currentUser, userId: currentUser?.id ?? null })
       if (!currentUser) {
         setLoading(false)
-        return
+        log('early return: no currentUser')
+        return null
       }
 
       const { data, error } = await supabase
@@ -170,6 +178,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         `)
         .eq('user_id', currentUser.id)
 
+      log('user_organizations query', { error: error?.message ?? null, rowCount: data?.length ?? 0 })
+
       if (error) {
         setLoading(false)
         if (typeof window !== 'undefined') {
@@ -182,7 +192,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
         }
-        return
+        log('early return: query error')
+        return null
       }
 
       if (!data || data.length === 0) {
@@ -209,7 +220,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
         }
-        return
+        log('early return: no data or empty')
+        return null
       }
 
       type OrgShape = { name: string; display_name?: string; slug: string }
@@ -232,8 +244,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setOrganizations(orgs)
       const currentOrg = orgs[0]
       setOrganization(currentOrg)
-      localStorage.setItem('current_organization_id', currentOrg.id)
-    } catch {
+      if (typeof window !== 'undefined' && currentOrg?.id) {
+        localStorage.setItem('current_organization_id', currentOrg.id)
+        log('localStorage.setItem', { orgId: currentOrg.id })
+      }
+      return currentOrg?.id ?? null
+    } catch (e) {
+      log('catch', { error: e })
       if (typeof window !== 'undefined') {
         const savedId = localStorage.getItem('current_organization_id')
         if (savedId) {
@@ -246,22 +263,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } catch { /* ignore */ }
         }
       }
+      return null
     } finally {
       setLoading(false)
     }
   }
 
   const signIn = async (email: string, password: string) => {
+    const log = (msg: string, extra?: unknown) => {
+      if (typeof window !== 'undefined') {
+        console.log('[signIn]', msg, extra ?? '')
+      }
+    }
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
     })
 
     if (!error && data.user) {
-      // Wait for session to be ready
+      log('signInWithPassword success', { userId: data.user.id })
+      // Wait for session to be ready (cookies / server)
       await new Promise(resolve => setTimeout(resolve, 1000))
-      await loadOrganizations(data.user.id)
+      log('after 1s delay, calling loadOrganizations')
+      const orgId = await loadOrganizations(data.user.id)
+      log('loadOrganizations returned', { orgId })
+      // Ensure localStorage is set BEFORE redirect (fixes Vercel empty localStorage)
+      if (typeof window !== 'undefined' && orgId) {
+        localStorage.setItem('current_organization_id', orgId)
+        log('signIn: set localStorage before redirect', { orgId })
+      }
       await new Promise(resolve => setTimeout(resolve, 500))
+      const stored = typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null
+      log('before redirect', { stored })
       window.location.href = '/dashboard'
     }
 
@@ -306,7 +339,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: 'owner'
         })
 
-      await loadOrganizations(authData.user.id)
+      const orgId = await loadOrganizations(authData.user.id)
+      if (typeof window !== 'undefined' && orgId) {
+        localStorage.setItem('current_organization_id', orgId)
+      }
       router.push('/dashboard')
 
       return { data: authData, error: null }
