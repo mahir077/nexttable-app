@@ -124,15 +124,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      const withRole = (data ?? [])
-        .filter((uo: { organizations?: unknown }) => uo.organizations)
-        .map((uo: { organization_id: string; role?: string; organizations: { name: string; display_name?: string; slug: string } }) => ({
-          id: uo.organization_id,
-          name: uo.organizations.name,
-          display_name: uo.organizations.display_name || uo.organizations.name,
-          slug: uo.organizations.slug,
-          _role: (uo.role || '').toLowerCase()
-        }))
+      type OrgShape = { name: string; display_name?: string; slug: string }
+      const rows = (data ?? []) as unknown as Array<{ organization_id: string; role?: string; organizations: OrgShape | OrgShape[] | null }>
+      const withRole = rows
+        .filter((uo) => uo.organizations)
+        .map((uo) => {
+          const raw = uo.organizations
+          const org: OrgShape | undefined = Array.isArray(raw) ? raw[0] : raw ?? undefined
+          if (!org) return null
+          return {
+            id: uo.organization_id,
+            name: org.name,
+            display_name: org.display_name || org.name,
+            slug: org.slug,
+            _role: (uo.role || '').toLowerCase()
+          }
+        })
+        .filter((o): o is NonNullable<typeof o> => o != null)
 
       // Owner's org first so demo/restaurant users see their own restaurant, not another org
       const orgs = withRole
