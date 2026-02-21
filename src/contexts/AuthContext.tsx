@@ -352,21 +352,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
+    setUser(null)
+    setOrganization(null)
+    setOrganizations([])
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('current_organization_id')
+      localStorage.removeItem('restaurantInfo')
+    }
     try {
-      await supabase.auth.signOut()
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+      ])
     } catch {
-      // ignore – still redirect
-    } finally {
-      setUser(null)
-      setOrganization(null)
-      setOrganizations([])
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('current_organization_id')
-        localStorage.removeItem('restaurantInfo')
-        window.location.href = '/login'
-      } else {
-        router.push('/login')
-      }
+      // ignore - redirect anyway
+    }
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login'
+    } else {
+      router.push('/login')
     }
   }
 
