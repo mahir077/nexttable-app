@@ -7,6 +7,7 @@ import { getCashDrawerUrl, setCashDrawerUrl as saveCashDrawerUrl } from '@/app/l
 import BackButton from '@/components/BackButton'
 import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
+import { useAuth } from '@/contexts/AuthContext'
 
 type InvoiceSettings = {
   show_logo: boolean
@@ -35,44 +36,8 @@ const defaultInvoiceSettings: InvoiceSettings = {
 }
 
 export default function SettingsPage() {
-  const [orgId, setOrgId] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-
-    const fetchOrg = async () => {
-      const savedId = typeof window !== 'undefined'
-        ? localStorage.getItem('current_organization_id')
-        : null
-
-      if (savedId) {
-        if (!cancelled) setOrgId(savedId)
-        return
-      }
-
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user || cancelled) return
-
-        const { data } = await supabase
-          .from('user_organizations')
-          .select('organization_id')
-          .eq('user_id', user.id)
-          .limit(1)
-          .maybeSingle()
-
-        if (data?.organization_id && !cancelled) {
-          localStorage.setItem('current_organization_id', data.organization_id)
-          setOrgId(data.organization_id)
-        }
-      } catch (e: unknown) {
-        if (e instanceof Error && e.name === 'AbortError') return
-      }
-    }
-
-    fetchOrg()
-    return () => { cancelled = true }
-  }, [])
+  const { organization } = useAuth()
+  const orgId = organization?.id ?? null
 
   const [activeTab, setActiveTab] = useState<'restaurant' | 'tables' | 'printer' | 'invoice'>('restaurant')
   
