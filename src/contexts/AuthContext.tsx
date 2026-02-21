@@ -137,6 +137,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         setLoading(false)
+        if (typeof window !== 'undefined') {
+          const savedId = localStorage.getItem('current_organization_id')
+          if (savedId) {
+            const { data: orgRow } = await supabase.from('organizations').select('id, name, slug, display_name').eq('id', savedId).single()
+            if (orgRow) {
+              setOrganization({ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name, slug: orgRow.slug })
+              setOrganizations([{ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name, slug: orgRow.slug }])
+            }
+          }
+        }
         return
       }
 
@@ -144,6 +154,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setOrganizations([])
         setOrganization(null)
         setLoading(false)
+        // Vercel fallback: restore org from localStorage if we had it before (e.g. after refresh when query failed)
+        if (typeof window !== 'undefined') {
+          const savedId = localStorage.getItem('current_organization_id')
+          if (savedId) {
+            const { data: orgRow } = await supabase
+              .from('organizations')
+              .select('id, name, slug, display_name')
+              .eq('id', savedId)
+              .single()
+            if (orgRow) {
+              setOrganization({
+                id: orgRow.id,
+                name: orgRow.name,
+                display_name: orgRow.display_name || orgRow.name,
+                slug: orgRow.slug
+              })
+              setOrganizations([{ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name, slug: orgRow.slug }])
+            }
+          }
+        }
         return
       }
 
@@ -171,7 +201,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('current_organization_id', currentOrg.id)
       }
     } catch {
-      // ignore (e.g. AbortError)
+      if (typeof window !== 'undefined') {
+        const savedId = localStorage.getItem('current_organization_id')
+        if (savedId) {
+          try {
+            const { data: orgRow } = await supabase.from('organizations').select('id, name, slug, display_name').eq('id', savedId).single()
+            if (orgRow) {
+              setOrganization({ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name, slug: orgRow.slug })
+              setOrganizations([{ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name, slug: orgRow.slug }])
+            }
+          } catch { /* ignore */ }
+        }
+      }
     } finally {
       setLoading(false)
     }
@@ -188,8 +229,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem('current_organization_id')
       }
       await loadOrganizations(data.user.id)
-      await new Promise(resolve => setTimeout(resolve, 500))
-      window.location.href = '/dashboard'
+      // Use router.push so we keep React state + session (fixes Vercel where full reload loses session before cookies are ready)
+      router.push('/dashboard')
     }
 
     return { data, error }

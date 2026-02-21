@@ -105,6 +105,14 @@ export default function SettingsPage() {
   const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings>(defaultInvoiceSettings)
 
   const { toast, showToast, hideToast } = useToast()
+  const [showStuckHint, setShowStuckHint] = useState(false)
+
+  // If org still not loaded after 4s (e.g. Vercel session issue), show refresh hint
+  useEffect(() => {
+    if (effectiveOrgId || !mounted) return
+    const t = setTimeout(() => setShowStuckHint(true), 4000)
+    return () => clearTimeout(t)
+  }, [effectiveOrgId, mounted])
 
   // Fetch data when org is available (use effectiveOrgId so we load even with stable ref)
   useEffect(() => {
@@ -618,9 +626,17 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {mounted && authLoading && !effectiveOrgId && (
+      {mounted && !effectiveOrgId && (authLoading || showStuckHint) && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-800 text-sm mb-6">
-          Loading your organization…
+          {authLoading ? 'Loading your organization…' : (
+            <span>
+              Could not load organization. Try{' '}
+              <button type="button" onClick={() => window.location.reload()} className="underline font-bold hover:no-underline">
+                refreshing the page
+              </button>
+              {' '}or log in again.
+            </span>
+          )}
         </div>
       )}
 
