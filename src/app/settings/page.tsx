@@ -120,9 +120,9 @@ export default function SettingsPage() {
   }, [orgId])
 
   // ===== FIX 2: loadSettings with timeout to prevent hanging on Vercel =====
-  const loadSettings = async () => {
+  const loadSettings = async (skipLoadingState?: boolean) => {
     if (!orgId) return
-    setRestaurantInfoLoading(true)
+    if (!skipLoadingState) setRestaurantInfoLoading(true)
     const timeout = (ms: number) => new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
     try {
       let orgData: { id: string; name: string; display_name?: string | null; slug?: string } | null = null
@@ -168,7 +168,7 @@ export default function SettingsPage() {
         console.error('Load settings error:', e)
       }
     } finally {
-      setRestaurantInfoLoading(false)
+      if (!skipLoadingState) setRestaurantInfoLoading(false)
     }
   }
 
@@ -290,7 +290,7 @@ export default function SettingsPage() {
       await Promise.race([savePromise, timeoutPromise])
 
       showToast('Settings saved!', 'success')
-      await loadSettings()
+      await loadSettings(true)
     } catch (error) {
       // ===== FIX: Ignore AbortError silently =====
       if (error instanceof Error && error.name === 'AbortError') {

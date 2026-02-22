@@ -82,31 +82,28 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchRestaurantInfo = async () => {
       if (!orgId) return
+      const timeout = (ms: number) => new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
       try {
-        const { data, error } = await supabase
-          .from('restaurant_settings')
-          .select('display_name')
-          .eq('organization_id', orgId)
-          .limit(1)
-          .maybeSingle()
+        const result = await Promise.race([
+          supabase.from('restaurant_settings').select('display_name').eq('organization_id', orgId).limit(1).maybeSingle(),
+          timeout(8000)
+        ]) as { data: { display_name?: string } | null; error: unknown }
 
-        if (!error && data?.display_name) {
-          setRestaurantName(String(data.display_name))
+        if (!result.error && result.data?.display_name) {
+          setRestaurantName(String(result.data.display_name))
           return
         }
       } catch (e) {
-        console.error('Error fetching restaurant info:', e)
+        if (e instanceof Error && e.message !== 'timeout') console.error('Error fetching restaurant info:', e)
       }
-      if (!restaurantName) {
-        try {
-          const saved = localStorage.getItem('restaurantInfo')
-          if (saved) {
-            const info = JSON.parse(saved) as { name?: string }
-            if (info.name && typeof info.name === 'string') setRestaurantName(info.name)
-          }
-        } catch {
-          // keep current
+      try {
+        const saved = localStorage.getItem('restaurantInfo')
+        if (saved) {
+          const info = JSON.parse(saved) as { name?: string }
+          if (info.name && typeof info.name === 'string') setRestaurantName(info.name)
         }
+      } catch {
+        // keep current
       }
     }
     fetchRestaurantInfo()

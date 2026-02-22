@@ -15,6 +15,17 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const pathname = usePathname()
   const { user, organization, organizations, switchOrganization, signOut } = useAuth()
   const [showOrgSwitcher, setShowOrgSwitcher] = useState(false)
+  const [savedRestaurantName, setSavedRestaurantName] = useState('')
+
+  useEffect(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem('restaurantInfo') : null
+      if (raw) {
+        const info = JSON.parse(raw) as { name?: string }
+        if (info.name && typeof info.name === 'string') setSavedRestaurantName(info.name)
+      }
+    } catch { /* ignore */ }
+  }, [organization?.id])
 
   useEffect(() => {
     const saved = localStorage.getItem('sidebarCollapsed')
@@ -170,8 +181,8 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
         <div className={`border-b border-slate-800 flex items-center justify-between ${isCollapsed ? 'p-3 justify-center' : 'p-6'}`}>
           {!isCollapsed && (
             <div className="min-w-0">
-              <h1 className="text-xl font-brand font-black truncate text-white" title={organization?.display_name || organization?.name || 'Restaurant'}>
-                {organization?.display_name || organization?.name || 'Restaurant'}
+              <h1 className="text-xl font-brand font-black truncate text-white" title={organization?.display_name || organization?.name || savedRestaurantName || 'Restaurant'}>
+                {organization?.display_name || organization?.name || savedRestaurantName || 'Restaurant'}
               </h1>
               <p className="text-xs text-slate-400 mt-1 font-semibold tracking-wide">
                 NextTable POS
@@ -179,8 +190,8 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
             </div>
           )}
           {isCollapsed && (
-            <div className="text-lg font-black text-emerald-500 truncate max-w-[3rem]" title={organization?.display_name || organization?.name || 'Restaurant'}>
-              {(organization?.display_name || organization?.name || 'R').slice(0, 2)}
+            <div className="text-lg font-black text-emerald-500 truncate max-w-[3rem]" title={organization?.display_name || organization?.name || savedRestaurantName || 'Restaurant'}>
+              {(organization?.display_name || organization?.name || savedRestaurantName || 'R').slice(0, 2)}
             </div>
           )}
           <div className="flex items-center gap-1">
@@ -246,7 +257,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                     className="w-full px-3 py-2 text-left text-xs font-semibold text-emerald-400 bg-slate-800/50 rounded-lg truncate hover:bg-slate-800"
                     title="Switch restaurant"
                   >
-                    🏢 {organization?.display_name || organization?.name || 'Restaurant'}
+                    🏢 {organization?.display_name || organization?.name || savedRestaurantName || 'Restaurant'}
                   </button>
                   {showOrgSwitcher && (
                     <div className="absolute bottom-full left-0 right-0 mb-1 py-1 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 max-h-40 overflow-y-auto">
@@ -270,8 +281,8 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                 </div>
               )}
               {!isCollapsed && organizations.length <= 1 && organization && (
-                <div className="px-3 py-2 mb-2 text-xs text-slate-400 truncate" title={organization?.display_name || organization?.name || 'Restaurant'}>
-                  🏢 {organization?.display_name || organization?.name || 'Restaurant'}
+                <div className="px-3 py-2 mb-2 text-xs text-slate-400 truncate" title={organization?.display_name || organization?.name || savedRestaurantName || 'Restaurant'}>
+                  🏢 {organization?.display_name || organization?.name || savedRestaurantName || 'Restaurant'}
                 </div>
               )}
               {!isCollapsed && (
