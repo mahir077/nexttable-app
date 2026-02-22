@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
@@ -70,17 +70,27 @@ export default function DashboardPage() {
   // Available tables count (for Dine-in quick action)
   const [availableTablesCount, setAvailableTablesCount] = useState<number>(0)
 
-  // Use org from context or localStorage so floors/tables run as soon as we have an id (don't block on auth loading)
-  const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
+  // Org from context first, then localStorage (so floors/tables run as soon as we have an id)
+  const orgIdFromStorage = typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null
+  const orgId = organization?.id ?? orgIdFromStorage
+
+  // Debug: log once per render (throttled in dev)
+  const renderCount = useRef(0)
+  renderCount.current += 1
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    console.log('[Dashboard] render', renderCount.current, { orgId: orgId ?? 'null', organizationId: organization?.id ?? 'null', fromStorage: orgIdFromStorage ?? 'null', selectedFloor: selectedFloor?.id ?? 'null' })
+  }
 
   // Set name from current org immediately (correct tenant), then refine from DB
   useEffect(() => {
+    console.log('[Dashboard] useEffect: restaurant name', { organizationId: organization?.id ?? 'null' })
     if (organization?.display_name || organization?.name) {
       setRestaurantName(organization.display_name || organization.name)
     }
   }, [organization?.id, organization?.display_name, organization?.name])
 
   useEffect(() => {
+    console.log('[Dashboard] useEffect: fetchRestaurantInfo', { orgId: orgId ?? 'null' })
     const fetchRestaurantInfo = async () => {
       if (!orgId) return
       const timeout = (ms: number) => new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
@@ -112,6 +122,7 @@ export default function DashboardPage() {
 
   // Set current date
   useEffect(() => {
+    console.log('[Dashboard] useEffect: set current date')
     const today = new Date()
     const options: Intl.DateTimeFormatOptions = {
       weekday: 'short',
@@ -124,14 +135,18 @@ export default function DashboardPage() {
 
   // Fetch floors for current org (with timeout so spinner doesn't hang)
   useEffect(() => {
-    if (!orgId) {
+    const effectiveOrgId = orgId ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
+    console.log('[Dashboard] useEffect: FLOORS', { orgId: orgId ?? 'null', effectiveOrgId: effectiveOrgId ?? 'null', willFetch: !!effectiveOrgId })
+    if (!effectiveOrgId) {
       setLoading(false)
       return
     }
     const timeout = (ms: number) => new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
     async function loadFloors() {
+      console.log('[Dashboard] loadFloors() calling getFloors', effectiveOrgId)
       try {
-        const floorsData = await Promise.race([getFloors(orgId), timeout(10000)])
+        const floorsData = await Promise.race([getFloors(effectiveOrgId), timeout(10000)])
+        console.log('[Dashboard] getFloors result', { count: floorsData?.length ?? 0, floors: floorsData })
         setFloors(floorsData)
         if (floorsData.length > 0) {
           setSelectedFloor(floorsData[0])
@@ -141,6 +156,7 @@ export default function DashboardPage() {
           setLoading(false)
         }
       } catch (error) {
+        console.error('[Dashboard] loadFloors error', error)
         if (error instanceof Error && error.message !== 'timeout') console.error('Error loading floors:', error)
         setFloors([])
         setSelectedFloor(null)
@@ -153,19 +169,24 @@ export default function DashboardPage() {
 
   // Fetch tables when floor changes (with timeout so spinner doesn't hang)
   useEffect(() => {
-    if (!orgId || !selectedFloor) {
-      if (!orgId) setLoading(false)
+    const effectiveOrgId = orgId ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
+    console.log('[Dashboard] useEffect: TABLES', { orgId: orgId ?? 'null', effectiveOrgId: effectiveOrgId ?? 'null', selectedFloorId: selectedFloor?.id ?? 'null', willFetch: !!(effectiveOrgId && selectedFloor) })
+    if (!effectiveOrgId || !selectedFloor) {
+      if (!effectiveOrgId) setLoading(false)
       return
     }
     const floor = selectedFloor
-    const oid = orgId
+    const oid = effectiveOrgId
     const timeout = (ms: number) => new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
     async function loadTables() {
+      console.log('[Dashboard] loadTables() calling getTablesByFloor', { floorId: floor.id, orgId: oid })
       setLoading(true)
       try {
         const tablesData = await Promise.race([getTablesByFloor(floor.id, oid), timeout(10000)])
+        console.log('[Dashboard] getTablesByFloor result', { count: tablesData?.length ?? 0 })
         setTables(tablesData)
       } catch (error) {
+        console.error('[Dashboard] loadTables error', error)
         if (error instanceof Error && error.message !== 'timeout') console.error('Error loading tables:', error)
         setTables([])
       } finally {
@@ -177,6 +198,7 @@ export default function DashboardPage() {
 
   // Fetch available tables count (for Dine-in link)
   useEffect(() => {
+    console.log('[Dashboard] useEffect: available count', { orgId: orgId ?? 'null' })
     if (!orgId) return
     const oid = orgId
     async function loadAvailableCount() {
@@ -193,6 +215,7 @@ export default function DashboardPage() {
 
   // Fetch order/food status per table (KOT vs At table) + pending bill per table
   useEffect(() => {
+    console.log('[Dashboard] useEffect: food status & bills', { tablesLength: tables.length, orgId: orgId ?? 'null' })
     if (tables.length === 0) {
       setTableFoodStatus({})
       setTablePendingBills({})
