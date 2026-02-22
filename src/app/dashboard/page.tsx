@@ -70,6 +70,7 @@ export default function DashboardPage() {
   // Available tables count (for Dine-in quick action)
   const [availableTablesCount, setAvailableTablesCount] = useState<number>(0)
 
+  // Use org from context or localStorage so floors/tables run as soon as we have an id (don't block on auth loading)
   const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
 
   // Set name from current org immediately (correct tenant), then refine from DB
