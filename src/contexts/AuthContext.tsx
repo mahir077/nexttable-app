@@ -46,18 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setUser(session.user)
       try {
-        const { data: adminData } = await supabase
-          .from('super_admins')
-          .select('id')
-          .eq('user_id', session.user.id)
-          .maybeSingle()
-        if (!mounted) return
-        if (adminData) {
-          setOrganization(null)
-          setOrganizations([])
-          setLoading(false)
-          return
-        }
+        // Load organizations for ALL users (including super admins) so app + Settings work.
+        // Admin pages use /api/check-admin for super-admin role; we don't block org here.
         await loadOrganizations(session.user.id)
       } catch (e) {
         if (mounted) setLoading(false)
@@ -153,6 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('[loadOrganizations]', msg, extra ?? '')
       }
     }
+    const timeout = (ms: number) => new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
     try {
       log('start', { userId })
       // Verify session before querying
@@ -164,21 +155,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return null
       }
 
-      const { data, error } = await supabase
-        .from('user_organizations')
-        .select(`
-          organization_id,
-          role,
-          organizations (
-            id,
-            name,
-            slug,
-            display_name
-          )
-        `)
-        .eq('user_id', currentUser.id)
+      const result = await Promise.race([
+        supabase
+          .from('user_organizations')
+          .select(`
+            organization_id,
+            role,
+            organizations (
+              id,
+              name,
+              slug,
+              display_name
+            )
+          `)
+          .eq('user_id', currentUser.id),
+        timeout(12000)
+      ]) as { data: unknown; error: { message?: string } | null }
 
-      log('user_organizations query', { error: error?.message ?? null, rowCount: data?.length ?? 0 })
+      const { data, error } = result
+      log('user_organizations query', { error: error?.message ?? null, rowCount: Array.isArray(data) ? data.length : 0 })
 
       if (error) {
         setLoading(false)
@@ -196,7 +191,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return null
       }
 
-      if (!data || data.length === 0) {
+      if (!data || !Array.isArray(data) || data.length === 0) {
         setOrganizations([])
         setOrganization(null)
         setLoading(false)
