@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { supabase } from '@/lib/supabase-client'
+import { useSupabase } from '@/contexts/SupabaseContext'
 import { getTablesByFloor, Floor, Table } from '@/app/lib/api/tables'
 import { getCashDrawerUrl, setCashDrawerUrl as saveCashDrawerUrl } from '@/app/lib/cashDrawer'
 import BackButton from '@/components/BackButton'
@@ -38,6 +38,7 @@ const defaultInvoiceSettings: InvoiceSettings = {
 export default function SettingsPage() {
   // ===== FIX 1: Get org from AuthContext + localStorage fallback =====
   const { organization } = useAuth()
+  const supabase = useSupabase()
   const [orgId, setOrgId] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('current_organization_id')
@@ -118,20 +119,18 @@ export default function SettingsPage() {
     loadInvoiceSettings()
   }, [orgId])
 
-  // ===== FIX 2: loadSettings with proper error handling =====
+  // ===== FIX 2: loadSettings with timeout to prevent hanging on Vercel =====
   const loadSettings = async () => {
     if (!orgId) return
-
     setRestaurantInfoLoading(true)
+    const timeout = (ms: number) => new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
     try {
       let orgData: { id: string; name: string; display_name?: string | null; slug?: string } | null = null
 
-      // Load organization details first
-      const { data: orgResp, error: orgError } = await supabase
-        .from('organizations')
-        .select('id, name, display_name, slug')
-        .eq('id', orgId)
-        .single()
+      const { data: orgResp, error: orgError } = await Promise.race([
+        supabase.from('organizations').select('id, name, display_name, slug').eq('id', orgId).single(),
+        timeout(8000)
+      ]) as any
 
       if (orgResp && !orgError) {
         orgData = orgResp
@@ -141,48 +140,34 @@ export default function SettingsPage() {
         }))
       }
 
-      // Load restaurant_settings for this org
-      const { data: settingsData, error: settingsError } = await supabase
-        .from('restaurant_settings')
-        .select('*')
-        .eq('organization_id', orgId)
-        .maybeSingle()
+      const { data: settingsData, error: settingsError } = await Promise.race([
+        supabase.from('restaurant_settings').select('*').eq('organization_id', orgId).maybeSingle(),
+        timeout(8000)
+      ]) as any
 
       if (settingsData && !settingsError) {
         setRestaurantSettingsId(settingsData.id)
-        setRestaurantInfo(prev => ({
-          name: (orgData?.display_name || orgData?.name) || (settingsData.display_name as string) || prev.name,
-          address: (settingsData.address as string) ?? prev.address,
-          phone: (settingsData.phone as string) ?? prev.phone,
-          email: (settingsData.email as string) ?? prev.email
-        }))
+        setRestaurantInfo({
+          name: (orgData?.display_name || orgData?.name) || (settingsData.display_name as string) || '',
+          address: (settingsData.address as string) ?? '',
+          phone: (settingsData.phone as string) ?? '',
+          email: (settingsData.email as string) ?? ''
+        })
       } else {
-        let address = '', phone = '', email = ''
-        try {
-          const saved = localStorage.getItem('restaurantInfo')
-          if (saved) {
-            const info = JSON.parse(saved) as { name?: string; address?: string; phone?: string; email?: string }
-            address = info.address ?? ''
-            phone = info.phone ?? ''
-            email = info.email ?? ''
-          }
-        } catch { /* ignore */ }
         setRestaurantInfo(prev => ({
           name: (orgData?.display_name || orgData?.name) ?? prev.name,
-          address,
-          phone,
-          email
+          address: prev.address,
+          phone: prev.phone,
+          email: prev.email
         }))
       }
     } catch (e) {
-      // ===== FIX: AbortError should NOT show error, but still reset loading =====
-      if (e instanceof Error && e.name === 'AbortError') {
-        // silently ignore
+      if (e instanceof Error && (e.name === 'AbortError' || e.message === 'timeout')) {
+        console.log('loadSettings timeout/abort - using cached data')
       } else {
         console.error('Load settings error:', e)
       }
     } finally {
-      // ===== FIX: ALWAYS reset loading state =====
       setRestaurantInfoLoading(false)
     }
   }
