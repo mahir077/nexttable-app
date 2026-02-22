@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase-client'
 import { getTablesByFloor, Floor, Table } from '@/app/lib/api/tables'
 import { getCashDrawerUrl, setCashDrawerUrl as saveCashDrawerUrl } from '@/app/lib/cashDrawer'
 import BackButton from '@/components/BackButton'
 import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
-import { useAuth } from '@/contexts/AuthContext'
 
 type InvoiceSettings = {
   show_logo: boolean
@@ -36,6 +36,7 @@ const defaultInvoiceSettings: InvoiceSettings = {
 }
 
 export default function SettingsPage() {
+  // ===== FIX 1: Get org from AuthContext + localStorage fallback =====
   const { organization } = useAuth()
   const [orgId, setOrgId] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
@@ -44,6 +45,7 @@ export default function SettingsPage() {
     return null
   })
 
+  // Sync with AuthContext when it loads (takes priority)
   useEffect(() => {
     if (organization?.id && organization.id !== orgId) {
       setOrgId(organization.id)
@@ -52,7 +54,7 @@ export default function SettingsPage() {
 
   const [activeTab, setActiveTab] = useState<'restaurant' | 'tables' | 'printer' | 'invoice'>('restaurant')
   
-  // Restaurant info state (synced with restaurant_settings in DB) – start empty so we don't show another org's data
+  // Restaurant info state
   const [restaurantInfo, setRestaurantInfo] = useState({
     name: '',
     address: '',
@@ -61,6 +63,9 @@ export default function SettingsPage() {
   })
   const [restaurantSettingsId, setRestaurantSettingsId] = useState<string | null>(null)
   const [restaurantInfoLoading, setRestaurantInfoLoading] = useState(false)
+
+  // Track if loadSettings has run to prevent re-runs
+  const loadSettingsRanRef = useRef(false)
 
   // Tables state
   const [floors, setFloors] = useState<Floor[]>([])
@@ -86,14 +91,15 @@ export default function SettingsPage() {
     seats: '4'
   })
 
-  // Printer & Cash Drawer (URL for open drawer)
+  // Printer & Cash Drawer
   const [cashDrawerUrl, setCashDrawerUrl] = useState('')
 
   // Invoice customization
   const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings>(defaultInvoiceSettings)
 
   const { toast, showToast, hideToast } = useToast()
-  // Fetch data when org is available (orgId from localStorage)
+
+  // Fetch data when org is available
   useEffect(() => {
     if (orgId) fetchFloors()
   }, [orgId])
@@ -112,7 +118,7 @@ export default function SettingsPage() {
     loadInvoiceSettings()
   }, [orgId])
 
-  // Load current organization + restaurant_settings into form (run when org is available)
+  // ===== FIX 2: loadSettings with proper error handling =====
   const loadSettings = async () => {
     if (!orgId) return
 
@@ -145,14 +151,12 @@ export default function SettingsPage() {
       if (settingsData && !settingsError) {
         setRestaurantSettingsId(settingsData.id)
         setRestaurantInfo(prev => ({
-          // Organization is source of truth for business name (dashboard/sidebar match)
           name: (orgData?.display_name || orgData?.name) || (settingsData.display_name as string) || prev.name,
           address: (settingsData.address as string) ?? prev.address,
           phone: (settingsData.phone as string) ?? prev.phone,
           email: (settingsData.email as string) ?? prev.email
         }))
       } else {
-        // No settings row yet – show org name so Settings is never fully empty
         let address = '', phone = '', email = ''
         try {
           const saved = localStorage.getItem('restaurantInfo')
@@ -171,14 +175,24 @@ export default function SettingsPage() {
         }))
       }
     } catch (e) {
-      console.error('Load settings error:', e)
+      // ===== FIX: AbortError should NOT show error, but still reset loading =====
+      if (e instanceof Error && e.name === 'AbortError') {
+        // silently ignore
+      } else {
+        console.error('Load settings error:', e)
+      }
     } finally {
+      // ===== FIX: ALWAYS reset loading state =====
       setRestaurantInfoLoading(false)
     }
   }
 
+  // Run loadSettings once when orgId is available
   useEffect(() => {
-    loadSettings()
+    if (orgId) {
+      loadSettingsRanRef.current = false
+      loadSettings()
+    }
   }, [orgId])
 
   const fetchFloors = async () => {
@@ -200,6 +214,7 @@ export default function SettingsPage() {
         setSelectedFloor(data[0])
       }
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return
       console.error('Error fetching floors:', error)
       showToast('Failed to load floors', 'error')
     } finally {
@@ -213,11 +228,12 @@ export default function SettingsPage() {
       const data = await getTablesByFloor(selectedFloor.id, orgId)
       setTables(data)
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return
       console.error('Error fetching tables:', error)
     }
   }
 
-  // Save restaurant info – update organization display_name + restaurant_settings, then refresh
+  // ===== FIX 3: Save with proper AbortError handling =====
   const handleSaveRestaurantInfo = async () => {
     if (!restaurantInfo.name?.trim()) {
       showToast('Please enter restaurant name', 'error')
@@ -237,7 +253,7 @@ export default function SettingsPage() {
       const updatedAt = new Date().toISOString()
 
       const savePromise = (async () => {
-        // 1) Save restaurant_settings first (name, address, phone, email) – this is what Settings shows
+        // 1) Save restaurant_settings
         const { data: existing } = await supabase
           .from('restaurant_settings')
           .select('id')
@@ -272,7 +288,7 @@ export default function SettingsPage() {
           if (error) throw error
         }
 
-        // 2) Try to update organization display_name — skip silently if RLS blocks it
+        // 2) Try to update organization display_name
         try {
           const { error: orgError } = await supabase
             .from('organizations')
@@ -280,7 +296,7 @@ export default function SettingsPage() {
             .eq('id', orgId)
           if (orgError) throw orgError
         } catch {
-          // Org update is optional — restaurant_settings is source of truth
+          // Org update is optional
         }
 
         localStorage.setItem('restaurantInfo', JSON.stringify(restaurantInfo))
@@ -289,20 +305,25 @@ export default function SettingsPage() {
       await Promise.race([savePromise, timeoutPromise])
 
       showToast('Settings saved!', 'success')
-      // Re-fetch form data so UI stays in sync; avoid full page reload so auth/org loading doesn't get stuck
       await loadSettings()
     } catch (error) {
-      console.error('Save error:', error)
-      const msg = String((error as Error)?.message || (error as { message?: string })?.message || 'Unknown error')
-      const isPermissionError = /app\.current_tenant_id|current_tenant_id|row-level security|policy|permission denied|violates row-level security/i.test(msg)
-      if (msg.includes('timed out')) {
-        showToast(msg, 'error')
-      } else if (isPermissionError) {
-        showToast(`Failed: ${msg.slice(0, 80)}${msg.length > 80 ? '…' : ''}. Already ran RUN_ONCE_settings_fix.sql? Try Save again.`, 'error')
+      // ===== FIX: Ignore AbortError silently =====
+      if (error instanceof Error && error.name === 'AbortError') {
+        // Do nothing - don't show error toast
       } else {
-        showToast('Failed: ' + msg, 'error')
+        console.error('Save error:', error)
+        const msg = String((error as Error)?.message || (error as { message?: string })?.message || 'Unknown error')
+        const isPermissionError = /app\.current_tenant_id|current_tenant_id|row-level security|policy|permission denied|violates row-level security/i.test(msg)
+        if (msg.includes('timed out')) {
+          showToast(msg, 'error')
+        } else if (isPermissionError) {
+          showToast(`Failed: ${msg.slice(0, 80)}${msg.length > 80 ? '…' : ''}. Already ran RUN_ONCE_settings_fix.sql? Try Save again.`, 'error')
+        } else {
+          showToast('Failed: ' + msg, 'error')
+        }
       }
     } finally {
+      // ===== FIX: ALWAYS reset loading =====
       setRestaurantInfoLoading(false)
     }
   }
@@ -375,7 +396,7 @@ export default function SettingsPage() {
     }
   }
 
-  // Delete Floor — optimistic UI
+  // Delete Floor
   const handleDeleteFloor = async (floor: Floor) => {
     if (!confirm(`Delete floor "${floor.name}"? This will delete all tables on this floor.`)) return
     if (!orgId) return
@@ -444,7 +465,7 @@ export default function SettingsPage() {
       return
     }
 
-    // Add new table — optimistic UI
+    // Add new table
     if (!orgId) {
       showToast('No organization selected. Please wait or refresh.', 'error')
       return
@@ -499,7 +520,7 @@ export default function SettingsPage() {
     }
   }
 
-  // Delete Table — optimistic UI
+  // Delete Table
   const handleDeleteTable = async (table: Table) => {
     if (!confirm(`Delete Table ${table.table_number}?`)) return
 
@@ -551,6 +572,7 @@ export default function SettingsPage() {
       }
       showToast('✅ Invoice settings saved!', 'success')
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return
       console.error('Save error:', error)
       showToast('Failed to save settings', 'error')
     }

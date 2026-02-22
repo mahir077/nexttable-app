@@ -351,29 +351,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // ===== FIXED SIGNOUT - clears state, cookies, then redirects =====
   const signOut = async () => {
+    // 1. Clear React state immediately
     setUser(null)
     setOrganization(null)
     setOrganizations([])
+
+    // 2. Clear localStorage
     if (typeof window !== 'undefined') {
       localStorage.removeItem('current_organization_id')
       localStorage.removeItem('restaurantInfo')
-      // Clear all Supabase auth cookies
+
+      // 3. Clear all Supabase auth cookies manually
       document.cookie.split(';').forEach(c => {
         const name = c.trim().split('=')[0]
-        if (name.startsWith('sb-') || name.includes('supabase')) {
+        if (name.startsWith('sb-') || name.includes('supabase') || name.includes('auth')) {
           document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/'
+          document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=' + window.location.hostname
         }
       })
     }
+
+    // 4. Try Supabase signOut with timeout (don't let it block)
     try {
       await Promise.race([
         supabase.auth.signOut(),
         new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
       ])
     } catch {
-      // ignore
+      // ignore - redirect anyway
     }
+
+    // 5. Always redirect
     if (typeof window !== 'undefined') {
       window.location.href = '/login'
     }
