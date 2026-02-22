@@ -122,7 +122,22 @@ export default function SettingsPage() {
   // ===== FIX 2: loadSettings with timeout to prevent hanging on Vercel =====
   const loadSettings = async (skipLoadingState?: boolean) => {
     if (!orgId) return
-    if (!skipLoadingState) setRestaurantInfoLoading(true)
+    if (!skipLoadingState) {
+      setRestaurantInfoLoading(true)
+      const safetyTimer = setTimeout(() => setRestaurantInfoLoading(false), 10000)
+      try {
+        await loadSettingsInner(false)
+      } finally {
+        clearTimeout(safetyTimer)
+        setRestaurantInfoLoading(false)
+      }
+      return
+    }
+    await loadSettingsInner(true)
+  }
+
+  const loadSettingsInner = async (skipLoadingState: boolean) => {
+    if (!orgId) return
     const timeout = (ms: number) => new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
     try {
       let orgData: { id: string; name: string; display_name?: string | null; slug?: string } | null = null
@@ -172,7 +187,7 @@ export default function SettingsPage() {
     }
   }
 
-  // Run loadSettings once when orgId is available
+  // Run loadSettings once when orgId is available (no skipLoadingState = show loading)
   useEffect(() => {
     if (orgId) {
       loadSettingsRanRef.current = false
@@ -229,6 +244,9 @@ export default function SettingsPage() {
       return
     }
     setRestaurantInfoLoading(true)
+    const safetyTimer = setTimeout(() => {
+      setRestaurantInfoLoading(false)
+    }, 25000)
     const timeoutMs = 20000
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('Save timed out. Please try again.')), timeoutMs)
@@ -308,7 +326,7 @@ export default function SettingsPage() {
         }
       }
     } finally {
-      // ===== FIX: ALWAYS reset loading =====
+      clearTimeout(safetyTimer)
       setRestaurantInfoLoading(false)
     }
   }

@@ -121,15 +121,16 @@ export default function DashboardPage() {
     setCurrentDate(today.toLocaleDateString('en-US', options).toUpperCase())
   }, [])
 
-  // Fetch floors for current org
+  // Fetch floors for current org (with timeout so spinner doesn't hang on Vercel)
   useEffect(() => {
     if (!orgId) {
       setLoading(false)
       return
     }
+    const timeout = (ms: number) => new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
     async function loadFloors() {
       try {
-        const floorsData = await getFloors(orgId)
+        const floorsData = await Promise.race([getFloors(orgId), timeout(10000)])
         setFloors(floorsData)
         if (floorsData.length > 0) {
           setSelectedFloor(floorsData[0])
@@ -139,14 +140,17 @@ export default function DashboardPage() {
           setLoading(false)
         }
       } catch (error) {
-        console.error('Error loading floors:', error)
+        if (error instanceof Error && error.message !== 'timeout') console.error('Error loading floors:', error)
+        setFloors([])
+        setSelectedFloor(null)
+        setTables([])
         setLoading(false)
       }
     }
     loadFloors()
   }, [orgId])
 
-  // Fetch tables when floor changes
+  // Fetch tables when floor changes (with timeout so spinner doesn't hang on Vercel)
   useEffect(() => {
     if (!orgId || !selectedFloor) {
       if (!orgId) setLoading(false)
@@ -154,13 +158,15 @@ export default function DashboardPage() {
     }
     const floor = selectedFloor
     const oid = orgId
+    const timeout = (ms: number) => new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
     async function loadTables() {
       setLoading(true)
       try {
-        const tablesData = await getTablesByFloor(floor.id, oid)
+        const tablesData = await Promise.race([getTablesByFloor(floor.id, oid), timeout(10000)])
         setTables(tablesData)
       } catch (error) {
-        console.error('Error loading tables:', error)
+        if (error instanceof Error && error.message !== 'timeout') console.error('Error loading tables:', error)
+        setTables([])
       } finally {
         setLoading(false)
       }
