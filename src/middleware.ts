@@ -62,9 +62,13 @@ export async function middleware(req: NextRequest) {
     return supabaseResponse
   }
 
+  // Super admin panel temporarily disabled – redirect all /admin to dashboard
   if (req.nextUrl.pathname.startsWith('/admin')) {
-    if (!user) return NextResponse.redirect(new URL('/login', req.url))
-    return supabaseResponse
+    const redirectResponse = NextResponse.redirect(new URL('/dashboard', req.url))
+    supabaseResponse.cookies.getAll().forEach(cookie => {
+      redirectResponse.cookies.set(cookie.name, cookie.value)
+    })
+    return redirectResponse
   }
 
   if (isProtectedRoute && !user) {
