@@ -11,6 +11,7 @@ interface Order {
   created_at: string
   payment_method: string | null
   order_type: string | null
+  status?: string
 }
 
 interface OrderItem {
@@ -120,6 +121,7 @@ export default function ReportsPage() {
           created_at,
           payment_method,
           order_type,
+          status,
           order_items (
             quantity,
             unit_price,
@@ -155,7 +157,7 @@ export default function ReportsPage() {
         // Fallback without menu_items join
         let fallback = supabase
           .from('orders')
-          .select('id, total, created_at, payment_method, order_type, order_items (quantity, unit_price, item_name)')
+          .select('id, total, created_at, payment_method, order_type, status, order_items (quantity, unit_price, item_name, menu_item_id, menu_item:menu_items (name, making_cost))')
           .eq('organization_id', orgId)
           .order('created_at', { ascending: false })
         if (dateFilter === 'today') {
@@ -189,16 +191,17 @@ export default function ReportsPage() {
     }
   }
 
-  const totalRevenue = orders.reduce((sum, o) => sum + (o.total || 0), 0)
-  const totalOrders = orders.length
+  const paidOrders = orders.filter(o => o.status === 'paid')
+  const totalRevenue = paidOrders.reduce((sum, o) => sum + (o.total || 0), 0)
+  const totalOrders = paidOrders.length
   const avgOrder = totalOrders > 0 ? totalRevenue / totalOrders : 0
 
-  const cashSales = orders.filter(o => o.payment_method === 'cash').reduce((sum, o) => sum + (o.total || 0), 0)
-  const cardSales = orders.filter(o => o.payment_method === 'card').reduce((sum, o) => sum + (o.total || 0), 0)
-  const mobileSales = orders.filter(o => o.payment_method === 'mobile').reduce((sum, o) => sum + (o.total || 0), 0)
+  const cashSales = paidOrders.filter(o => o.payment_method === 'cash').reduce((sum, o) => sum + (o.total || 0), 0)
+  const cardSales = paidOrders.filter(o => o.payment_method === 'card').reduce((sum, o) => sum + (o.total || 0), 0)
+  const mobileSales = paidOrders.filter(o => o.payment_method === 'mobile').reduce((sum, o) => sum + (o.total || 0), 0)
 
   const itemSales: Record<string, { name: string; quantity: number; revenue: number; cost: number }> = {}
-  orders.forEach(order => {
+  paidOrders.forEach(order => {
     if (order.order_items && Array.isArray(order.order_items)) {
       order.order_items.forEach(item => {
         const name = item.menu_item?.name ?? item.item_name
@@ -223,7 +226,7 @@ export default function ReportsPage() {
   const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0
 
   const categorySales: Record<string, { category: string; quantity: number; revenue: number }> = {}
-  orders.forEach(order => {
+  paidOrders.forEach(order => {
     if (order.order_items && Array.isArray(order.order_items)) {
       order.order_items.forEach(item => {
         const rawCat = item.menu_item?.category
@@ -731,7 +734,11 @@ export default function ReportsPage() {
                         {stockData.map((item, idx) => (
                           <tr key={idx} className="border-t hover:bg-slate-50">
                             <td className="px-4 py-3 font-semibold">{item.menu_item?.name}</td>
-                            <td className="px-4 py-3 text-slate-600 capitalize">{item.menu_item?.category}</td>
+                            <td className="px-4 py-3 text-slate-600 capitalize">
+                              {typeof item.menu_item?.category === 'object' && item.menu_item?.category !== null && 'name' in item.menu_item.category
+                                ? (item.menu_item.category as { name: string }).name
+                                : String(item.menu_item?.category ?? '')}
+                            </td>
                             <td className="px-4 py-3 text-right text-blue-600">৳{(item.opening_value ?? 0).toFixed(2)}</td>
                             <td className="px-4 py-3 text-right text-emerald-600 font-bold">
                               +৳{(item.total_in_value ?? 0).toFixed(2)}

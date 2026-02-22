@@ -12,7 +12,7 @@ const SupabaseContext = createContext<SupabaseClient | null>(null)
 
 export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => {
-    // No custom storage: @supabase/ssr uses cookies so middleware sees session on Vercel
+    // No custom storage: @supabase/ssr uses cookies so middleware sees session
     const client = createBrowserClient(supabaseUrl, supabaseAnonKey)
     setSupabaseClient(client)
     return client

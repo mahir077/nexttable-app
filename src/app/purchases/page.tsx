@@ -60,6 +60,12 @@ export default function PurchasesPage() {
   const [itemQuantity, setItemQuantity] = useState('')
   const [itemCost, setItemCost] = useState('')
 
+  // Bazaar / Raw material entry (amount only, no menu items)
+  const [entryMode, setEntryMode] = useState<'items' | 'bazaar'>('items')
+  const [bazaarAmount, setBazaarAmount] = useState('')
+  const [bazaarDate, setBazaarDate] = useState(new Date().toISOString().split('T')[0])
+  const [bazaarNotes, setBazaarNotes] = useState('')
+
   const { toast, showToast, hideToast } = useToast()
 
   useEffect(() => {
@@ -96,7 +102,7 @@ export default function PurchasesPage() {
         .eq('organization_id', orgId)
         .order('name')
 
-      setMenuItems(itemsData || [])
+      setMenuItems((itemsData || []).filter((i: MenuItem) => i.name !== 'বাজার / Raw material'))
     } catch (error) {
       console.error('Error:', error)
       showToast('Failed to load data', 'error')
@@ -141,8 +147,120 @@ export default function PurchasesPage() {
     return purchaseItems.reduce((sum, item) => sum + item.total_cost, 0)
   }
 
+  // Get or create the special "Raw material" menu item so we can insert stock_movement without DB migration
+  const getOrCreateRawMaterialMenuItemId = async (): Promise<string | null> => {
+    if (!orgId) return null
+    const RAW_NAME = 'বাজার / Raw material'
+    const { data: existing, error: findErr } = await supabase
+      .from('menu_items')
+      .select('id')
+      .eq('organization_id', orgId)
+      .eq('name', RAW_NAME)
+      .limit(1)
+      .maybeSingle()
+    if (!findErr && existing?.id) return existing.id
+    const { data: categories } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('organization_id', orgId)
+      .limit(1)
+    let categoryId = categories?.[0]?.id
+    if (!categoryId) {
+      const { data: newCat, error: catErr } = await supabase
+        .from('categories')
+        .insert({ name: 'Stock', display_order: 999, organization_id: orgId, is_active: true })
+        .select('id')
+        .single()
+      if (catErr) {
+        console.error('Create category for bazaar:', catErr)
+        return null
+      }
+      categoryId = newCat?.id
+    }
+    if (!categoryId) return null
+    const { data: newItem, error: itemErr } = await supabase
+      .from('menu_items')
+      .insert({
+        name: RAW_NAME,
+        category_id: categoryId,
+        price: 0,
+        making_cost: 0,
+        is_available: false,
+        is_active: true,
+        organization_id: orgId,
+      })
+      .select('id')
+      .single()
+    if (itemErr) {
+      console.error('Create raw material menu item:', itemErr)
+      return null
+    }
+    return newItem?.id ?? null
+  }
+
+  const handleSubmitBazaar = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const amount = parseFloat(bazaarAmount)
+    if (!amount || amount <= 0) {
+      showToast('Please enter a valid amount (৳)', 'error')
+      return
+    }
+    if (!orgId) {
+      showToast('Organization not loaded. Please refresh.', 'error')
+      return
+    }
+    try {
+      const rawMaterialId = await getOrCreateRawMaterialMenuItemId()
+      if (!rawMaterialId) {
+        showToast('Could not create raw material item. Try again.', 'error')
+        return
+      }
+      const payload = {
+        menu_item_id: rawMaterialId,
+        movement_type: 'purchase',
+        quantity: 0,
+        unit_cost: 0,
+        total_value: amount,
+        notes: bazaarNotes.trim() ? `Bazaar: ${bazaarNotes.trim()}` : 'Bazaar / Raw material',
+        organization_id: orgId,
+      }
+      let insertPayload: typeof payload & { movement_date?: string } = { ...payload }
+      try {
+        insertPayload.movement_date = bazaarDate ? `${bazaarDate}T00:00:00` : new Date().toISOString().slice(0, 19)
+      } catch {
+        // ignore
+      }
+      const { error } = await supabase.from('stock_movements').insert(insertPayload)
+      if (error) {
+        const msg = (error as { message?: string }).message ?? ''
+        if (msg.includes('movement_date') || msg.includes('column')) {
+          const { error: err2 } = await supabase.from('stock_movements').insert(payload)
+          if (err2) throw err2
+        } else throw error
+      }
+      showToast('✅ Bazaar entry added! Stock value increased by ৳' + amount.toFixed(2), 'success')
+      setShowForm(false)
+      setEntryMode('items')
+      setBazaarAmount('')
+      setBazaarDate(new Date().toISOString().split('T')[0])
+      setBazaarNotes('')
+      fetchData()
+    } catch (err) {
+      const msg = (err && typeof err === 'object' && (err as { message?: string }).message) ||
+        (err instanceof Error ? err.message : String(err))
+      console.error('Bazaar entry error:', msg, err)
+      const short = String(msg).slice(0, 100)
+      showToast(short ? `Failed: ${short}` : 'Failed to add bazaar entry. Please try again.', 'error')
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (entryMode === 'bazaar') {
+      handleSubmitBazaar(e)
+      return
+    }
 
     if (!formData.supplier_id) {
       showToast('Please select a supplier', 'error')
@@ -275,9 +393,69 @@ export default function PurchasesPage() {
           <div className="bg-white rounded-xl max-w-4xl w-full p-6 my-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold">New Purchase Entry</h2>
-              <button type="button" onClick={() => setShowForm(false)} className="text-2xl">×</button>
+              <button type="button" onClick={() => { setShowForm(false); setEntryMode('items'); setBazaarAmount(''); setBazaarNotes(''); }} className="text-2xl">×</button>
             </div>
 
+            {/* Entry type: Item-wise | Bazaar */}
+            <div className="flex gap-2 mb-6 border-2 border-slate-200 rounded-lg p-1">
+              <button
+                type="button"
+                onClick={() => setEntryMode('items')}
+                className={`flex-1 py-2 rounded-md font-bold text-sm ${entryMode === 'items' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'}`}
+              >
+                Item-wise
+              </button>
+              <button
+                type="button"
+                onClick={() => setEntryMode('bazaar')}
+                className={`flex-1 py-2 rounded-md font-bold text-sm ${entryMode === 'bazaar' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'}`}
+              >
+                বাজার / Raw material (Amount only)
+              </button>
+            </div>
+
+            {entryMode === 'bazaar' ? (
+              <form onSubmit={handleSubmitBazaar}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Amount (৳) *</label>
+                    <input
+                      type="number"
+                      value={bazaarAmount}
+                      onChange={(e) => setBazaarAmount(e.target.value)}
+                      step="0.01"
+                      min="0"
+                      required
+                      placeholder="e.g. 5000"
+                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Date *</label>
+                    <input
+                      type="date"
+                      value={bazaarDate}
+                      onChange={(e) => setBazaarDate(e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg text-slate-900"
+                    />
+                  </div>
+                </div>
+                <div className="mb-6">
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Notes (optional)</label>
+                  <textarea
+                    value={bazaarNotes}
+                    onChange={(e) => setBazaarNotes(e.target.value)}
+                    rows={2}
+                    placeholder="e.g. গরু, মুরগি, মশালা..."
+                    className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg text-slate-900"
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setShowForm(false)} className="flex-1 px-4 py-3 bg-slate-200 text-slate-700 rounded-lg font-bold">Cancel</button>
+                  <button type="submit" className="flex-1 px-4 py-3 bg-emerald-500 text-white rounded-lg font-bold hover:bg-emerald-600">Add to Stock</button>
+                </div>
+              </form>
+            ) : (
             <form onSubmit={handleSubmit}>
               {/* Purchase Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -462,6 +640,7 @@ export default function PurchasesPage() {
                 </button>
               </div>
             </form>
+            )}
           </div>
         </div>
       )}

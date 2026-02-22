@@ -36,6 +36,9 @@ interface OrderItem {
 
 type OrderType = 'dine-in' | 'takeaway' | 'online' | 'event'
 
+// Reject order feature – off for now (can re-enable later)
+const REJECT_ORDER_ENABLED = false
+
 interface EditLineItem {
   menu_item_id: string
   item_name: string
@@ -832,7 +835,7 @@ export default function KitchenPage() {
               )}
             </div>
           )}
-          {(order.status === 'pending' || order.status === 'preparing') && (
+          {REJECT_ORDER_ENABLED && (order.status === 'pending' || order.status === 'preparing') && (
             <button
               type="button"
               onClick={e => {
@@ -975,8 +978,8 @@ export default function KitchenPage() {
             </div>
           )}
 
-          {/* Rejected Orders - Collapsible */}
-          {rejectedOrders.length > 0 && (
+          {/* Rejected Orders - Collapsible (off when REJECT_ORDER_ENABLED is false) */}
+          {REJECT_ORDER_ENABLED && rejectedOrders.length > 0 && (
             <div className="mt-6">
               <div className="bg-red-950/40 rounded-xl p-4 border-2 border-red-800/60">
                 <h3 className="font-bold text-red-300 text-sm mb-3 flex items-center justify-between">
@@ -1222,8 +1225,8 @@ export default function KitchenPage() {
         </div>
       )}
 
-      {/* Reject Order Modal */}
-      {showRejectModal && (
+      {/* Reject Order Modal (only when feature enabled) */}
+      {REJECT_ORDER_ENABLED && showRejectModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">

@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // Initial load: use getUser() so session is validated with server (fixes Vercel where getSession() can be stale/missing)
+    // Initial load: use getUser() so session is validated with server
     const loadInitialSession = async (retry = false) => {
       const { data: { user }, error } = await supabase.auth.getUser()
       if (!mounted) return
@@ -68,9 +68,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await applySession({ user } as { user: { id: string } })
         return
       }
-      // On Vercel, cookie might not be ready on first paint; retry once
+      // Cookie might not be ready on first paint; retry once
       if (!retry && typeof window !== 'undefined') {
-        setTimeout(() => loadInitialSession(true), 800)
+        setTimeout(() => loadInitialSession(true), 400)
       } else {
         setLoading(false)
       }
@@ -195,7 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setOrganizations([])
         setOrganization(null)
         setLoading(false)
-        // Vercel fallback: restore org from localStorage if we had it before (e.g. after refresh when query failed)
+        // Fallback: restore org from localStorage if we had it before (e.g. after refresh when query failed)
         if (typeof window !== 'undefined') {
           const savedId = localStorage.getItem('current_organization_id')
           if (savedId) {
@@ -277,17 +277,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (!error && data.user) {
       log('signInWithPassword success', { userId: data.user.id })
-      // Wait for session to be ready (cookies / server)
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      log('after 1s delay, calling loadOrganizations')
+      // Brief wait for session/cookies to be ready
+      await new Promise(resolve => setTimeout(resolve, 400))
+      log('after delay, calling loadOrganizations')
       const orgId = await loadOrganizations(data.user.id)
       log('loadOrganizations returned', { orgId })
-      // Ensure localStorage is set BEFORE redirect (fixes Vercel empty localStorage)
       if (typeof window !== 'undefined' && orgId) {
         localStorage.setItem('current_organization_id', orgId)
         log('signIn: set localStorage before redirect', { orgId })
       }
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await new Promise(resolve => setTimeout(resolve, 200))
       const stored = typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null
       log('before redirect', { stored })
       window.location.href = '/dashboard'

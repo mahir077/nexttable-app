@@ -108,7 +108,7 @@ export default function BillingPage() {
             item_name_bangla,
             subtotal,
             menu_item_id,
-            menu_item:menu_items(id)
+            menu_item:menu_items(id, making_cost)
           )
         `)
         .eq('organization_id', orgId)
@@ -257,13 +257,17 @@ export default function BillingPage() {
 
       // Auto-deduct stock value on sale
       const items = selectedOrder.order_items || []
-      if (items.length > 0) {
+      if (items.length > 0 && orgId) {
+        const movementDate = now.slice(0, 19) // YYYY-MM-DDTHH:mm:ss for DB
         const stockMovements = items
-          .filter(item => item.menu_item_id || item.menu_item?.id)
+          .filter(item => {
+            const id = item.menu_item_id ?? item.menu_item?.id
+            return id && String(id).trim() !== ''
+          })
           .map(item => {
             const menuItemId = item.menu_item_id ?? item.menu_item?.id ?? ''
-            const makingCost = item.menu_item?.making_cost ?? 0
-            const qty = item.quantity
+            const makingCost = Number(item.menu_item?.making_cost) || 0
+            const qty = Number(item.quantity) || 0
             return {
               menu_item_id: menuItemId,
               movement_type: 'sale',
@@ -273,7 +277,8 @@ export default function BillingPage() {
               reference_type: 'order',
               reference_id: selectedOrder.id,
               notes: `Sale - Order ${selectedOrder.order_number}`,
-              ...(organization?.id && { organization_id: organization.id }),
+              movement_date: movementDate,
+              organization_id: orgId,
             }
           })
         if (stockMovements.length > 0) {
@@ -281,8 +286,35 @@ export default function BillingPage() {
             .from('stock_movements')
             .insert(stockMovements)
           if (movementsError) {
-            console.error('Stock deduction error:', movementsError)
+            console.error('Stock deduction error:', movementsError.message ?? movementsError)
             // Don't throw - payment already completed
+          } else {
+            // Update stock_summary so OUT and current value reflect the sale
+            const byItem: Record<string, number> = {}
+            stockMovements.forEach(m => {
+              byItem[m.menu_item_id] = (byItem[m.menu_item_id] ?? 0) + m.total_value
+            })
+            for (const [menuItemId, outValue] of Object.entries(byItem)) {
+              const { data: row } = await supabase
+                .from('stock_summary')
+                .select('total_out_value, current_value')
+                .eq('menu_item_id', menuItemId)
+                .eq('organization_id', orgId)
+                .maybeSingle()
+              if (row) {
+                const newOut = (Number(row.total_out_value) || 0) + outValue
+                const newCurrent = (Number(row.current_value) || 0) - outValue
+                await supabase
+                  .from('stock_summary')
+                  .update({
+                    total_out_value: newOut,
+                    current_value: Math.max(0, newCurrent),
+                    last_updated: now,
+                  })
+                  .eq('menu_item_id', menuItemId)
+                  .eq('organization_id', orgId)
+              }
+            }
           }
         }
       }

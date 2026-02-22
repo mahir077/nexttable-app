@@ -119,7 +119,7 @@ export default function SettingsPage() {
     loadInvoiceSettings()
   }, [orgId])
 
-  // ===== FIX 2: loadSettings with timeout to prevent hanging on Vercel =====
+  // loadSettings with timeout to prevent hanging on slow/serverless
   const loadSettings = async (skipLoadingState?: boolean) => {
     if (!orgId) return
     if (!skipLoadingState) {

@@ -11,6 +11,7 @@ interface Order {
   created_at: string
   payment_method: string | null
   order_type: string | null
+  status?: string
 }
 
 interface OrderItem {
@@ -20,6 +21,7 @@ interface OrderItem {
   item_name?: string
   menu_item?: {
     name: string
+    making_cost?: number
     category: string | { name?: string }
   }
 }
@@ -33,13 +35,32 @@ export default function ReportsSummaryPage() {
   const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
   const [activeTab, setActiveTab] = useState('daily-sales')
   const [orders, setOrders] = useState<OrderWithItems[]>([])
+  const [stockValue, setStockValue] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [dateFilter, setDateFilter] = useState('today')
 
   useEffect(() => {
-    if (orgId) fetchOrders()
-    else setLoading(false)
+    if (orgId) {
+      fetchOrders()
+      fetchStockValue()
+    } else setLoading(false)
   }, [orgId, dateFilter])
+
+  const fetchStockValue = async () => {
+    if (!orgId) return
+    try {
+      const { data, error } = await supabase
+        .from('stock_movements')
+        .select('movement_type, total_value')
+        .eq('organization_id', orgId)
+      if (error) return
+      const totalIn = (data || []).filter(m => m.movement_type !== 'sale').reduce((s, m) => s + (m.total_value || 0), 0)
+      const totalOut = (data || []).filter(m => m.movement_type === 'sale').reduce((s, m) => s + (m.total_value || 0), 0)
+      setStockValue(totalIn - totalOut)
+    } catch {
+      setStockValue(null)
+    }
+  }
 
   const fetchOrders = async () => {
     if (!orgId) return
@@ -54,12 +75,14 @@ export default function ReportsSummaryPage() {
           created_at,
           payment_method,
           order_type,
+          status,
           order_items (
             quantity,
             unit_price,
             item_name,
             menu_item:menu_items (
               name,
+              making_cost,
               category:categories(name)
             )
           )
@@ -89,7 +112,7 @@ export default function ReportsSummaryPage() {
         console.warn('Reports query with joins failed, trying simple query:', error.message)
         let fallback = supabase
           .from('orders')
-          .select('id, total, created_at, payment_method, order_type, order_items (quantity, unit_price, item_name)')
+          .select('id, total, created_at, payment_method, order_type, status, order_items (quantity, unit_price, item_name, menu_item_id, menu_item:menu_items (name, making_cost))')
           .eq('organization_id', orgId)
           .order('created_at', { ascending: false })
         if (dateFilter === 'today') {
@@ -125,28 +148,28 @@ export default function ReportsSummaryPage() {
     }
   }
 
-  // Calculate stats with null checks
-  const totalRevenue = orders.reduce((sum, o) => sum + (o.total || 0), 0)
-  const totalOrders = orders.length
+  const paidOrders = orders.filter(o => o.status === 'paid')
+  const totalRevenue = paidOrders.reduce((sum, o) => sum + (o.total || 0), 0)
+  const totalOrders = paidOrders.length
   const avgOrder = totalOrders > 0 ? totalRevenue / totalOrders : 0
 
-  // Payment breakdown with null checks
-  const cashSales = orders
-    .filter(o => o.payment_method === 'cash')
-    .reduce((sum, o) => sum + (o.total || 0), 0)
+  // Cost = sum of (making_cost * quantity) for paid order items
+  const totalCost = paidOrders.reduce((sum, order) => {
+    if (!order.order_items || !Array.isArray(order.order_items)) return sum
+    const orderCost = order.order_items.reduce((s, item) => {
+      const cost = (item.menu_item?.making_cost ?? 0) * (item.quantity ?? 0)
+      return s + cost
+    }, 0)
+    return sum + orderCost
+  }, 0)
+  const grossProfit = totalRevenue - totalCost
 
-  const cardSales = orders
-    .filter(o => o.payment_method === 'card')
-    .reduce((sum, o) => sum + (o.total || 0), 0)
+  const cashSales = paidOrders.filter(o => o.payment_method === 'cash').reduce((sum, o) => sum + (o.total || 0), 0)
+  const cardSales = paidOrders.filter(o => o.payment_method === 'card').reduce((sum, o) => sum + (o.total || 0), 0)
+  const mobileSales = paidOrders.filter(o => o.payment_method === 'mobile').reduce((sum, o) => sum + (o.total || 0), 0)
 
-  const mobileSales = orders
-    .filter(o => o.payment_method === 'mobile')
-    .reduce((sum, o) => sum + (o.total || 0), 0)
-
-  // Item-wise sales with null checks (support price, unit_price, menu_item.name, item_name)
   const itemSales: Record<string, { name: string; quantity: number; revenue: number }> = {}
-
-  orders.forEach(order => {
+  paidOrders.forEach(order => {
     if (order.order_items && Array.isArray(order.order_items)) {
       order.order_items.forEach(item => {
         const name = item.menu_item?.name ?? item.item_name ?? null
@@ -169,7 +192,7 @@ export default function ReportsSummaryPage() {
   // Category-wise sales with null checks (category can be string or { name } from join)
   const categorySales: Record<string, { category: string; quantity: number; revenue: number }> = {}
 
-  orders.forEach(order => {
+  paidOrders.forEach(order => {
     if (order.order_items && Array.isArray(order.order_items)) {
       order.order_items.forEach(item => {
         const rawCat = item.menu_item?.category
@@ -280,20 +303,31 @@ export default function ReportsSummaryPage() {
 
           {/* Profit & Loss Tab */}
           {activeTab === 'profit-loss' && (
-            <div className="bg-white rounded-xl p-4 lg:p-6 border-2 border-slate-200">
-              <h2 className="text-xl lg:text-2xl font-bold mb-4">💰 Profit & Loss</h2>
-              <div className="space-y-4">
-                <div className="flex justify-between py-3 border-b">
-                  <span className="font-semibold">Total Revenue</span>
-                  <span className="text-emerald-600 font-bold">৳{totalRevenue.toFixed(2)}</span>
+            <div className="space-y-6">
+              <div className="bg-white rounded-xl p-4 lg:p-6 border-2 border-slate-200">
+                <h2 className="text-xl lg:text-2xl font-bold mb-4">💰 Profit & Loss (selected period)</h2>
+                <div className="space-y-4">
+                  <div className="flex justify-between py-3 border-b">
+                    <span className="font-semibold">Total Revenue</span>
+                    <span className="text-emerald-600 font-bold">৳{totalRevenue.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between py-3 border-b">
+                    <span className="font-semibold">Cost (making cost of sold items)</span>
+                    <span className="text-red-600 font-bold">৳{totalCost.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between py-3 bg-emerald-50 px-4 rounded-lg">
+                    <span className="font-bold text-lg">Gross Profit</span>
+                    <span className={`font-bold text-lg ${grossProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                      ৳{grossProfit.toFixed(2)}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between py-3 border-b">
-                  <span className="font-semibold">Cost (Not tracked yet)</span>
-                  <span className="text-slate-400">৳0.00</span>
-                </div>
-                <div className="flex justify-between py-3 bg-emerald-50 px-4 rounded-lg">
-                  <span className="font-bold text-lg">Gross Profit</span>
-                  <span className="text-emerald-600 font-bold text-lg">৳{totalRevenue.toFixed(2)}</span>
+              </div>
+              <div className="bg-white rounded-xl p-4 lg:p-6 border-2 border-blue-200">
+                <h2 className="text-xl font-bold mb-2">📦 Current Stock Value</h2>
+                <p className="text-sm text-slate-600 mb-2">Total stock IN − OUT (all time)</p>
+                <div className="text-2xl lg:text-3xl font-bold text-blue-700">
+                  {stockValue !== null ? `৳${stockValue.toFixed(2)}` : '—'}
                 </div>
               </div>
             </div>

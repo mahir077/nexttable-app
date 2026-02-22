@@ -164,11 +164,49 @@ export default function StockPage() {
       return
     }
 
+    if (!orgId) {
+      showToast('Organization not loaded. Please refresh.', 'error')
+      return
+    }
+
     try {
       const quantity = parseFloat(openingQty)
       const value = parseFloat(openingValue)
+      if (Number.isNaN(quantity) || Number.isNaN(value) || quantity <= 0) {
+        showToast('Please enter valid quantity and value', 'error')
+        return
+      }
 
-      // Create opening stock movement
+      const now = new Date().toISOString()
+      const movementDate = now.slice(0, 19)
+
+      // 1) Update stock_summary (multi-tenant: unique is usually menu_item_id + organization_id)
+      const summaryPayload = {
+        menu_item_id: selectedItem,
+        current_quantity: quantity,
+        opening_value: value,
+        total_in_value: 0,
+        total_out_value: 0,
+        current_value: value,
+        last_updated: now,
+        organization_id: orgId,
+      }
+      let summaryError = (await supabase
+        .from('stock_summary')
+        .upsert(summaryPayload, { onConflict: 'menu_item_id,organization_id' })).error
+      if (summaryError?.message?.includes('ON CONFLICT')) {
+        summaryError = (await supabase
+          .from('stock_summary')
+          .upsert(summaryPayload, { onConflict: 'organization_id,menu_item_id' })).error
+      }
+      if (summaryError) {
+        const msg = (summaryError as { message?: string }).message ?? String(summaryError)
+        console.error('Stock summary upsert error:', msg, summaryError)
+        showToast(msg.slice(0, 80) || 'Failed to update stock summary', 'error')
+        return
+      }
+
+      // 2) Create opening stock movement (movement_date required by DB)
       const { error: movementError } = await supabase
         .from('stock_movements')
         .insert({
@@ -178,28 +216,16 @@ export default function StockPage() {
           unit_cost: value / quantity,
           total_value: value,
           notes: 'Opening stock balance',
-          ...(orgId && { organization_id: orgId }),
+          movement_date: movementDate,
+          organization_id: orgId,
         })
 
-      if (movementError) throw movementError
-
-      // Update stock summary
-      const { error: summaryError } = await supabase
-        .from('stock_summary')
-        .upsert({
-          menu_item_id: selectedItem,
-          current_quantity: quantity,
-          opening_value: value,
-          total_in_value: 0,
-          total_out_value: 0,
-          current_value: value,
-          last_updated: new Date().toISOString(),
-          ...(orgId && { organization_id: orgId }),
-        }, {
-          onConflict: 'menu_item_id'
-        })
-
-      if (summaryError) throw summaryError
+      if (movementError) {
+        const msg = (movementError as { message?: string }).message ?? movementError.code ?? String(movementError)
+        console.error('Stock movement insert error:', msg, movementError)
+        showToast(msg.slice(0, 80) || 'Failed to save opening movement', 'error')
+        return
+      }
 
       showToast('✅ Opening balance set!', 'success')
       setShowOpeningModal(false)
@@ -208,8 +234,9 @@ export default function StockPage() {
       setOpeningValue('')
       fetchData()
     } catch (error) {
-      console.error('Error:', error)
-      showToast('Failed to set opening balance', 'error')
+      const msg = error instanceof Error ? error.message : (error as { message?: string })?.message ?? String(error)
+      console.error('Set opening error:', msg, error)
+      showToast(msg.slice(0, 80) || 'Failed to set opening balance.', 'error')
     }
   }
 
@@ -405,7 +432,9 @@ export default function StockPage() {
                       {item.menu_item?.name}
                     </td>
                     <td className="px-4 py-3 text-slate-600 capitalize">
-                      {item.menu_item?.category}
+                      {typeof item.menu_item?.category === 'object' && item.menu_item?.category !== null && 'name' in item.menu_item.category
+                        ? (item.menu_item.category as { name: string }).name
+                        : String(item.menu_item?.category ?? '')}
                     </td>
                     <td className="px-4 py-3 text-right font-semibold">
                       {item.current_quantity.toFixed(2)}

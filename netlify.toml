@@ -1,0 +1,12 @@
+# Netlify deployment for Next.js
+# https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

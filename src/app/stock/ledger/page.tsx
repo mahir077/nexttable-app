@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext'
 
 interface StockMovement {
   id: string
-  menu_item_id: string
+  menu_item_id: string | null
   movement_type: string
   quantity: number
   unit_cost: number
@@ -212,7 +212,9 @@ export default function StockLedgerPage() {
                       {new Date(movement.movement_date).toLocaleString()}
                     </td>
                     <td className="px-4 py-3 font-semibold">
-                      {movement.menu_item?.name ?? menuItems.find(m => m.id === movement.menu_item_id)?.name ?? '—'}
+                      {movement.menu_item_id
+                        ? (movement.menu_item?.name ?? menuItems.find(m => m.id === movement.menu_item_id)?.name ?? '—')
+                        : 'বাজার / Raw material'}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-1 rounded text-xs font-bold ${
@@ -225,7 +227,7 @@ export default function StockLedgerPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right font-semibold">
-                      {movement.movement_type === 'sale' ? '-' : '+'}{movement.quantity.toFixed(2)}
+                      {movement.menu_item_id == null ? '—' : (movement.movement_type === 'sale' ? '-' : '+') + movement.quantity.toFixed(2)}
                     </td>
                     <td className="px-4 py-3 text-right">
                       ৳{movement.unit_cost.toFixed(2)}

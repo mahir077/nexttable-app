@@ -121,7 +121,7 @@ export default function DashboardPage() {
     setCurrentDate(today.toLocaleDateString('en-US', options).toUpperCase())
   }, [])
 
-  // Fetch floors for current org (with timeout so spinner doesn't hang on Vercel)
+  // Fetch floors for current org (with timeout so spinner doesn't hang)
   useEffect(() => {
     if (!orgId) {
       setLoading(false)
@@ -150,7 +150,7 @@ export default function DashboardPage() {
     loadFloors()
   }, [orgId])
 
-  // Fetch tables when floor changes (with timeout so spinner doesn't hang on Vercel)
+  // Fetch tables when floor changes (with timeout so spinner doesn't hang)
   useEffect(() => {
     if (!orgId || !selectedFloor) {
       if (!orgId) setLoading(false)
@@ -528,51 +528,44 @@ export default function DashboardPage() {
               <svg className="w-5 h-5 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
               Reservation
             </Link>
-
-            <Link
-              href="/kitchen"
-              className="ml-auto inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-slate-900 text-emerald-300 text-xs font-semibold shadow-sm hover:bg-slate-800"
-            >
-              🍳 KOT
-            </Link>
           </div>
             </section>
 
-            {/* Row 3: Quick Actions */}
+            {/* Row 3: Quick Actions (same style as Order type) */}
             <section>
               <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-widest mb-3 sm:mb-4">Quick Actions</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-                <Link href="/billing" className="flex flex-col items-center justify-center gap-2 p-4 sm:p-5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white shadow-sm transition-all min-h-[88px] sm:min-h-[96px]">
-                  <svg className="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                  <span className="text-xs sm:text-sm font-bold text-center leading-tight">Billing Hub</span>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <Link href="/billing" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-emerald-50 hover:border-emerald-200 text-slate-700 text-sm font-semibold transition-colors cursor-pointer">
+                  <svg className="w-5 h-5 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                  <span>Billing Hub</span>
                 </Link>
-                <Link href="/orders" className="flex flex-col items-center justify-center gap-2 p-4 sm:p-5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm transition-all min-h-[88px] sm:min-h-[96px]">
-                  <svg className="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                  <span className="text-xs sm:text-sm font-bold text-center leading-tight">Sales History</span>
+                <Link href="/orders" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-emerald-50 hover:border-emerald-200 text-slate-700 text-sm font-semibold transition-colors cursor-pointer">
+                  <svg className="w-5 h-5 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                  <span>Sales History</span>
                 </Link>
-                <Link href="/kitchen" className="flex flex-col items-center justify-center gap-2 p-4 sm:p-5 rounded-xl bg-slate-700 hover:bg-slate-800 text-white shadow-sm transition-all min-h-[88px] sm:min-h-[96px]">
-                  <svg className="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-                  <span className="text-xs sm:text-sm font-bold text-center leading-tight">KOT Screen</span>
+                <Link href="/kitchen" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold transition-colors cursor-pointer">
+                  <svg className="w-5 h-5 text-emerald-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                  <span>KOT Screen</span>
                 </Link>
-                <button type="button" onClick={() => alert('Merge Token coming soon!')} className="flex flex-col items-center justify-center gap-2 p-4 sm:p-5 rounded-xl bg-violet-500 hover:bg-violet-600 text-white shadow-sm transition-all min-h-[88px] sm:min-h-[96px]">
-                  <svg className="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
-                  <span className="text-xs sm:text-sm font-bold text-center leading-tight">Merge Token</span>
+                <button type="button" onClick={() => alert('Merge Token coming soon!')} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-emerald-50 hover:border-emerald-200 text-slate-700 text-sm font-semibold transition-colors cursor-pointer">
+                  <svg className="w-5 h-5 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                  <span>Merge Token</span>
                 </button>
-                <button type="button" onClick={openMergeModal} className="flex flex-col items-center justify-center gap-2 p-4 sm:p-5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm transition-all min-h-[88px] sm:min-h-[96px]">
-                  <span className="text-2xl">🔀</span>
-                  <span className="text-xs sm:text-sm font-bold text-center leading-tight">Merge Table</span>
+                <button type="button" onClick={openMergeModal} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-emerald-50 hover:border-emerald-200 text-slate-700 text-sm font-semibold transition-colors cursor-pointer">
+                  <span className="text-lg">🔀</span>
+                  <span>Merge Table</span>
                 </button>
-                <button type="button" onClick={openChangeModal} className="flex flex-col items-center justify-center gap-2 p-4 sm:p-5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white shadow-sm transition-all min-h-[88px] sm:min-h-[96px]">
-                  <span className="text-2xl">↔️</span>
-                  <span className="text-xs sm:text-sm font-bold text-center leading-tight">Change Table</span>
+                <button type="button" onClick={openChangeModal} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-emerald-50 hover:border-emerald-200 text-slate-700 text-sm font-semibold transition-colors cursor-pointer">
+                  <span className="text-lg">↔️</span>
+                  <span>Change Table</span>
                 </button>
-                <Link href="/stock" className="flex flex-col items-center justify-center gap-2 p-4 sm:p-5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm transition-all min-h-[88px] sm:min-h-[96px]">
-                  <svg className="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
-                  <span className="text-xs sm:text-sm font-bold text-center leading-tight">Stock</span>
+                <Link href="/stock" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-emerald-50 hover:border-emerald-200 text-slate-700 text-sm font-semibold transition-colors cursor-pointer">
+                  <svg className="w-5 h-5 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                  <span>Stock</span>
                 </Link>
-                <Link href="/menu" className="flex flex-col items-center justify-center gap-2 p-4 sm:p-5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm transition-all min-h-[88px] sm:min-h-[96px]">
-                  <svg className="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-                  <span className="text-xs sm:text-sm font-bold text-center leading-tight">Menu</span>
+                <Link href="/menu" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-emerald-50 hover:border-emerald-200 text-slate-700 text-sm font-semibold transition-colors cursor-pointer">
+                  <svg className="w-5 h-5 text-slate-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                  <span>Menu</span>
                 </Link>
               </div>
             </section>
