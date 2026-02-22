@@ -145,7 +145,8 @@ export default function DashboardPage() {
     async function loadFloors() {
       console.log('[Dashboard] loadFloors() calling getFloors', effectiveOrgId)
       try {
-        const floorsData = await Promise.race([getFloors(effectiveOrgId), timeout(10000)])
+        // 25s timeout: Supabase can be slow on first request or from some regions
+        const floorsData = await Promise.race([getFloors(effectiveOrgId), timeout(25000)])
         console.log('[Dashboard] getFloors result', { count: floorsData?.length ?? 0, floors: floorsData })
         setFloors(floorsData)
         if (floorsData.length > 0) {
@@ -182,7 +183,7 @@ export default function DashboardPage() {
       console.log('[Dashboard] loadTables() calling getTablesByFloor', { floorId: floor.id, orgId: oid })
       setLoading(true)
       try {
-        const tablesData = await Promise.race([getTablesByFloor(floor.id, oid), timeout(10000)])
+        const tablesData = await Promise.race([getTablesByFloor(floor.id, oid), timeout(25000)])
         console.log('[Dashboard] getTablesByFloor result', { count: tablesData?.length ?? 0 })
         setTables(tablesData)
       } catch (error) {

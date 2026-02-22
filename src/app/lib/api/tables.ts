@@ -21,6 +21,9 @@ export interface Table {
 
 // Fetch floors (optionally scoped to organization)
 export async function getFloors(organizationId?: string | null): Promise<Floor[]> {
+  if (typeof window !== 'undefined') {
+    console.log('[getFloors] start', { organizationId: organizationId ?? 'null' })
+  }
   let query = supabase
     .from('floors')
     .select('*')
@@ -30,6 +33,9 @@ export async function getFloors(organizationId?: string | null): Promise<Floor[]
     query = query.eq('organization_id', organizationId)
   }
   const { data, error } = await query
+  if (typeof window !== 'undefined') {
+    console.log('[getFloors] done', { count: data?.length ?? 0, error: error?.message ?? null })
+  }
   if (error) throw error
   return data || []
 }
