@@ -25,10 +25,22 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+function getInitialOrganizationFromStorage(): Organization | null {
+  if (typeof window === 'undefined') return null
+  const id = localStorage.getItem('current_organization_id')
+  if (!id) return null
+  return {
+    id,
+    name: '',
+    slug: '',
+    display_name: ''
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = useSupabase()
   const [user, setUser] = useState<any>(null)
-  const [organization, setOrganization] = useState<Organization | null>(null)
+  const [organization, setOrganization] = useState<Organization | null>(getInitialOrganizationFromStorage)
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [loading, setLoading] = useState(true)
   const router = useRouter()
@@ -72,6 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!retry && typeof window !== 'undefined') {
         setTimeout(() => loadInitialSession(true), 400)
       } else {
+        setOrganization(null)
         setLoading(false)
       }
     }
