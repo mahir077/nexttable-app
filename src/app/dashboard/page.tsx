@@ -72,30 +72,6 @@ export default function DashboardPage() {
 
   const orgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
 
-  // Debug: session and organization on dashboard load
-  useEffect(() => {
-    console.log('🔍 DEBUG - Dashboard Load')
-
-    supabase.auth.getSession().then(({ data }) => {
-      console.log('✅ Session:', data.session)
-      console.log('✅ User ID:', data.session?.user?.id)
-      console.log('✅ User Email:', data.session?.user?.email)
-    })
-
-    const orgFromStorage = typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null
-    console.log('✅ Organization ID from localStorage:', orgFromStorage)
-    console.log('✅ Organization from context:', organization?.id, organization?.name)
-
-    supabase
-      .from('tables')
-      .select('*')
-      .then(({ data, error }) => {
-        console.log('📊 Tables Query Result:')
-        console.log('  Data:', data)
-        console.log('  Error:', error)
-      })
-  }, [])
-
   // Set name from current org immediately (correct tenant), then refine from DB
   useEffect(() => {
     if (organization?.display_name || organization?.name) {

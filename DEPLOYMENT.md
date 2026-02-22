@@ -43,6 +43,8 @@ Add these (replace with your real values):
 - For **production**: add/override variables in **Production** (or **All**).
 - You can copy variable names (and optional placeholders) from **.env.example** in the repo.
 
+**Critical for tables/data loading:** Next.js inlines `NEXT_PUBLIC_*` variables into the client bundle **at build time**. If they are missing during the build, the app may show infinite loading or auth/data errors in production even if the same vars are set at runtime. In Netlify, ensure `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are set for **Build** (e.g. **Scopes** → include "Build" or use **All**). After changing env vars, trigger a **new deploy** so the build runs with the correct values.
+
 ---
 
 ## 3. Deploy
@@ -92,9 +94,10 @@ Add these (replace with your real values):
   - Confirm **Node version 18** (set in `netlify.toml`).
   - Confirm all **required** env vars are set (no typos).
 
-- **Auth or API errors in production**
-  - Confirm `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in Netlify env.
+- **Auth or API errors in production / Tables stuck loading**
+  - Confirm `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in Netlify env and that they apply to **Build** (not only Deploy/Runtime). Redeploy after setting them.
   - In Supabase Dashboard: **Authentication** → **URL Configuration** → add your Netlify URL to **Redirect URLs** (e.g. `https://your-site.netlify.app/**`).
+  - If the browser console shows `[Supabase] Missing NEXT_PUBLIC_...`, the build ran without those vars; set them and trigger a new deploy.
 
 - **Admin create-client or manage clients fails**
   - Ensure `SUPABASE_SERVICE_ROLE_KEY` is set in Netlify (and not exposed in client-side code).
