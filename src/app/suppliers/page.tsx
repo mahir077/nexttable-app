@@ -70,6 +70,10 @@ export default function SuppliersPage() {
       showToast('Please enter supplier name', 'error')
       return
     }
+    if (!orgId) {
+      showToast('Organization not set. Please refresh and try again.', 'error')
+      return
+    }
 
     try {
       if (editingSupplier) {
@@ -80,7 +84,7 @@ export default function SuppliersPage() {
             updated_at: new Date().toISOString()
           })
           .eq('id', editingSupplier.id)
-          .eq('organization_id', orgId!)
+          .eq('organization_id', orgId)
 
         if (error) throw error
         showToast('✅ Supplier updated!', 'success')
@@ -90,7 +94,7 @@ export default function SuppliersPage() {
           .insert({
             ...formData,
             is_active: true,
-            ...(orgId && { organization_id: orgId }),
+            organization_id: orgId,
           })
 
         if (error) throw error

@@ -11,6 +11,10 @@
 
 Run **`010_fix_floors_tables_rls.sql`** in the SQL Editor. It reapplies the correct RLS policies and helper for `floors` and `tables` so the app can load them.
 
+## Supabase linter: Auth RLS Init Plan / multiple policies / duplicate index
+
+Run **`011_rls_linter_fixes.sql`** in the SQL Editor. It: uses `(SELECT auth.uid())` so auth is not re-evaluated per row; drops duplicate `*_simple` RLS policies on `floors` and `tables` (keeps only `*_org_*`); and drops one duplicate index on `user_organizations`. Run after 010.
+
 ## After running
 
 - All listed tables will have an `organization_id` column and RLS so each organization only sees its own data.

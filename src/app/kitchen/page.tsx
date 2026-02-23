@@ -636,11 +636,15 @@ export default function KitchenPage() {
       showToast('Reason is required.', 'error')
       return
     }
+    const oId = organization?.id ?? orgId
+    if (!oId) {
+      showToast('Organization not set. Please refresh and try again.', 'error')
+      return
+    }
     setEditLoading(true)
     try {
       const subtotal = editLines.reduce((s, l) => s + l.unit_price * l.quantity, 0)
-      const oId = organization?.id ?? orgId
-      await supabase.from('order_items').delete().eq('order_id', editOrder.order.id).eq('organization_id', oId!)
+      await supabase.from('order_items').delete().eq('order_id', editOrder.order.id).eq('organization_id', oId)
       await supabase.from('order_items').insert(editLines.map(l => ({
         order_id: editOrder.order.id,
         menu_item_id: l.menu_item_id,
@@ -650,13 +654,13 @@ export default function KitchenPage() {
         unit_price: l.unit_price,
         subtotal: l.unit_price * l.quantity,
         status: 'pending',
-        ...(oId && { organization_id: oId }),
+        organization_id: oId,
       })))
       await supabase.from('orders').update({
         subtotal,
         total: subtotal,
         updated_at: new Date().toISOString()
-      }).eq('id', editOrder.order.id).eq('organization_id', oId!)
+      }).eq('id', editOrder.order.id).eq('organization_id', oId)
       setShowEditModal(false)
       setSelectedOrder(null)
       fetchOrders()

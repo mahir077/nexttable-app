@@ -221,6 +221,10 @@ export default function BillingPage() {
       showToast('Please select payment method', 'error')
       return
     }
+    if (!orgId) {
+      showToast('Organization not set. Please refresh and try again.', 'error')
+      return
+    }
 
     try {
       const now = new Date().toISOString()
@@ -248,7 +252,7 @@ export default function BillingPage() {
         .from('orders')
         .update(updateData)
         .eq('id', selectedOrder.id)
-        .eq('organization_id', orgId!)
+        .eq('organization_id', orgId)
 
       if (orderError) {
         console.error('Order update error:', orderError)

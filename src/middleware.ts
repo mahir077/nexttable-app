@@ -7,9 +7,20 @@ export async function middleware(req: NextRequest) {
     request: req,
   })
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseAnonKey) {
+    // Env missing (e.g. Netlify build without vars) – still enforce route protection
+    const isProtected = ['/dashboard', '/pos', '/menu', '/orders', '/kitchen', '/billing', '/reports', '/stock', '/suppliers', '/purchases', '/reservations', '/settings'].some(r => req.nextUrl.pathname.startsWith(r))
+    if (req.nextUrl.pathname === '/') return NextResponse.redirect(new URL('/login', req.url))
+    if (req.nextUrl.pathname.startsWith('/admin')) return NextResponse.redirect(new URL('/dashboard', req.url))
+    if (isProtected) return NextResponse.redirect(new URL('/login', req.url))
+    return supabaseResponse
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
