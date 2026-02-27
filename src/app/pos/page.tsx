@@ -3,12 +3,13 @@
 import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase-client'
 import { getFloors, getTablesByFloor, Floor, Table } from '@/app/lib/api/tables'
 import { getCategories, getMenuItemsByCategory, type CartItem, type Category, type MenuItem } from '@/app/lib/api/menu'
 import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
 import { useAuth } from '@/contexts/AuthContext'
+import { createOrder, insertOrderItems } from '@/app/lib/db/orders'
+import { getTableStatus, updateTableStatus } from '@/app/lib/db/tables'
 
 const ORDER_TYPES = [
   { id: 'dine-in', label: 'Dine-in', emoji: '🍽️', color: 'emerald', border: 'border-emerald-400', bg: 'bg-emerald-50' },
@@ -440,12 +441,7 @@ function POSContent() {
     }
     try {
       if (orderType === 'dine-in' && selectedTable) {
-        const { data: tableCheck } = await supabase
-          .from('tables')
-          .select('status')
-          .eq('id', selectedTable)
-          .eq('organization_id', orgId)
-          .single()
+        const { data: tableCheck } = await getTableStatus(orgId, selectedTable)
 
         if (tableCheck && tableCheck.status !== 'available') {
           showToast('This table is no longer available! Please select another table.', 'error')
@@ -476,11 +472,7 @@ function POSContent() {
         ...(orgId && { organization_id: orgId }),
       }
 
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert(insertPayload)
-        .select()
-        .single()
+      const { data: order, error: orderError } = await createOrder(insertPayload)
 
       if (orderError) throw orderError
 
@@ -496,11 +488,11 @@ function POSContent() {
         ...(orgId && { organization_id: orgId }),
       }))
 
-      const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
+      const { error: itemsError } = await insertOrderItems(orderItems)
       if (itemsError) throw itemsError
 
       if (orderType === 'dine-in' && selectedTable && orgId) {
-        await supabase.from('tables').update({ status: 'occupied' }).eq('id', selectedTable).eq('organization_id', orgId)
+        await updateTableStatus(orgId, selectedTable, 'occupied')
       }
 
       const tableLabel = orderType === 'dine-in' && selectedTable

@@ -1,19 +1,19 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { 
+import {
   supabase,
-  getCategories, 
-  getAllMenuItems, 
-  createMenuItem, 
-  updateMenuItem, 
+  getCategories,
+  getAllMenuItems,
+  createMenuItem,
+  updateMenuItem,
   deleteMenuItem,
   toggleItemAvailability,
   createCategory,
   updateCategory,
   deleteCategory,
-  Category, 
-  MenuItem 
+  Category,
+  MenuItem,
 } from '@/app/lib/api/menu'
 import BackButton from '@/components/BackButton'
 import Toast from '@/components/Toast'
@@ -78,16 +78,12 @@ export default function MenuManagementPage() {
   const fetchCategories = async () => {
     const currentOrgId = organization?.id ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
     if (!currentOrgId) return
-    const { data, error } = await supabase
-      .from('categories')
-      .select('*')
-      .eq('organization_id', currentOrgId)
-      .order('name')
-    if (error) {
+    try {
+      const data = await getCategories(currentOrgId)
+      setCategories(data || [])
+    } catch (error) {
       console.error('Error loading categories:', error)
-      return
     }
-    setCategories((data as Category[]) || [])
   }
 
   useEffect(() => {
@@ -265,13 +261,14 @@ export default function MenuManagementPage() {
       showToast('No organization selected. Please refresh and try again.', 'error')
       return
     }
-    const { error } = await supabase.from('categories').insert({
-      name,
-      display_order: categories.length,
-      organization_id: currentOrgId,
-      is_active: true
-    })
-    if (!error) {
+    const created = await createCategory(
+      {
+        name,
+        display_order: categories.length,
+      },
+      currentOrgId
+    )
+    if (created) {
       setNewCategory('')
       setShowCategoryForm(false)
       fetchCategories()

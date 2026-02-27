@@ -1,11 +1,21 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase-client'
 import BackButton from '@/components/BackButton'
 import { useToast } from '@/hooks/useToast'
 import Toast from '@/components/Toast'
 import { useAuth } from '@/contexts/AuthContext'
+import {
+  fetchPurchasesWithSuppliers,
+  fetchActiveSuppliers,
+  fetchMenuItemsForPurchases,
+  createPurchase,
+  insertPurchaseItems,
+} from '@/app/lib/db/purchases'
+import {
+  insertBazaarStockMovement,
+  insertStockMovements,
+} from '@/app/lib/db/stock'
 
 interface Supplier {
   id: string
@@ -78,29 +88,16 @@ export default function PurchasesPage() {
     try {
       setLoading(true)
 
-      const { data: purchasesData, error: purchasesError } = await supabase
-        .from('purchases')
-        .select('*, supplier:suppliers(name)')
-        .eq('organization_id', orgId)
-        .order('purchase_date', { ascending: false })
+      const { data: purchasesData, error: purchasesError } = await fetchPurchasesWithSuppliers(orgId)
 
       if (purchasesError) throw purchasesError
       setPurchases(purchasesData || [])
 
-      const { data: suppliersData } = await supabase
-        .from('suppliers')
-        .select('id, name')
-        .eq('organization_id', orgId)
-        .eq('is_active', true)
-        .order('name')
+      const { data: suppliersData } = await fetchActiveSuppliers(orgId)
 
       setSuppliers(suppliersData || [])
 
-      const { data: itemsData } = await supabase
-        .from('menu_items')
-        .select('id, name, making_cost')
-        .eq('organization_id', orgId)
-        .order('name')
+      const { data: itemsData } = await fetchMenuItemsForPurchases(orgId)
 
       setMenuItems((itemsData || []).filter((i: MenuItem) => i.name !== 'বাজার / Raw material'))
     } catch (error) {
@@ -151,14 +148,11 @@ export default function PurchasesPage() {
   const getOrCreateRawMaterialMenuItemId = async (): Promise<string | null> => {
     if (!orgId) return null
     const RAW_NAME = 'বাজার / Raw material'
-    const { data: existing, error: findErr } = await supabase
-      .from('menu_items')
-      .select('id')
-      .eq('organization_id', orgId)
-      .eq('name', RAW_NAME)
-      .limit(1)
-      .maybeSingle()
-    if (!findErr && existing?.id) return existing.id
+    const { data: existing, error: findErr } = await fetchMenuItemsForPurchases(orgId)
+    if (!findErr && Array.isArray(existing)) {
+      const raw = existing.find(i => i.name === RAW_NAME)
+      if (raw?.id) return raw.id
+    }
     const { data: categories } = await supabase
       .from('categories')
       .select('id')
@@ -224,20 +218,9 @@ export default function PurchasesPage() {
         notes: bazaarNotes.trim() ? `Bazaar: ${bazaarNotes.trim()}` : 'Bazaar / Raw material',
         organization_id: orgId,
       }
-      let insertPayload: typeof payload & { movement_date?: string } = { ...payload }
-      try {
-        insertPayload.movement_date = bazaarDate ? `${bazaarDate}T00:00:00` : new Date().toISOString().slice(0, 19)
-      } catch {
-        // ignore
-      }
-      const { error } = await supabase.from('stock_movements').insert(insertPayload)
-      if (error) {
-        const msg = (error as { message?: string }).message ?? ''
-        if (msg.includes('movement_date') || msg.includes('column')) {
-          const { error: err2 } = await supabase.from('stock_movements').insert(payload)
-          if (err2) throw err2
-        } else throw error
-      }
+      const movementDate = bazaarDate ? `${bazaarDate}T00:00:00` : undefined
+      const { error } = await insertBazaarStockMovement(payload, movementDate)
+      if (error) throw error
       showToast('✅ Bazaar entry added! Stock value increased by ৳' + amount.toFixed(2), 'success')
       setShowForm(false)
       setEntryMode('items')
@@ -276,20 +259,16 @@ export default function PurchasesPage() {
       const totalAmount = calculateTotal()
 
       // Create purchase
-      const { data: purchase, error: purchaseError } = await supabase
-        .from('purchases')
-        .insert({
-          supplier_id: formData.supplier_id,
-          purchase_date: formData.purchase_date,
-          total_amount: totalAmount,
-          paid_amount: formData.paid_amount,
-          payment_status: formData.paid_amount >= totalAmount ? 'paid' :
-            formData.paid_amount > 0 ? 'partial' : 'pending',
-          notes: formData.notes,
-          ...(orgId && { organization_id: orgId }),
-        })
-        .select()
-        .single()
+      const { data: purchase, error: purchaseError } = await createPurchase({
+        supplier_id: formData.supplier_id,
+        purchase_date: formData.purchase_date,
+        total_amount: totalAmount,
+        paid_amount: formData.paid_amount,
+        payment_status: formData.paid_amount >= totalAmount ? 'paid' :
+          formData.paid_amount > 0 ? 'partial' : 'pending',
+        notes: formData.notes,
+        ...(orgId && { organization_id: orgId }),
+      })
 
       if (purchaseError) throw purchaseError
 
@@ -303,9 +282,7 @@ export default function PurchasesPage() {
         ...(orgId && { organization_id: orgId }),
       }))
 
-      const { error: itemsError } = await supabase
-        .from('purchase_items')
-        .insert(items)
+      const { error: itemsError } = await insertPurchaseItems(items)
 
       if (itemsError) throw itemsError
 
@@ -322,9 +299,7 @@ export default function PurchasesPage() {
         ...(orgId && { organization_id: orgId }),
       }))
 
-      const { error: movementsError } = await supabase
-        .from('stock_movements')
-        .insert(movements)
+      const { error: movementsError } = await insertStockMovements(movements)
 
       if (movementsError) throw movementsError
 

@@ -1,11 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase-client'
 import BackButton from '@/components/BackButton'
 import { useToast } from '@/hooks/useToast'
 import Toast from '@/components/Toast'
 import { useAuth } from '@/contexts/AuthContext'
+import {
+  getStockMovementsBaseQuery,
+  getStockMovementsFallbackQuery,
+  getStockMovementsBareQuery,
+} from '@/app/lib/db/stock'
 
 interface StockMovement {
   id: string
@@ -50,15 +54,7 @@ export default function StockLedgerPage() {
     try {
       setLoading(true)
 
-      let query = supabase
-        .from('stock_movements')
-        .select(`
-          *,
-          menu_item:menu_items(name, category:categories(name))
-        `)
-        .eq('organization_id', orgId)
-        .order('movement_date', { ascending: false })
-        .limit(200)
+      let query = getStockMovementsBaseQuery(orgId)
 
       if (filterType !== 'all') {
         query = query.eq('movement_type', filterType)
@@ -71,17 +67,12 @@ export default function StockLedgerPage() {
       let { data, error } = await query
 
       if (error) {
-        let fallback = supabase
-          .from('stock_movements')
-          .select('*, menu_item:menu_items(name)')
-          .eq('organization_id', orgId)
-          .order('movement_date', { ascending: false })
-          .limit(200)
+        let fallback = getStockMovementsFallbackQuery(orgId)
         if (filterType !== 'all') fallback = fallback.eq('movement_type', filterType)
         if (filterItem !== 'all') fallback = fallback.eq('menu_item_id', filterItem)
         const res = await fallback
         if (res.error) {
-          let bare = supabase.from('stock_movements').select('*').eq('organization_id', orgId).order('movement_date', { ascending: false }).limit(200)
+          let bare = getStockMovementsBareQuery(orgId)
           if (filterType !== 'all') bare = bare.eq('movement_type', filterType)
           if (filterItem !== 'all') bare = bare.eq('menu_item_id', filterItem)
           const bareRes = await bare

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { getOrders, getOrderWithItems } from '@/app/lib/api/orders'
-import { supabase } from '@/lib/supabase-client'
 import { getFloors, getTablesByFloor, getAllTables, type Floor, type Table } from '@/app/lib/api/tables'
 import { getCategories, getMenuItemsByCategory, getAllMenuItems, type MenuItem } from '@/app/lib/api/menu'
 import BackButton from '@/components/BackButton'
@@ -11,6 +10,16 @@ import EmptyState from '@/components/EmptyState'
 import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
 import { useAuth } from '@/contexts/AuthContext'
+import {
+  updateOrderStatus,
+  createOrder,
+  insertOrderItems,
+  deleteOrderItemsByOrder,
+  updateOrderTotals,
+  deleteOrderById,
+  rejectOrder,
+} from '@/app/lib/db/orders'
+import { supabase } from '@/lib/supabase-client'
 
 interface Order {
   id: string
@@ -360,11 +369,7 @@ export default function KitchenPage() {
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     if (!orgId) return
     try {
-      const { error } = await supabase
-        .from('orders')
-        .update({ status: newStatus })
-        .eq('id', orderId)
-        .eq('organization_id', orgId)
+      const { error } = await updateOrderStatus(orgId, orderId, newStatus)
 
       if (error) {
         console.error('Error updating status:', error)
@@ -537,21 +542,17 @@ export default function KitchenPage() {
       const orderNumber = `ORD-${Date.now()}`
       const subtotal = items.reduce((s, { item, quantity }) => s + item.price * quantity, 0)
       const total = subtotal
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          order_number: orderNumber,
-          order_type: addOrderType,
-          table_id: addOrderType === 'dine-in' ? addTableId : null,
-          subtotal,
-          tax: 0,
-          discount: 0,
-          total,
-          status: 'pending',
-          ...(orgId && { organization_id: orgId }),
-        })
-        .select()
-        .single()
+      const { data: order, error: orderError } = await createOrder({
+        order_number: orderNumber,
+        order_type: addOrderType,
+        table_id: addOrderType === 'dine-in' ? addTableId : null,
+        subtotal,
+        tax: 0,
+        discount: 0,
+        total,
+        status: 'pending',
+        ...(orgId && { organization_id: orgId }),
+      })
       if (orderError) throw orderError
       const orderItems = items.map(({ item, quantity }) => ({
         order_id: order.id,
@@ -564,7 +565,7 @@ export default function KitchenPage() {
         status: 'pending',
         ...(orgId && { organization_id: orgId }),
       }))
-      const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
+      const { error: itemsError } = await insertOrderItems(orderItems)
       if (itemsError) throw itemsError
       setShowAddModal(false)
       fetchOrders()
@@ -644,8 +645,8 @@ export default function KitchenPage() {
     setEditLoading(true)
     try {
       const subtotal = editLines.reduce((s, l) => s + l.unit_price * l.quantity, 0)
-      await supabase.from('order_items').delete().eq('order_id', editOrder.order.id).eq('organization_id', oId)
-      await supabase.from('order_items').insert(editLines.map(l => ({
+      await deleteOrderItemsByOrder(oId, editOrder.order.id)
+      await insertOrderItems(editLines.map(l => ({
         order_id: editOrder.order.id,
         menu_item_id: l.menu_item_id,
         item_name: l.item_name,
@@ -656,11 +657,11 @@ export default function KitchenPage() {
         status: 'pending',
         organization_id: oId,
       })))
-      await supabase.from('orders').update({
+      await updateOrderTotals(oId, editOrder.order.id, {
         subtotal,
         total: subtotal,
-        updated_at: new Date().toISOString()
-      }).eq('id', editOrder.order.id).eq('organization_id', oId)
+        updated_at: new Date().toISOString(),
+      })
       setShowEditModal(false)
       setSelectedOrder(null)
       fetchOrders()
@@ -691,8 +692,8 @@ export default function KitchenPage() {
     }
     setDeleteLoading(true)
     try {
-      await supabase.from('order_items').delete().eq('order_id', deleteOrder.id).eq('organization_id', orgId)
-      await supabase.from('orders').delete().eq('id', deleteOrder.id).eq('organization_id', orgId)
+      await deleteOrderItemsByOrder(orgId, deleteOrder.id)
+      await deleteOrderById(orgId, deleteOrder.id)
       setShowDeleteModal(false)
       setDeleteOrder(null)
       setSelectedOrder(null)
@@ -714,16 +715,7 @@ export default function KitchenPage() {
     }
 
     try {
-      const { error } = await supabase
-        .from('orders')
-        .update({
-          status: 'rejected',
-          rejected_at: new Date().toISOString(),
-          rejected_by: 'Kitchen Staff',
-          rejection_reason: rejectReason
-        })
-        .eq('id', rejectOrderId)
-        .eq('organization_id', orgId)
+      const { error } = await rejectOrder(orgId, rejectOrderId, rejectReason, 'Kitchen Staff')
 
       if (error) throw error
 

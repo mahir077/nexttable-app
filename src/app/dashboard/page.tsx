@@ -4,13 +4,21 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
-import { supabase } from '@/lib/supabase-client'
 import { getFloors, getTablesByFloor, getAllTables, Floor, Table } from '@/app/lib/api/tables'
 import { getTodayStats, getWeeklyStats } from '@/app/lib/api/orders'
 import type { Order } from '@/app/lib/api/orders'
 import TableModal from '@/components/TableModal'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import { useAuth } from '@/contexts/AuthContext'
+import { fetchRestaurantDisplayName } from '@/app/lib/db/org'
+import {
+  fetchActiveOrdersByTables,
+  fetchOrdersForTablesMerge,
+  moveOrdersToTable,
+  updateOrderTable,
+  fetchActiveDineInOrders,
+} from '@/app/lib/db/orders'
+import { updateTableStatus, setTablesAvailable } from '@/app/lib/db/tables'
 
 interface TodayStats {
   totalRevenue: number
@@ -96,8 +104,8 @@ export default function DashboardPage() {
       const timeout = (ms: number) => new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
       try {
         const result = await Promise.race([
-          supabase.from('restaurant_settings').select('display_name').eq('organization_id', orgId).limit(1).maybeSingle(),
-          timeout(8000)
+          fetchRestaurantDisplayName(orgId),
+          timeout(8000),
         ]) as { data: { display_name?: string } | null; error: unknown }
 
         if (!result.error && result.data?.display_name) {
@@ -226,12 +234,12 @@ export default function DashboardPage() {
     async function fetchFoodStatusAndBills() {
       if (!orgId) return
       try {
-        const { data } = await supabase
-          .from('orders')
-          .select('table_id, status, total')
-          .eq('organization_id', orgId)
-          .in('table_id', tableIds)
-          .in('status', ['pending', 'preparing', 'ready', 'served'])
+        const { data } = await fetchActiveOrdersByTables(orgId, tableIds, [
+          'pending',
+          'preparing',
+          'ready',
+          'served',
+        ])
         const statusMap: Record<string, 'kot' | 'table'> = {}
         const billsMap: Record<string, number> = {}
         ;(data || []).forEach((row: { table_id: string | null; status: string; total?: number }) => {
@@ -282,11 +290,7 @@ export default function DashboardPage() {
   const handleStatusChange = async (tableId: string, newStatus: string) => {
     if (!orgId) return
     try {
-      const { error } = await supabase
-        .from('tables')
-        .update({ status: newStatus })
-        .eq('id', tableId)
-        .eq('organization_id', orgId)
+      const { error } = await updateTableStatus(orgId, tableId, newStatus)
 
       if (error) throw error
 
@@ -340,25 +344,24 @@ export default function DashboardPage() {
     setMergeLoading(true)
     try {
       const otherIds = selected.filter(id => id !== mergePrimaryId)
-      const { data: ordersToMove } = await supabase
-        .from('orders')
-        .select('id')
-        .eq('organization_id', orgId)
-        .in('table_id', otherIds)
-        .in('status', ['pending', 'preparing', 'ready', 'served'])
+      const { data: ordersToMove } = await fetchOrdersForTablesMerge(orgId!, otherIds, [
+        'pending',
+        'preparing',
+        'ready',
+        'served',
+      ])
       if (ordersToMove && ordersToMove.length > 0) {
-        await supabase
-          .from('orders')
-          .update({ table_id: mergePrimaryId, updated_at: new Date().toISOString() })
-          .eq('organization_id', orgId)
-          .in('id', ordersToMove.map(o => o.id))
+        await moveOrdersToTable(
+          orgId!,
+          ordersToMove.map(o => o.id),
+          mergePrimaryId,
+          new Date().toISOString(),
+        )
       }
-      for (const id of otherIds) {
-        await supabase.from('tables').update({ status: 'available' }).eq('id', id).eq('organization_id', orgId)
-      }
+      await setTablesAvailable(orgId!, otherIds)
       setShowMergeModal(false)
       if (selectedFloor && orgId) {
-        const tablesData = await getTablesByFloor(selectedFloor.id, orgId)
+        const tablesData = await getTablesByFloor(selectedFloor.id, orgId!)
         setTables(tablesData)
       }
       alert('Tables merged successfully. All orders are now on the primary table.')
@@ -378,15 +381,8 @@ export default function DashboardPage() {
     setChangeNewTableId('')
     try {
       const [ordersRes, tablesRes] = await Promise.all([
-        supabase
-          .from('orders')
-          .select('*')
-          .eq('organization_id', orgId)
-          .eq('order_type', 'dine-in')
-          .not('table_id', 'is', null)
-          .in('status', ['pending', 'preparing', 'ready', 'served'])
-          .order('created_at', { ascending: false }),
-        getAllTables(orgId)
+        fetchActiveDineInOrders(orgId!),
+        getAllTables(orgId!),
       ])
       const tablesList = tablesRes || []
       setActiveDineInOrders((ordersRes.data as Order[]) || [])
@@ -412,13 +408,9 @@ export default function DashboardPage() {
     }
     setChangeLoading(true)
     try {
-      await supabase
-        .from('orders')
-        .update({ table_id: changeNewTableId, updated_at: new Date().toISOString() })
-        .eq('id', changeOrderId)
-        .eq('organization_id', orgId)
-      await supabase.from('tables').update({ status: 'available' }).eq('id', oldTableId).eq('organization_id', orgId)
-      await supabase.from('tables').update({ status: 'occupied' }).eq('id', changeNewTableId).eq('organization_id', orgId)
+      await updateOrderTable(orgId!, changeOrderId, changeNewTableId, new Date().toISOString())
+      await updateTableStatus(orgId!, oldTableId, 'available')
+      await updateTableStatus(orgId!, changeNewTableId, 'occupied')
       setShowChangeModal(false)
       if (selectedFloor && orgId) {
         const tablesData = await getTablesByFloor(selectedFloor.id, orgId)

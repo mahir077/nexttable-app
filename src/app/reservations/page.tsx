@@ -1,12 +1,17 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase-client'
 import { getAllTables, type Table } from '@/app/lib/api/tables'
 import BackButton from '@/components/BackButton'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/hooks/useToast'
 import Toast from '@/components/Toast'
+import {
+  fetchPendingReservations,
+  createReservation,
+  markReservationArrived,
+  cancelReservationById,
+} from '@/app/lib/db/reservations'
 
 interface Reservation {
   id: string
@@ -48,13 +53,7 @@ export default function ReservationsPage() {
   const fetchReservations = async () => {
     if (!orgId) return
     setLoading(true)
-    const { data } = await supabase
-      .from('reservations')
-      .select('*')
-      .eq('organization_id', orgId)
-      .eq('status', 'pending')
-      .order('date', { ascending: true })
-      .order('time', { ascending: true })
+    const { data } = await fetchPendingReservations(orgId)
     setReservations((data as Reservation[]) || [])
     setLoading(false)
   }
@@ -73,7 +72,9 @@ export default function ReservationsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const { error } = await supabase.from('reservations').insert({
+    if (!orgId) return
+
+    const { error } = await createReservation({
       date,
       time,
       table_id: tableId,
@@ -82,7 +83,7 @@ export default function ReservationsPage() {
       guest_count: guestCount ? parseInt(guestCount, 10) : null,
       special_requests: specialRequests || null,
       status: 'pending',
-      ...(orgId && { organization_id: orgId }),
+      organization_id: orgId,
     })
 
     if (!error) {
@@ -103,8 +104,7 @@ export default function ReservationsPage() {
 
   const markAsArrived = async (reservation: Reservation) => {
     if (orgId) {
-      await supabase.from('tables').update({ status: 'occupied' }).eq('id', reservation.table_id).eq('organization_id', orgId)
-      await supabase.from('reservations').update({ status: 'arrived' }).eq('id', reservation.id).eq('organization_id', orgId)
+      await markReservationArrived(orgId, reservation.id, reservation.table_id)
     }
     alert('✅ Guest arrived!')
     fetchReservations()
@@ -112,7 +112,7 @@ export default function ReservationsPage() {
 
   const cancelReservation = async (id: string) => {
     if (confirm('Cancel this reservation?')) {
-      if (orgId) await supabase.from('reservations').delete().eq('id', id).eq('organization_id', orgId)
+      if (orgId) await cancelReservationById(orgId, id)
       fetchReservations()
     }
   }

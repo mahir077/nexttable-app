@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { useSupabase } from '@/contexts/SupabaseContext'
+import { fetchOrganizationById } from '@/app/lib/db/org'
 import { useRouter } from 'next/navigation'
 
 interface Organization {
@@ -127,12 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const savedId = localStorage.getItem('current_organization_id')
     if (!savedId) return
     let cancelled = false
-    supabase
-      .from('organizations')
-      .select('id, name, slug, display_name')
-      .eq('id', savedId)
-      .single()
-      .then(({ data: orgRow, error }) => {
+    fetchOrganizationById(savedId).then(({ data: orgRow, error }) => {
         if (cancelled || error || !orgRow) return
         setOrganization({
           id: orgRow.id,
@@ -193,7 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (typeof window !== 'undefined') {
           const savedId = localStorage.getItem('current_organization_id')
           if (savedId) {
-            const { data: orgRow } = await supabase.from('organizations').select('id, name, slug, display_name').eq('id', savedId).single()
+            const { data: orgRow } = await fetchOrganizationById(savedId)
             if (orgRow) {
               setOrganization({ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name, slug: orgRow.slug })
               setOrganizations([{ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name, slug: orgRow.slug }])
@@ -212,11 +208,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (typeof window !== 'undefined') {
           const savedId = localStorage.getItem('current_organization_id')
           if (savedId) {
-            const { data: orgRow } = await supabase
-              .from('organizations')
-              .select('id, name, slug, display_name')
-              .eq('id', savedId)
-              .single()
+            const { data: orgRow } = await fetchOrganizationById(savedId)
             if (orgRow) {
               setOrganization({
                 id: orgRow.id,
@@ -259,18 +251,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return currentOrg?.id ?? null
     } catch (e) {
       log('catch', { error: e })
-      if (typeof window !== 'undefined') {
-        const savedId = localStorage.getItem('current_organization_id')
-        if (savedId) {
-          try {
-            const { data: orgRow } = await supabase.from('organizations').select('id, name, slug, display_name').eq('id', savedId).single()
-            if (orgRow) {
-              setOrganization({ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name, slug: orgRow.slug })
-              setOrganizations([{ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name, slug: orgRow.slug }])
-            }
-          } catch { /* ignore */ }
+        if (typeof window !== 'undefined') {
+          const savedId = localStorage.getItem('current_organization_id')
+          if (savedId) {
+            try {
+              const { data: orgRow } = await fetchOrganizationById(savedId)
+              if (orgRow) {
+                setOrganization({ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name, slug: orgRow.slug })
+                setOrganizations([{ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name, slug: orgRow.slug }])
+              }
+            } catch { /* ignore */ }
+          }
         }
-      }
       return null
     } finally {
       setLoading(false)

@@ -1,9 +1,17 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase-client'
 import BackButton from '@/components/BackButton'
 import { useAuth } from '@/contexts/AuthContext'
+import {
+  getOrdersReportBaseQuery,
+  getOrdersReportFallbackQuery,
+} from '@/app/lib/db/orders'
+import {
+  getStockSummaryBaseQuery,
+  getStockSummaryFallbackQuery,
+} from '@/app/lib/db/stock'
+import { fetchPurchasesWithSuppliers } from '@/app/lib/db/purchases'
 
 interface Order {
   id: string
@@ -43,19 +51,11 @@ export default function ReportsPage() {
   const fetchStockData = async () => {
     if (!orgId) return
     try {
-      let query = supabase
-        .from('stock_summary')
-        .select(`
-          *,
-          menu_item:menu_items(name, category:categories(name))
-        `)
-        .eq('organization_id', orgId)
-
-      const { data, error } = await query
+      const { data, error } = await getStockSummaryBaseQuery(orgId)
 
       if (error) {
         const msg = (error as { message?: string; code?: string })?.message || (error as { message?: string; code?: string })?.code || String(error)
-        const { data: fallbackData } = await supabase.from('stock_summary').select('*').eq('organization_id', orgId)
+        const { data: fallbackData } = await getStockSummaryFallbackQuery(orgId)
         setStockData(fallbackData || [])
         return
       }
@@ -69,33 +69,38 @@ export default function ReportsPage() {
   const fetchPurchases = async () => {
     if (!orgId) return
     try {
-      let query = supabase
-        .from('purchases')
-        .select('total_amount, purchase_date')
-        .eq('organization_id', orgId)
-        .order('purchase_date', { ascending: false })
-
-      if (dateFilter === 'today') {
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        query = query.gte('purchase_date', today.toISOString().split('T')[0])
-      } else if (dateFilter === 'week') {
-        const weekAgo = new Date()
-        weekAgo.setDate(weekAgo.getDate() - 7)
-        query = query.gte('purchase_date', weekAgo.toISOString().split('T')[0])
-      } else if (dateFilter === 'month') {
-        const monthAgo = new Date()
-        monthAgo.setDate(monthAgo.getDate() - 30)
-        query = query.gte('purchase_date', monthAgo.toISOString().split('T')[0])
-      }
-
-      const { data, error } = await query
+      const { data, error } = await fetchPurchasesWithSuppliers(orgId)
       if (error) {
         const msg = (error as { message?: string; code?: string })?.message || String(error)
         setPurchases([])
         return
       }
-      setPurchases(data || [])
+
+      let filtered = data || []
+      if (dateFilter === 'today') {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        filtered = filtered.filter(p => {
+          const d = new Date(p.purchase_date ?? '')
+          return d >= today
+        })
+      } else if (dateFilter === 'week') {
+        const weekAgo = new Date()
+        weekAgo.setDate(weekAgo.getDate() - 7)
+        filtered = filtered.filter(p => {
+          const d = new Date(p.purchase_date ?? '')
+          return d >= weekAgo
+        })
+      } else if (dateFilter === 'month') {
+        const monthAgo = new Date()
+        monthAgo.setDate(monthAgo.getDate() - 30)
+        filtered = filtered.filter(p => {
+          const d = new Date(p.purchase_date ?? '')
+          return d >= monthAgo
+        })
+      }
+
+      setPurchases(filtered || [])
     } catch (err) {
       setPurchases([])
     }
@@ -113,28 +118,7 @@ export default function ReportsPage() {
     try {
       setLoading(true)
 
-      let query = supabase
-        .from('orders')
-        .select(`
-          id,
-          total,
-          created_at,
-          payment_method,
-          order_type,
-          status,
-          order_items (
-            quantity,
-            unit_price,
-            item_name,
-            menu_item:menu_items (
-              name,
-              category:categories(name),
-              making_cost
-            )
-          )
-        `)
-        .eq('organization_id', orgId)
-        .order('created_at', { ascending: false })
+      let query = getOrdersReportBaseQuery(orgId)
 
       if (dateFilter === 'today') {
         const today = new Date()
@@ -155,11 +139,7 @@ export default function ReportsPage() {
       if (error) {
         const msg = (error as { message?: string; code?: string })?.message || (error as { message?: string; code?: string })?.code || String(error)
         // Fallback without menu_items join
-        let fallback = supabase
-          .from('orders')
-          .select('id, total, created_at, payment_method, order_type, status, order_items (quantity, unit_price, item_name, menu_item_id, menu_item:menu_items (name, making_cost))')
-          .eq('organization_id', orgId)
-          .order('created_at', { ascending: false })
+        let fallback = getOrdersReportFallbackQuery(orgId)
         if (dateFilter === 'today') {
           const today = new Date()
           today.setHours(0, 0, 0, 0)
