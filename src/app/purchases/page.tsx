@@ -157,7 +157,7 @@ export default function PurchasesPage() {
       return
     }
     try {
-      const rawMaterialId = await getOrCreateRawMaterialMenuItemId()
+      const rawMaterialId = await getOrCreateRawMaterialMenuItemId(orgId)
       if (!rawMaterialId) {
         showToast('Could not create raw material item. Try again.', 'error')
         return
