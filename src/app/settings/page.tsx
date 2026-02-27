@@ -257,8 +257,8 @@ export default function SettingsPage() {
     setRestaurantInfoLoading(true)
     const safetyTimer = setTimeout(() => {
       setRestaurantInfoLoading(false)
-    }, 25000)
-    const timeoutMs = 20000
+    }, 15000)
+    const timeoutMs = 12000
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('Save timed out. Please try again.')), timeoutMs)
     )

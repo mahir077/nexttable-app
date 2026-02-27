@@ -140,9 +140,10 @@ export default function DashboardPage() {
     setCurrentDate(today.toLocaleDateString('en-US', options).toUpperCase())
   }, [])
 
-  // Fetch floors only when we have organization from context (skip for super admin / no org)
+  // Fetch floors only when organization is available from AuthContext (avoids timing issue + null orgId in production)
   useEffect(() => {
-    if (!hasOrg || !orgId) {
+    const orgId = organization?.id ?? null
+    if (orgId == null) {
       setLoading(false)
       setFloors([])
       setSelectedFloor(null)
@@ -169,7 +170,7 @@ export default function DashboardPage() {
       }
     }
     loadFloors()
-  }, [hasOrg, orgId])
+  }, [organization?.id])
 
   useEffect(() => {
     if (!hasOrg || !orgId || !selectedFloor) {
