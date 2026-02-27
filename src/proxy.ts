@@ -8,7 +8,10 @@ export async function proxy(req: NextRequest) {
   })
 
   const searchParams = req.nextUrl.searchParams
-  const isRecovery = searchParams.get('type') === 'recovery' || searchParams.has('access_token')
+  const isRecovery =
+    searchParams.get('type') === 'recovery' ||
+    searchParams.has('access_token') ||
+    searchParams.has('token_hash')
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
