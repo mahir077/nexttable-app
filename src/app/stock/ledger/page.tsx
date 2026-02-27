@@ -10,6 +10,7 @@ import {
   getStockMovementsFallbackQuery,
   getStockMovementsBareQuery,
 } from '@/app/lib/db/stock'
+import { supabase } from '@/lib/supabase-client'
 
 interface StockMovement {
   id: string

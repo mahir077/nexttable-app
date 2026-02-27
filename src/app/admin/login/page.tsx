@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSupabase } from '@/contexts/SupabaseContext'
 import { useSearchParams } from 'next/navigation'
 
 type Mode = 'login' | 'reset' | 'update'
 
-export default function AdminLoginPage() {
+function AdminLoginInner() {
   const supabase = useSupabase()
   const searchParams = useSearchParams()
 
@@ -362,6 +362,15 @@ export default function AdminLoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function AdminLoginPage() {
+  // Wrap the client-side searchParams usage in a Suspense boundary to satisfy Next.js CSR bailout rules.
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 text-slate-200">Loading...</div>}>
+      <AdminLoginInner />
+    </Suspense>
   )
 }
 
