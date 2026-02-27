@@ -11,6 +11,7 @@ import {
   fetchMenuItemsForPurchases,
   createPurchase,
   insertPurchaseItems,
+  getOrCreateRawMaterialMenuItemId
 } from '@/app/lib/db/purchases'
 import {
   insertBazaarStockMovement,
@@ -142,54 +143,6 @@ export default function PurchasesPage() {
 
   const calculateTotal = () => {
     return purchaseItems.reduce((sum, item) => sum + item.total_cost, 0)
-  }
-
-  // Get or create the special "Raw material" menu item so we can insert stock_movement without DB migration
-  const getOrCreateRawMaterialMenuItemId = async (): Promise<string | null> => {
-    if (!orgId) return null
-    const RAW_NAME = 'বাজার / Raw material'
-    const { data: existing, error: findErr } = await fetchMenuItemsForPurchases(orgId)
-    if (!findErr && Array.isArray(existing)) {
-      const raw = existing.find(i => i.name === RAW_NAME)
-      if (raw?.id) return raw.id
-    }
-    const { data: categories } = await supabase
-      .from('categories')
-      .select('id')
-      .eq('organization_id', orgId)
-      .limit(1)
-    let categoryId = categories?.[0]?.id
-    if (!categoryId) {
-      const { data: newCat, error: catErr } = await supabase
-        .from('categories')
-        .insert({ name: 'Stock', display_order: 999, organization_id: orgId, is_active: true })
-        .select('id')
-        .single()
-      if (catErr) {
-        console.error('Create category for bazaar:', catErr)
-        return null
-      }
-      categoryId = newCat?.id
-    }
-    if (!categoryId) return null
-    const { data: newItem, error: itemErr } = await supabase
-      .from('menu_items')
-      .insert({
-        name: RAW_NAME,
-        category_id: categoryId,
-        price: 0,
-        making_cost: 0,
-        is_available: false,
-        is_active: true,
-        organization_id: orgId,
-      })
-      .select('id')
-      .single()
-    if (itemErr) {
-      console.error('Create raw material menu item:', itemErr)
-      return null
-    }
-    return newItem?.id ?? null
   }
 
   const handleSubmitBazaar = async (e: React.FormEvent) => {
