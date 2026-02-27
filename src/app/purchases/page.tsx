@@ -164,7 +164,7 @@ export default function PurchasesPage() {
       }
       const payload = {
         menu_item_id: rawMaterialId,
-        movement_type: 'purchase',
+        movement_type: 'purchase' as const,
         quantity: 0,
         unit_cost: 0,
         total_value: amount,
