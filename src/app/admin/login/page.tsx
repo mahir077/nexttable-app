@@ -88,7 +88,8 @@ function AdminLoginInner() {
     setLoading(true)
 
     try {
-      let data: { user: unknown; session?: { access_token?: string } }; let authError: { message?: string } | null = null
+      let data: { user: unknown; session?: { access_token?: string } | null } | null = null
+      let authError: { message?: string } | null = null
       try {
         const result = await supabase.auth.signInWithPassword({ email, password })
         data = result.data
@@ -101,12 +102,12 @@ function AdminLoginInner() {
         throw err
       }
 
-      if (authError || !data.user) {
+      if (authError || !data?.user) {
         if (mountedRef.current) setError(authError?.message || 'Invalid email or password')
         return
       }
 
-      const accessToken = data.session?.access_token
+      const accessToken = data?.session?.access_token
       const verifyUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/verify-admin` : '/api/verify-admin'
       console.log('[admin/login] Calling verify-admin:', verifyUrl)
       let verifyRes: Response
