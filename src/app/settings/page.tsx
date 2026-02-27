@@ -155,7 +155,7 @@ export default function SettingsPage() {
     if (!orgId) return
     const timeout = (ms: number) => new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
     try {
-      let orgData: { id: string; name: string; display_name?: string | null; slug?: string } | null = null
+      let orgData: { id: string; name: string; display_name?: string | null } | null = null
 
       const { data: orgResp, error: orgError } = await Promise.race([
         fetchOrganizationById(orgId),

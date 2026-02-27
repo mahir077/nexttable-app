@@ -8,7 +8,6 @@ import { useRouter } from 'next/navigation'
 interface Organization {
   id: string
   name: string
-  slug: string
   display_name: string
 }
 
@@ -34,7 +33,6 @@ function getInitialOrganizationFromStorage(): Organization | null {
   return {
     id,
     name: '',
-    slug: '',
     display_name: ''
   }
 }
@@ -161,14 +159,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setOrganization({
           id: orgRow.id,
           name: orgRow.name,
-          display_name: orgRow.display_name || orgRow.name,
-          slug: orgRow.slug
+          display_name: orgRow.display_name || orgRow.name
         })
         setOrganizations([{
           id: orgRow.id,
           name: orgRow.name,
-          display_name: orgRow.display_name || orgRow.name,
-          slug: orgRow.slug
+          display_name: orgRow.display_name || orgRow.name
         }])
       })
     return () => { cancelled = true }
@@ -201,7 +197,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             organizations (
               id,
               name,
-              slug,
               display_name
             )
           `)
@@ -219,8 +214,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (savedId) {
             const { data: orgRow } = await fetchOrganizationById(savedId)
             if (orgRow) {
-              setOrganization({ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name, slug: orgRow.slug })
-              setOrganizations([{ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name, slug: orgRow.slug }])
+              setOrganization({ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name })
+              setOrganizations([{ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name }])
             } else {
               // Stale org id – clear it so dashboards/settings don't keep querying with an invalid organization
               localStorage.removeItem('current_organization_id')
@@ -244,10 +239,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setOrganization({
                 id: orgRow.id,
                 name: orgRow.name,
-                display_name: orgRow.display_name || orgRow.name,
-                slug: orgRow.slug
+                display_name: orgRow.display_name || orgRow.name
               })
-              setOrganizations([{ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name, slug: orgRow.slug }])
+              setOrganizations([{ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name }])
             } else {
               // Stale org id – clear it so that empty tenants don't keep causing RLS/permission noise
               localStorage.removeItem('current_organization_id')
@@ -258,7 +252,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return null
       }
 
-      type OrgShape = { name: string; display_name?: string; slug: string }
+      type OrgShape = { name: string; display_name?: string }
       const rows = data as unknown as Array<{ organization_id: string; organizations: OrgShape | OrgShape[] | null }>
       const orgs: Organization[] = rows
         .filter((uo) => uo.organizations)
@@ -269,8 +263,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return {
             id: uo.organization_id,
             name: org.name,
-            display_name: org.display_name || org.name,
-            slug: org.slug
+            display_name: org.display_name || org.name
           }
         })
         .filter((o): o is Organization => o != null)
@@ -291,8 +284,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             try {
               const { data: orgRow } = await fetchOrganizationById(savedId)
               if (orgRow) {
-                setOrganization({ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name, slug: orgRow.slug })
-                setOrganizations([{ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name, slug: orgRow.slug }])
+                setOrganization({ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name })
+                setOrganizations([{ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name }])
               }
             } catch { /* ignore */ }
           }
@@ -321,11 +314,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     log('signInWithPassword success', { userId: data.user.id })
 
     // Restaurant login must only allow users that exist in the app-level users table.
+    log('checking app users table', { authUserId: data.user.id })
     const { data: appUser, error: appUserError } = await supabase
       .from('users')
       .select('id')
       .eq('auth_user_id', data.user.id)
       .maybeSingle()
+
+    log('users query result', {
+      hasUserRow: !!appUser,
+      appUser,
+      appUserErrorMessage: appUserError?.message ?? null,
+      appUserError: appUserError ?? null,
+    })
 
     if (appUserError || !appUser) {
       // Logged-in auth user is not a restaurant user (likely a super admin) – block regular login.
@@ -366,14 +367,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      // 2. Create organization
-      const slug = orgName.toLowerCase().replace(/[^a-z0-9]/g, '-')
-
       const { data: org, error: orgError } = await supabase
         .from('organizations')
         .insert({
           name: orgName,
-          slug: slug + '-' + Date.now(),
           display_name: orgName,
           owner_id: authData.user.id,
           subscription_status: 'trial'
@@ -451,7 +448,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data, error } = await supabase
       .from('organizations')
-      .select('id, name, slug, display_name')
+      .select('id, name, display_name')
       .eq('id', savedOrgId)
       .single()
 
@@ -459,8 +456,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setOrganization({
         id: data.id,
         name: data.name,
-        display_name: data.display_name || data.name,
-        slug: data.slug
+        display_name: data.display_name || data.name
       })
     }
   }

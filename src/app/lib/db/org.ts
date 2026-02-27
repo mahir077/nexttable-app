@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase-client'
 export async function fetchOrganizationById(orgId: string) {
   return supabase
     .from('organizations')
-    .select('id, name, slug, display_name')
+    .select('id, name, display_name')
     .eq('id', orgId)
     .single()
 }

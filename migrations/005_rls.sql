@@ -51,10 +51,18 @@ CREATE POLICY "org_select" ON organizations FOR SELECT USING (id = get_my_org_id
 CREATE POLICY "org_insert" ON organizations FOR INSERT WITH CHECK (is_super_admin());
 CREATE POLICY "org_update" ON organizations FOR UPDATE USING (id = get_my_org_id() OR is_super_admin());
 
--- users
-CREATE POLICY "users_select" ON users FOR SELECT USING (organization_id = get_my_org_id() OR is_super_admin());
-CREATE POLICY "users_insert" ON users FOR INSERT WITH CHECK (organization_id = get_my_org_id() OR is_super_admin());
-CREATE POLICY "users_update" ON users FOR UPDATE USING (organization_id = get_my_org_id() OR is_super_admin());
+-- users (auth.uid()-based to avoid recursion with get_my_org_id)
+CREATE POLICY "users_select" ON users
+  FOR SELECT
+  USING (auth_user_id = auth.uid() OR is_super_admin());
+
+CREATE POLICY "users_insert" ON users
+  FOR INSERT
+  WITH CHECK (auth_user_id = auth.uid() OR is_super_admin());
+
+CREATE POLICY "users_update" ON users
+  FOR UPDATE
+  USING (auth_user_id = auth.uid() OR is_super_admin());
 
 -- user_organizations
 CREATE POLICY "user_orgs_select" ON user_organizations FOR SELECT USING (organization_id = get_my_org_id() OR is_super_admin());
