@@ -34,7 +34,7 @@ interface TodayStats {
 
 export default function DashboardPage() {
   const router = useRouter()
-  const { organization } = useAuth()
+  const { organization, loading: authLoading, isSuperAdmin } = useAuth()
   const [currentDate, setCurrentDate] = useState<string>('')
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false)
   const [floors, setFloors] = useState<Floor[]>([])
@@ -78,27 +78,27 @@ export default function DashboardPage() {
   // Available tables count (for Dine-in quick action)
   const [availableTablesCount, setAvailableTablesCount] = useState<number>(0)
 
-  // Org from context first, then localStorage (so floors/tables run as soon as we have an id)
   const orgIdFromStorage = typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null
   const orgId = organization?.id ?? orgIdFromStorage
+  const hasOrg = !!organization?.id
 
-  // Debug: log once per render (throttled in dev)
-  const renderCount = useRef(0)
-  renderCount.current += 1
-  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-    console.log('[Dashboard] render', renderCount.current, { orgId: orgId ?? 'null', organizationId: organization?.id ?? 'null', fromStorage: orgIdFromStorage ?? 'null', selectedFloor: selectedFloor?.id ?? 'null' })
-  }
-
-  // Set name from current org immediately (correct tenant), then refine from DB
+  // Super admin: redirect to admin dashboard (no restaurant org)
   useEffect(() => {
-    console.log('[Dashboard] useEffect: restaurant name', { organizationId: organization?.id ?? 'null' })
-    if (organization?.display_name || organization?.name) {
-      setRestaurantName(organization.display_name || organization.name)
+    if (authLoading) return
+    if (isSuperAdmin && typeof window !== 'undefined') {
+      window.location.href = '/admin/dashboard'
+      return
     }
-  }, [organization?.id, organization?.display_name, organization?.name])
+  }, [authLoading, isSuperAdmin])
+
+  const orgIdStable = organization?.id ?? null
+  const orgDisplayName = organization?.display_name ?? organization?.name ?? null
 
   useEffect(() => {
-    console.log('[Dashboard] useEffect: fetchRestaurantInfo', { orgId: orgId ?? 'null' })
+    if (orgDisplayName) setRestaurantName(orgDisplayName)
+  }, [orgIdStable, orgDisplayName])
+
+  useEffect(() => {
     const fetchRestaurantInfo = async () => {
       if (!orgId) return
       const timeout = (ms: number) => new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
@@ -130,7 +130,6 @@ export default function DashboardPage() {
 
   // Set current date
   useEffect(() => {
-    console.log('[Dashboard] useEffect: set current date')
     const today = new Date()
     const options: Intl.DateTimeFormatOptions = {
       weekday: 'short',
@@ -141,21 +140,19 @@ export default function DashboardPage() {
     setCurrentDate(today.toLocaleDateString('en-US', options).toUpperCase())
   }, [])
 
-  // Fetch floors for current org (with timeout so spinner doesn't hang)
+  // Fetch floors only when we have organization from context (skip for super admin / no org)
   useEffect(() => {
-    const effectiveOrgId = orgId ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
-    console.log('[Dashboard] useEffect: FLOORS', { orgId: orgId ?? 'null', effectiveOrgId: effectiveOrgId ?? 'null', willFetch: !!effectiveOrgId })
-    if (!effectiveOrgId) {
+    if (!hasOrg || !orgId) {
       setLoading(false)
+      setFloors([])
+      setSelectedFloor(null)
+      setTables([])
       return
     }
     const timeout = (ms: number) => new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
     async function loadFloors() {
-      console.log('[Dashboard] loadFloors() calling getFloors', effectiveOrgId)
       try {
-        // 25s timeout: Supabase can be slow on first request or from some regions
-        const floorsData = await Promise.race([getFloors(effectiveOrgId), timeout(25000)])
-        console.log('[Dashboard] getFloors result', { count: floorsData?.length ?? 0, floors: floorsData })
+        const floorsData = await Promise.race([getFloors(orgId), timeout(25000)])
         setFloors(floorsData)
         if (floorsData.length > 0) {
           setSelectedFloor(floorsData[0])
@@ -164,9 +161,7 @@ export default function DashboardPage() {
           setTables([])
           setLoading(false)
         }
-      } catch (error) {
-        console.error('[Dashboard] loadFloors error', error)
-        if (error instanceof Error && error.message !== 'timeout') console.error('Error loading floors:', error)
+      } catch {
         setFloors([])
         setSelectedFloor(null)
         setTables([])
@@ -174,67 +169,55 @@ export default function DashboardPage() {
       }
     }
     loadFloors()
-  }, [orgId])
+  }, [hasOrg, orgId])
 
-  // Fetch tables when floor changes (with timeout so spinner doesn't hang)
   useEffect(() => {
-    const effectiveOrgId = orgId ?? (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
-    console.log('[Dashboard] useEffect: TABLES', { orgId: orgId ?? 'null', effectiveOrgId: effectiveOrgId ?? 'null', selectedFloorId: selectedFloor?.id ?? 'null', willFetch: !!(effectiveOrgId && selectedFloor) })
-    if (!effectiveOrgId || !selectedFloor) {
-      if (!effectiveOrgId) setLoading(false)
+    if (!hasOrg || !orgId || !selectedFloor) {
+      if (!hasOrg || !orgId) setLoading(false)
       return
     }
     const floor = selectedFloor
-    const oid = effectiveOrgId
+    const oid = orgId
     const timeout = (ms: number) => new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
     async function loadTables() {
-      console.log('[Dashboard] loadTables() calling getTablesByFloor', { floorId: floor.id, orgId: oid })
       setLoading(true)
       try {
         const tablesData = await Promise.race([getTablesByFloor(floor.id, oid), timeout(25000)])
-        console.log('[Dashboard] getTablesByFloor result', { count: tablesData?.length ?? 0 })
         setTables(tablesData)
-      } catch (error) {
-        console.error('[Dashboard] loadTables error', error)
-        if (error instanceof Error && error.message !== 'timeout') console.error('Error loading tables:', error)
+      } catch {
         setTables([])
       } finally {
         setLoading(false)
       }
     }
     loadTables()
-  }, [orgId, selectedFloor])
+  }, [hasOrg, orgId, selectedFloor])
 
-  // Fetch available tables count (for Dine-in link)
   useEffect(() => {
-    console.log('[Dashboard] useEffect: available count', { orgId: orgId ?? 'null' })
-    if (!orgId) return
+    if (!hasOrg || !orgId) return
     const oid = orgId
     async function loadAvailableCount() {
       try {
         const data = await getAllTables(oid)
-        const count = data.filter(t => t.status === 'available').length
-        setAvailableTablesCount(count)
-      } catch (error) {
-        console.error('Error loading tables count:', error)
+        setAvailableTablesCount(data.filter(t => t.status === 'available').length)
+      } catch {
+        setAvailableTablesCount(0)
       }
     }
     loadAvailableCount()
-  }, [orgId])
+  }, [hasOrg, orgId])
 
-  // Fetch order/food status per table (KOT vs At table) + pending bill per table
   useEffect(() => {
-    console.log('[Dashboard] useEffect: food status & bills', { tablesLength: tables.length, orgId: orgId ?? 'null' })
-    if (tables.length === 0) {
+    if (!hasOrg || !orgId || tables.length === 0) {
       setTableFoodStatus({})
       setTablePendingBills({})
       return
     }
+    const oid = orgId
     const tableIds = tables.map(t => t.id)
     async function fetchFoodStatusAndBills() {
-      if (!orgId) return
       try {
-        const { data } = await fetchActiveOrdersByTables(orgId, tableIds, [
+        const { data } = await fetchActiveOrdersByTables(oid, tableIds, [
           'pending',
           'preparing',
           'ready',
@@ -258,11 +241,10 @@ export default function DashboardPage() {
       }
     }
     fetchFoodStatusAndBills()
-  }, [orgId, tables])
+  }, [hasOrg, orgId, tables])
 
-  // Fetch analytics
   useEffect(() => {
-    if (!orgId) return
+    if (!hasOrg || !orgId) return
     const oid = orgId
     async function loadAnalytics() {
       try {
@@ -272,14 +254,14 @@ export default function DashboardPage() {
         ])
         setTodayStats(today)
         setWeeklyRevenue(weekly.totalRevenue)
-      } catch (error) {
-        console.error('Error loading analytics:', error)
+      } catch {
+        // Permission or network; keep default empty stats
       }
     }
     loadAnalytics()
-    const interval = setInterval(loadAnalytics, 30000) // Refresh every 30s
+    const interval = setInterval(loadAnalytics, 30000)
     return () => clearInterval(interval)
-  }, [orgId])
+  }, [hasOrg, orgId])
 
   // Handle table click — go to POS for that table
   const handleTableClick = (table: Table) => {
@@ -463,6 +445,19 @@ export default function DashboardPage() {
           badge: 'bg-slate-500/90'
         }
     }
+  }
+
+  if (!authLoading && !hasOrg) {
+    return (
+      <div className="flex h-screen bg-white overflow-hidden">
+        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+          <p className="text-slate-600 mb-2">No organization selected.</p>
+          <p className="text-sm text-slate-500 mb-4">Try refreshing the page or log in again.</p>
+          <Link href="/settings" className="text-emerald-600 hover:underline font-medium">Go to Settings</Link>
+        </div>
+      </div>
+    )
   }
 
   return (

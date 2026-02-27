@@ -10,6 +10,8 @@ export async function proxy(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams
   const isRecovery =
     searchParams.get('type') === 'recovery' ||
+    searchParams.get('type') === 'magiclink' ||
+    searchParams.get('type') === 'signup' ||
     searchParams.has('access_token') ||
     searchParams.has('token_hash')
 

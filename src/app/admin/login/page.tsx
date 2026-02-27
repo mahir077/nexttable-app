@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSupabase } from '@/contexts/SupabaseContext'
 import { useSearchParams } from 'next/navigation'
 
@@ -17,6 +17,10 @@ function AdminLoginInner() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showRegisterAdmin, setShowRegisterAdmin] = useState(false)
+  const [registerSuccess, setRegisterSuccess] = useState('')
+  const [registerLoading, setRegisterLoading] = useState(false)
+  const mountedRef = useRef(true)
 
   // Reset-password request state
   const [resetEmail, setResetEmail] = useState('')
@@ -31,6 +35,14 @@ function AdminLoginInner() {
   const [updateMessage, setUpdateMessage] = useState('')
   const [updateLoading, setUpdateLoading] = useState(false)
 
+  // Track mount so we don't setState after unmount (e.g. Turbopack hot reload during fetch)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
   // When coming from Supabase recovery link, show password update form.
   useEffect(() => {
     if (searchParams?.get('type') === 'recovery') {
@@ -38,9 +50,35 @@ function AdminLoginInner() {
     }
   }, [searchParams])
 
+  // Brutal: suppress AbortError so Next.js Turbopack overlay never shows it
+  useEffect(() => {
+    const onRejection = (ev: PromiseRejectionEvent) => {
+      const reason = ev?.reason
+      if (reason?.name === 'AbortError' || (typeof reason?.message === 'string' && reason.message.toLowerCase().includes('abort'))) {
+        ev.preventDefault()
+        ev.stopPropagation()
+      }
+    }
+    const onError = (event: ErrorEvent) => {
+      if (event?.message?.toLowerCase().includes('abort') || (event?.error as Error)?.name === 'AbortError') {
+        event.preventDefault()
+        return true
+      }
+      return false
+    }
+    window.addEventListener('unhandledrejection', onRejection, true)
+    window.addEventListener('error', onError, true)
+    return () => {
+      window.removeEventListener('unhandledrejection', onRejection, true)
+      window.removeEventListener('error', onError, true)
+    }
+  }, [])
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setShowRegisterAdmin(false)
+    setRegisterSuccess('')
 
     if (!email || !password) {
       setError('Please fill in all fields')
@@ -50,38 +88,70 @@ function AdminLoginInner() {
     setLoading(true)
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      })
+      let data: { user: unknown; session?: { access_token?: string } }; let authError: { message?: string } | null = null
+      try {
+        const result = await supabase.auth.signInWithPassword({ email, password })
+        data = result.data
+        authError = result.error
+      } catch (err: unknown) {
+        if ((err as Error)?.name === 'AbortError') {
+          if (mountedRef.current) setLoading(false)
+          return
+        }
+        throw err
+      }
 
-      if (error || !data.user) {
-        setError(error?.message || 'Invalid email or password')
+      if (authError || !data.user) {
+        if (mountedRef.current) setError(authError?.message || 'Invalid email or password')
         return
       }
 
-      // Check that this auth user is a super admin
-      const { data: adminData, error: adminError } = await supabase
-        .from('super_admins')
-        .select('id')
-        .eq('auth_user_id', data.user.id)
-        .maybeSingle()
+      const accessToken = data.session?.access_token
+      const verifyUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/verify-admin` : '/api/verify-admin'
+      console.log('[admin/login] Calling verify-admin:', verifyUrl)
+      let verifyRes: Response
+      try {
+        verifyRes = await fetch(verifyUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ access_token: accessToken }),
+        })
+      } catch (err: unknown) {
+        if ((err as Error)?.name === 'AbortError') {
+          if (mountedRef.current) setLoading(false)
+          return
+        }
+        throw err
+      }
+      let verifyData: { isAdmin?: boolean }
+      try {
+        verifyData = await verifyRes.json().catch(() => ({ isAdmin: false }))
+      } catch (err: unknown) {
+        if ((err as Error)?.name === 'AbortError') {
+          if (mountedRef.current) setLoading(false)
+          return
+        }
+        verifyData = { isAdmin: false }
+      }
 
-      if (adminError || !adminData) {
-        // Not a super admin – immediately sign out and show an error
-        await supabase.auth.signOut()
+      if (!mountedRef.current) return
+      if (!verifyData.isAdmin) {
         setError('This account is not a NextTable super admin. Please use the restaurant login.')
+        setShowRegisterAdmin(true)
         return
       }
 
-      // Valid super admin – go to super admin dashboard
       if (typeof window !== 'undefined') {
         window.location.href = '/admin/dashboard'
       }
-    } catch {
-      setError('Failed to sign in. Please try again.')
+    } catch (err) {
+      if ((err as Error)?.name === 'AbortError' || (err as Error)?.message?.toLowerCase().includes('abort')) {
+        if (mountedRef.current) setLoading(false)
+        return
+      }
+      if (mountedRef.current) setError('Failed to sign in. Please try again.')
     } finally {
-      setLoading(false)
+      if (mountedRef.current) setLoading(false)
     }
   }
 
@@ -100,17 +170,17 @@ function AdminLoginInner() {
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
         redirectTo: 'https://nexttable.netlify.app/admin/login',
       })
-
+      if (!mountedRef.current) return
       if (error) {
         setResetError(error.message)
         return
       }
-
       setResetMessage('Password reset link sent to your email')
-    } catch {
-      setResetError('Failed to send reset link. Please try again.')
+    } catch (err) {
+      if ((err as Error)?.name === 'AbortError') return
+      if (mountedRef.current) setResetError('Failed to send reset link. Please try again.')
     } finally {
-      setResetLoading(false)
+      if (mountedRef.current) setResetLoading(false)
     }
   }
 
@@ -135,17 +205,18 @@ function AdminLoginInner() {
     setUpdateLoading(true)
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword })
+      if (!mountedRef.current) return
       if (error) {
         setUpdateError(error.message)
         return
       }
-
       setUpdateMessage('Password updated successfully. You can now sign in.')
       setMode('login')
-    } catch {
-      setUpdateError('Failed to update password. Please try again.')
+    } catch (err) {
+      if ((err as Error)?.name === 'AbortError') return
+      if (mountedRef.current) setUpdateError('Failed to update password. Please try again.')
     } finally {
-      setUpdateLoading(false)
+      if (mountedRef.current) setUpdateLoading(false)
     }
   }
 
@@ -174,8 +245,56 @@ function AdminLoginInner() {
                 ⚠️ {error}
               </div>
             )}
+            {registerSuccess && (
+              <div className="mb-4 p-3 bg-emerald-900/40 border border-emerald-500 rounded-lg text-emerald-100 text-sm">
+                {registerSuccess}
+              </div>
+            )}
+            {showRegisterAdmin && !registerSuccess && (
+              <div className="mb-4 p-3 bg-slate-800/60 border border-slate-600 rounded-lg text-slate-200 text-sm">
+                <p className="mb-2">If this is your platform admin account, you can add it once (set <code className="text-amber-300">ALLOW_SUPER_ADMIN_REGISTER=true</code> in <code className="text-amber-300">.env.local</code> and restart).</p>
+                <button
+                  type="button"
+                  disabled={registerLoading}
+                  onClick={async () => {
+                    setRegisterLoading(true)
+                    try {
+                      const { data } = await supabase.auth.getSession()
+                      if (!mountedRef.current) return
+                      const token = data.session?.access_token
+                      if (!token) {
+                        setError('Session expired. Sign in again and try the button.')
+                        return
+                      }
+                      const res = await fetch('/api/admin/register-super-admin', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ access_token: token }),
+                      })
+                      const j = await res.json().catch(() => ({}))
+                      if (!mountedRef.current) return
+                      if (res.ok && j.ok) {
+                        setRegisterSuccess('Registered. Sign in again to continue.')
+                        setShowRegisterAdmin(false)
+                        setError('')
+                      } else {
+                        setError(j.error || (res.status === 403 ? 'Set ALLOW_SUPER_ADMIN_REGISTER=true in .env.local and restart the app.' : 'Registration failed.'))
+                      }
+                    } catch (err) {
+                      if ((err as Error)?.name === 'AbortError') return
+                      if (mountedRef.current) setError('Request failed.')
+                    } finally {
+                      if (mountedRef.current) setRegisterLoading(false)
+                    }
+                  }}
+                  className="mt-2 px-3 py-1.5 text-sm font-medium bg-amber-600 hover:bg-amber-500 text-white rounded-lg disabled:opacity-50"
+                >
+                  {registerLoading ? 'Registering…' : 'Register this account as Super Admin'}
+                </button>
+              </div>
+            )}
 
-            <form onSubmit={handleLogin} className="space-y-4">
+            <form onSubmit={(e) => { handleLogin(e).catch((err: unknown) => { if ((err as Error)?.name === 'AbortError') return; if (mountedRef.current) { setError('Failed to sign in. Please try again.'); setLoading(false); } }); }} className="space-y-4">
               <div>
                 <label className="block text-sm font-bold text-slate-200 mb-2">
                   Admin Email

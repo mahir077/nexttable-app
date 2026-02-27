@@ -60,18 +60,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setUser(session.user)
       try {
-        // First check if this user is a super admin.
-        const { data: adminData, error: adminError } = await supabase
-          .from('super_admins')
-          .select('id')
-          .eq('auth_user_id', session.user.id)
-          .maybeSingle()
-
-        const isAdmin = !!adminData && !adminError
-        setIsSuperAdmin(isAdmin)
-
-        if (isAdmin) {
-          // Super admins never have an organization context on the client.
+        const verifyUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/verify-admin` : '/api/verify-admin'
+        const verifyRes = await fetch(verifyUrl, { method: 'GET', credentials: 'include' })
+        const verifyData = await verifyRes.json().catch(() => ({ isAdmin: false }))
+        if (verifyData?.isAdmin === true) {
+          setIsSuperAdmin(true)
           setOrganization(null)
           setOrganizations([])
           if (typeof window !== 'undefined') {
@@ -85,10 +78,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setLoading(false)
           return
         }
-
-        // Non-admin: load tenant organizations as before.
-        await loadOrganizations(session.user.id)
+        setIsSuperAdmin(false)
+        const verifyUserUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/verify-user` : '/api/verify-user'
+        const verifyUserRes = await fetch(verifyUserUrl, { method: 'GET', credentials: 'include' })
+        const verifyUserData = await verifyUserRes.json().catch(() => ({ isUser: false, organizationId: null, organizations: [] }))
+        if (verifyUserData?.isUser && verifyUserData?.organizationId) {
+          const orgId = verifyUserData.organizationId as string
+          const orgsFromApi = (verifyUserData.organizations ?? []) as { id: string; name: string; display_name: string }[]
+          const firstOrg = orgsFromApi[0] ?? { id: orgId, name: '', display_name: '' }
+          const orgsToSet = orgsFromApi.length > 0 ? orgsFromApi : [{ id: orgId, name: firstOrg.name, display_name: firstOrg.display_name || firstOrg.name }]
+          const orgToSet = { id: orgId, name: firstOrg.name, display_name: firstOrg.display_name || firstOrg.name }
+          if (mounted) {
+            setOrganizations(orgsToSet)
+            setOrganization(orgToSet)
+          }
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('current_organization_id', orgId)
+            localStorage.setItem('restaurantInfo', JSON.stringify({ name: orgToSet.display_name || orgToSet.name }))
+          }
+        } else {
+          if (mounted) {
+            setOrganization(null)
+            setOrganizations([])
+          }
+        }
       } catch (e) {
+        if (mounted) setLoading(false)
+      } finally {
         if (mounted) setLoading(false)
       }
     }
@@ -188,41 +204,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return null
       }
 
-      const result = await Promise.race([
-        supabase
-          .from('user_organizations')
-          .select(`
-            organization_id,
-            role,
-            organizations (
-              id,
-              name,
-              display_name
-            )
-          `)
-          .eq('user_id', currentUser.id),
-        timeout(12000)
-      ]) as { data: unknown; error: { message?: string } | null }
+      let data: unknown
+      let error: { message?: string } | null = null
+      try {
+        const result = await Promise.race([
+          supabase
+            .from('user_organizations')
+            .select(`
+              organization_id,
+              role,
+              organizations (
+                id,
+                name,
+                display_name
+              )
+            `)
+            .eq('user_id', currentUser.id),
+          timeout(12000)
+        ]) as { data: unknown; error: { message?: string } | null }
+        data = result.data
+        error = result.error
+      } catch (queryErr) {
+        log('user_organizations query threw (e.g. 400 for super admin)', queryErr)
+        setOrganizations([])
+        setOrganization(null)
+        setLoading(false)
+        return null
+      }
 
-      const { data, error } = result
       log('user_organizations query', { error: error?.message ?? null, rowCount: Array.isArray(data) ? data.length : 0 })
 
       if (error) {
+        setOrganizations([])
+        setOrganization(null)
         setLoading(false)
         if (typeof window !== 'undefined') {
           const savedId = localStorage.getItem('current_organization_id')
           if (savedId) {
-            const { data: orgRow } = await fetchOrganizationById(savedId)
-            if (orgRow) {
-              setOrganization({ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name })
-              setOrganizations([{ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name }])
-            } else {
-              // Stale org id – clear it so dashboards/settings don't keep querying with an invalid organization
+            try {
+              const { data: orgRow } = await fetchOrganizationById(savedId)
+              if (orgRow) {
+                setOrganization({ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name })
+                setOrganizations([{ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name }])
+              } else {
+                localStorage.removeItem('current_organization_id')
+              }
+            } catch {
               localStorage.removeItem('current_organization_id')
             }
           }
         }
-        log('early return: query error')
+        log('early return: query error (no UI error shown)')
         return null
       }
 
@@ -313,23 +345,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     log('signInWithPassword success', { userId: data.user.id })
 
-    // Restaurant login must only allow users that exist in the app-level users table.
-    log('checking app users table', { authUserId: data.user.id })
-    const { data: appUser, error: appUserError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('auth_user_id', data.user.id)
-      .maybeSingle()
+    const accessToken = data.session?.access_token
+    let verifyRes: Response
+    try {
+      verifyRes = await fetch('/api/verify-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ access_token: accessToken }),
+      })
+    } catch (e) {
+      if ((e as Error)?.name === 'AbortError') {
+        return {
+          data: null,
+          error: { message: 'Request was cancelled. Please try again.' } as unknown as Error
+        }
+      }
+      throw e
+    }
+    const verifyData = await verifyRes.json().catch(() => ({ isUser: false, organizationId: null, organizations: [] }))
 
-    log('users query result', {
-      hasUserRow: !!appUser,
-      appUser,
-      appUserErrorMessage: appUserError?.message ?? null,
-      appUserError: appUserError ?? null,
+    log('verify-user response', {
+      isUser: verifyData?.isUser,
+      organizationId: verifyData?.organizationId,
+      organizations: verifyData?.organizations,
+      raw: verifyData,
     })
 
-    if (appUserError || !appUser) {
-      // Logged-in auth user is not a restaurant user (likely a super admin) – block regular login.
+    if (!verifyData.isUser || !verifyData.organizationId) {
       await supabase.auth.signOut()
       return {
         data: null,
@@ -337,21 +379,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // Brief wait for session/cookies to be ready
-    await new Promise(resolve => setTimeout(resolve, 400))
+    const orgId = verifyData.organizationId as string
+    const orgsFromApi = (verifyData.organizations ?? []) as { id: string; name: string; display_name: string }[]
+    const firstOrg = orgsFromApi[0] ?? { id: orgId, name: '', display_name: '' }
 
-    log('after delay, calling loadOrganizations')
-    const orgId = await loadOrganizations(data.user.id)
-    log('loadOrganizations returned', { orgId })
-    if (typeof window !== 'undefined' && orgId) {
+    const orgsToSet = orgsFromApi.length > 0 ? orgsFromApi : [{ id: orgId, name: firstOrg.name, display_name: firstOrg.display_name || firstOrg.name }]
+    const orgToSet = { id: orgId, name: firstOrg.name, display_name: firstOrg.display_name || firstOrg.name }
+
+    log('setting state', { orgId, orgsFromApi, firstOrg, orgsToSet, orgToSet })
+
+    if (typeof window !== 'undefined') {
       localStorage.setItem('current_organization_id', orgId)
-      log('signIn: set localStorage before redirect', { orgId })
+      localStorage.setItem('restaurantInfo', JSON.stringify({ name: orgToSet.display_name || orgToSet.name }))
     }
-    await new Promise(resolve => setTimeout(resolve, 200))
-    const stored = typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null
-    log('before redirect', { stored })
-    window.location.href = '/dashboard'
+    setOrganizations(orgsToSet)
+    setOrganization(orgToSet)
 
+    router.push('/dashboard')
     return { data, error: null }
   }
 

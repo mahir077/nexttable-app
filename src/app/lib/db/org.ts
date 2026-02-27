@@ -76,7 +76,7 @@ export async function updateOrganizationDisplayName(
 ) {
   return supabase
     .from('organizations')
-    .update({ display_name: displayName, updated_at: updatedAt })
+    .update({ name: displayName, updated_at: updatedAt })
     .eq('id', orgId)
 }
 

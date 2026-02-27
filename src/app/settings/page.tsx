@@ -53,7 +53,7 @@ const defaultInvoiceSettings: InvoiceSettings = {
 
 export default function SettingsPage() {
   // ===== FIX 1: Get org from AuthContext + localStorage fallback =====
-  const { organization } = useAuth()
+  const { organization, refreshOrganization } = useAuth()
   const [orgId, setOrgId] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('current_organization_id')
@@ -267,7 +267,7 @@ export default function SettingsPage() {
       const updatedAt = new Date().toISOString()
 
       const savePromise = (async () => {
-        // 1) Save restaurant_settings
+        // 1) Save restaurant_settings (display_name, address, phone, email)
         await upsertRestaurantSettings(orgId, {
           display_name: displayName,
           address: restaurantInfo.address?.trim() ?? null,
@@ -276,14 +276,11 @@ export default function SettingsPage() {
           updated_at: updatedAt,
         })
 
-        // 2) Try to update organization display_name
-        try {
-          const { error: orgError } = await updateOrganizationDisplayName(orgId, displayName, updatedAt)
-          if (orgError) throw orgError
-        } catch {
-          // Org update is optional
-        }
+        // 2) Update organizations table (name and display_name with restaurant name)
+        const { error: orgError } = await updateOrganizationDisplayName(orgId, displayName, updatedAt)
+        if (orgError) throw orgError
 
+        // 3) Update localStorage so sidebar and other pages see the new name immediately
         localStorage.setItem('restaurantInfo', JSON.stringify(restaurantInfo))
       })()
 
@@ -291,6 +288,10 @@ export default function SettingsPage() {
 
       showToast('Settings saved!', 'success')
       await loadSettings(true)
+
+      // 4) Update AuthContext organization state so sidebar name updates without reload
+      await refreshOrganization()
+      localStorage.setItem('restaurantInfo', JSON.stringify(restaurantInfo))
     } catch (error) {
       // ===== FIX: Ignore AbortError silently =====
       if (error instanceof Error && error.name === 'AbortError') {

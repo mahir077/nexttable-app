@@ -343,10 +343,7 @@ export async function getTodayStats(organizationId: string): Promise<TodayStats>
       .gte('updated_at', startOfToday)
       .lte('updated_at', endOfToday)
 
-    if (ordersError) {
-      console.error('Error fetching today orders:', ordersError)
-      return empty
-    }
+    if (ordersError) return empty
 
     const orderList = [
       ...(ordersWithPaidAt || []),
@@ -401,8 +398,7 @@ export async function getTodayStats(organizationId: string): Promise<TodayStats>
       popularItems,
       orders: orderList
     }
-  } catch (error) {
-    console.error('Error in getTodayStats:', error)
+  } catch {
     return empty
   }
 }
@@ -436,10 +432,7 @@ export async function getWeeklyStats(organizationId: string): Promise<WeeklyStat
       .gte('updated_at', startOfWeek)
       .lte('updated_at', endOfToday)
 
-    if (error) {
-      console.error('Error fetching weekly orders:', error)
-      return empty
-    }
+    if (error) return empty
 
     const idsWithPaidAt = new Set((ordersWithPaidAt || []).map((o: { id: string }) => o.id))
     const extra = (ordersNullPaidAt || []).filter((o: { id: string }) => !idsWithPaidAt.has(o.id))
