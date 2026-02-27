@@ -17,6 +17,7 @@ interface AuthContextType {
   organization: Organization | null
   organizations: Organization[]
   loading: boolean
+  isSuperAdmin: boolean
   signIn: (email: string, password: string) => Promise<any>
   signUp: (email: string, password: string, orgName: string) => Promise<any>
   signOut: () => Promise<void>
@@ -44,6 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [organization, setOrganization] = useState<Organization | null>(getInitialOrganizationFromStorage)
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [loading, setLoading] = useState(true)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -54,13 +56,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null)
         setOrganization(null)
         setOrganizations([])
+        setIsSuperAdmin(false)
         setLoading(false)
         return
       }
       setUser(session.user)
       try {
-        // Load organizations for ALL users (including super admins) so app + Settings work.
-        // Admin pages use /api/check-admin for super-admin role; we don't block org here.
+        // First check if this user is a super admin.
+        const { data: adminData, error: adminError } = await supabase
+          .from('super_admins')
+          .select('id')
+          .eq('auth_user_id', session.user.id)
+          .maybeSingle()
+
+        const isAdmin = !!adminData && !adminError
+        setIsSuperAdmin(isAdmin)
+
+        if (isAdmin) {
+          // Super admins never have an organization context on the client.
+          setOrganization(null)
+          setOrganizations([])
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('current_organization_id')
+            localStorage.removeItem('restaurantInfo')
+            const path = window.location.pathname
+            if (!path.startsWith('/admin')) {
+              window.location.href = '/admin/dashboard'
+            }
+          }
+          setLoading(false)
+          return
+        }
+
+        // Non-admin: load tenant organizations as before.
         await loadOrganizations(session.user.id)
       } catch (e) {
         if (mounted) setLoading(false)
@@ -193,6 +221,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (orgRow) {
               setOrganization({ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name, slug: orgRow.slug })
               setOrganizations([{ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name, slug: orgRow.slug }])
+            } else {
+              // Stale org id – clear it so dashboards/settings don't keep querying with an invalid organization
+              localStorage.removeItem('current_organization_id')
             }
           }
         }
@@ -217,6 +248,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 slug: orgRow.slug
               })
               setOrganizations([{ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name, slug: orgRow.slug }])
+            } else {
+              // Stale org id – clear it so that empty tenants don't keep causing RLS/permission noise
+              localStorage.removeItem('current_organization_id')
             }
           }
         }
@@ -280,24 +314,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password
     })
 
-    if (!error && data.user) {
-      log('signInWithPassword success', { userId: data.user.id })
-      // Brief wait for session/cookies to be ready
-      await new Promise(resolve => setTimeout(resolve, 400))
-      log('after delay, calling loadOrganizations')
-      const orgId = await loadOrganizations(data.user.id)
-      log('loadOrganizations returned', { orgId })
-      if (typeof window !== 'undefined' && orgId) {
-        localStorage.setItem('current_organization_id', orgId)
-        log('signIn: set localStorage before redirect', { orgId })
-      }
-      await new Promise(resolve => setTimeout(resolve, 200))
-      const stored = typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null
-      log('before redirect', { stored })
-      window.location.href = '/dashboard'
+    if (error || !data.user) {
+      return { data, error }
     }
 
-    return { data, error }
+    log('signInWithPassword success', { userId: data.user.id })
+
+    // Restaurant login must only allow users that exist in the app-level users table.
+    const { data: appUser, error: appUserError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('auth_user_id', data.user.id)
+      .maybeSingle()
+
+    if (appUserError || !appUser) {
+      // Logged-in auth user is not a restaurant user (likely a super admin) – block regular login.
+      await supabase.auth.signOut()
+      return {
+        data: null,
+        error: { message: 'This account is not a restaurant user. Please use the admin login.' } as unknown as Error
+      }
+    }
+
+    // Brief wait for session/cookies to be ready
+    await new Promise(resolve => setTimeout(resolve, 400))
+
+    log('after delay, calling loadOrganizations')
+    const orgId = await loadOrganizations(data.user.id)
+    log('loadOrganizations returned', { orgId })
+    if (typeof window !== 'undefined' && orgId) {
+      localStorage.setItem('current_organization_id', orgId)
+      log('signIn: set localStorage before redirect', { orgId })
+    }
+    await new Promise(resolve => setTimeout(resolve, 200))
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null
+    log('before redirect', { stored })
+    window.location.href = '/dashboard'
+
+    return { data, error: null }
   }
 
   const signUp = async (email: string, password: string, orgName: string) => {
@@ -429,6 +483,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         organization,
         organizations,
         loading,
+        isSuperAdmin,
         signIn,
         signUp,
         signOut,

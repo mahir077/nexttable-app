@@ -31,7 +31,7 @@ export async function GET() {
     const { data: adminData, error: adminError } = await supabase
       .from('super_admins')
       .select('id')
-      .eq('user_id', user.id)
+      .eq('auth_user_id', user.id)
       .maybeSingle()
 
     if (adminError || !adminData) {

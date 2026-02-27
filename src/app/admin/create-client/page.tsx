@@ -29,7 +29,7 @@ export default function CreateClientPage() {
 
       if (!data.isAdmin) {
         alert('🚫 Access Denied\n\nThis page is only accessible to NextTable administrators.')
-        router.push('/dashboard')
+        router.push('/admin/login')
         return
       }
 
@@ -37,7 +37,7 @@ export default function CreateClientPage() {
     } catch (err) {
       console.error('Admin check failed:', err)
       alert('Access verification failed. Redirecting...')
-      router.push('/login')
+      router.push('/admin/login')
     } finally {
       setVerifying(false)
     }

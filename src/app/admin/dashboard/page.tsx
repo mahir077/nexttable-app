@@ -45,14 +45,14 @@ export default function SuperAdminDashboard() {
       const data = await response.json()
 
       if (!data.isAdmin) {
-        router.push('/login')
+        router.push('/admin/login')
         return
       }
 
       await loadClients()
     } catch (error) {
       console.error('Error:', error)
-      router.push('/login')
+      router.push('/admin/login')
     }
   }
 

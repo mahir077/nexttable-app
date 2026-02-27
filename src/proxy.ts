@@ -7,14 +7,34 @@ export async function proxy(req: NextRequest) {
     request: req,
   })
 
+  const searchParams = req.nextUrl.searchParams
+  const isRecovery = searchParams.get('type') === 'recovery' || searchParams.has('access_token')
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!supabaseUrl || !supabaseAnonKey) {
     // Env missing (e.g. Netlify build without vars) – still enforce route protection
     const isProtected = ['/dashboard', '/pos', '/menu', '/orders', '/kitchen', '/billing', '/reports', '/stock', '/suppliers', '/purchases', '/reservations', '/settings'].some(r => req.nextUrl.pathname.startsWith(r))
-    if (req.nextUrl.pathname === '/') return NextResponse.redirect(new URL('/login', req.url))
-    if (req.nextUrl.pathname.startsWith('/admin')) return NextResponse.redirect(new URL('/dashboard', req.url))
-    if (isProtected) return NextResponse.redirect(new URL('/login', req.url))
+
+    if (req.nextUrl.pathname === '/') {
+      const target = isRecovery ? '/admin/login' : '/login'
+      return NextResponse.redirect(new URL(target, req.url))
+    }
+
+    // Always allow the admin login page to render
+    if (req.nextUrl.pathname === '/admin/login') {
+      return supabaseResponse
+    }
+
+    // Other admin routes should go to the admin login screen when env is missing
+    if (req.nextUrl.pathname.startsWith('/admin')) {
+      return NextResponse.redirect(new URL('/admin/login', req.url))
+    }
+
+    if (isProtected) {
+      const target = isRecovery ? '/admin/login' : '/login'
+      return NextResponse.redirect(new URL(target, req.url))
+    }
     return supabaseResponse
   }
 
@@ -59,10 +79,15 @@ export async function proxy(req: NextRequest) {
       })
       return redirectResponse
     }
-    return NextResponse.redirect(new URL('/login', req.url))
+    const target = isRecovery ? '/admin/login' : '/login'
+    return NextResponse.redirect(new URL(target, req.url))
   }
 
   if (req.nextUrl.pathname === '/login' || req.nextUrl.pathname === '/signup') {
+    // Special case: password recovery links should always land on the super admin login page UI
+    if (isRecovery) {
+      return NextResponse.redirect(new URL('/admin/login', req.url))
+    }
     if (user) {
       const redirectResponse = NextResponse.redirect(new URL('/dashboard', req.url))
       supabaseResponse.cookies.getAll().forEach(cookie => {
@@ -73,17 +98,24 @@ export async function proxy(req: NextRequest) {
     return supabaseResponse
   }
 
-  // Super admin panel temporarily disabled – redirect all /admin to dashboard
+  // Allow admin login page to render for both authenticated and unauthenticated users
+  if (req.nextUrl.pathname === '/admin/login') {
+    return supabaseResponse
+  }
+
+  // Protect all other /admin routes: unauthenticated users should go to /admin/login
   if (req.nextUrl.pathname.startsWith('/admin')) {
-    const redirectResponse = NextResponse.redirect(new URL('/dashboard', req.url))
-    supabaseResponse.cookies.getAll().forEach(cookie => {
-      redirectResponse.cookies.set(cookie.name, cookie.value)
-    })
-    return redirectResponse
+    if (!user) {
+      return NextResponse.redirect(new URL('/admin/login', req.url))
+    }
+    // Authenticated users (including non-super-admins) can proceed; client-side /api/check-admin
+    // will enforce super admin access and redirect as needed.
+    return supabaseResponse
   }
 
   if (isProtectedRoute && !user) {
-    return NextResponse.redirect(new URL('/login', req.url))
+    const target = isRecovery ? '/admin/login' : '/login'
+    return NextResponse.redirect(new URL(target, req.url))
   }
 
   return supabaseResponse
