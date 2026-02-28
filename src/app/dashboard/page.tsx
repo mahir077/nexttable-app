@@ -34,7 +34,7 @@ interface TodayStats {
 
 export default function DashboardPage() {
   const router = useRouter()
-  const { organization, loading: authLoading, isSuperAdmin } = useAuth()
+  const { user, organization, loading: authLoading, isSuperAdmin } = useAuth()
   const [currentDate, setCurrentDate] = useState<string>('')
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false)
   const [floors, setFloors] = useState<Floor[]>([])
@@ -447,6 +447,19 @@ export default function DashboardPage() {
           badge: 'bg-slate-500/90'
         }
     }
+  }
+
+  if (!authLoading && !user && hasOrg) {
+    return (
+      <div className="flex h-screen bg-white overflow-hidden">
+        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+          <p className="text-slate-600 mb-2">Session expired.</p>
+          <p className="text-sm text-slate-500 mb-4">Please log in again to load your data.</p>
+          <Link href="/login" className="text-emerald-600 hover:underline font-medium">Log in again</Link>
+        </div>
+      </div>
+    )
   }
 
   if (!authLoading && !hasOrg) {

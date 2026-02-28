@@ -53,7 +53,7 @@ const defaultInvoiceSettings: InvoiceSettings = {
 
 export default function SettingsPage() {
   // ===== FIX 1: Get org from AuthContext + localStorage fallback =====
-  const { organization, refreshOrganization } = useAuth()
+  const { user, organization, refreshOrganization } = useAuth()
   const [orgId, setOrgId] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('current_organization_id')
@@ -540,7 +540,16 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {!orgId && (
+      {!user && orgId && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-800 text-sm mb-6">
+          <span>
+            Session expired. Please{' '}
+            <a href="/login" className="underline font-bold hover:no-underline">log in again</a>
+            {' '}to load and save settings.
+          </span>
+        </div>
+      )}
+      {!orgId && user && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-800 text-sm mb-6">
           <span>
             No organization selected. Try{' '}
@@ -652,10 +661,10 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={handleSaveRestaurantInfo}
-            disabled={restaurantInfoLoading || savingRestaurantInfo || !orgId}
+            disabled={restaurantInfoLoading || savingRestaurantInfo || !orgId || !user}
             className="mt-6 px-8 py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors disabled:opacity-60"
           >
-            {!orgId ? 'No organization' : savingRestaurantInfo ? 'Saving…' : restaurantInfoLoading ? 'Loading…' : '💾 Save Restaurant Info'}
+            {!user && orgId ? 'Log in to save' : !orgId ? 'No organization' : savingRestaurantInfo ? 'Saving…' : restaurantInfoLoading ? 'Loading…' : '💾 Save Restaurant Info'}
           </button>
         </div>
       )}

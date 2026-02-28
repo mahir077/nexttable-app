@@ -163,10 +163,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Session might not be ready on first paint; retry once
       if (!retry && typeof window !== 'undefined') {
         setTimeout(() => loadInitialSession(true), 400)
-      } else {
-        setOrganization(null)
-        setLoading(false)
+        return
       }
+      // No session (e.g. lost on Netlify reload) – restore org from cache so "No organization" doesn't show
+      if (typeof window !== 'undefined') {
+        const cachedOrgId = localStorage.getItem('current_organization_id')
+        let cachedOrg: { id: string; name: string; display_name: string } | null = null
+        let cachedOrgs: { id: string; name: string; display_name: string }[] = []
+        try {
+          const raw = localStorage.getItem('organization_cache')
+          if (raw) cachedOrg = JSON.parse(raw) as { id: string; name: string; display_name: string }
+          const rawList = localStorage.getItem('organizations_cache')
+          if (rawList) cachedOrgs = JSON.parse(rawList) as { id: string; name: string; display_name: string }[]
+        } catch {
+          // ignore
+        }
+        if (cachedOrgId && cachedOrg && cachedOrgs.length > 0) {
+          setOrganizations(cachedOrgs)
+          setOrganization(cachedOrg)
+          setLoading(false)
+          return
+        }
+      }
+      setOrganization(null)
+      setLoading(false)
     }
     loadInitialSession()
 
