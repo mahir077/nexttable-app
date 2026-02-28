@@ -26,21 +26,47 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-function getInitialOrganizationFromStorage(): Organization | null {
-  if (typeof window === 'undefined') return null
-  const id = localStorage.getItem('current_organization_id')
-  if (!id) return null
-  return {
-    id,
-    name: '',
-    display_name: ''
+const AUTH_KEYS = {
+  userId: 'auth_user_id',
+  userEmail: 'auth_user_email',
+  organizationId: 'current_organization_id',
+  organizations: 'organizations_cache',
+  restaurantInfo: 'restaurantInfo',
+} as const
+
+function clearAuthStorage() {
+  if (typeof window === 'undefined') return
+  Object.values(AUTH_KEYS).forEach((key) => localStorage.removeItem(key))
+}
+
+function getStoredAuth(): {
+  userId: string | null
+  userEmail: string | null
+  organizationId: string | null
+  organizations: Organization[]
+  hasValidCache: boolean
+} {
+  if (typeof window === 'undefined') {
+    return { userId: null, userEmail: null, organizationId: null, organizations: [], hasValidCache: false }
   }
+  const userId = localStorage.getItem(AUTH_KEYS.userId)
+  const userEmail = localStorage.getItem(AUTH_KEYS.userEmail)
+  const organizationId = localStorage.getItem(AUTH_KEYS.organizationId)
+  let organizations: Organization[] = []
+  try {
+    const raw = localStorage.getItem(AUTH_KEYS.organizations)
+    if (raw) organizations = JSON.parse(raw) as Organization[]
+  } catch {
+    // ignore
+  }
+  const hasValidCache = !!(userId && organizationId && organizations.length > 0)
+  return { userId, userEmail, organizationId, organizations, hasValidCache }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = useSupabase()
   const [user, setUser] = useState<any>(null)
-  const [organization, setOrganization] = useState<Organization | null>(getInitialOrganizationFromStorage)
+  const [organization, setOrganization] = useState<Organization | null>(null)
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [loading, setLoading] = useState(true)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
@@ -49,173 +75,113 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true
 
-    const applySession = async (session: { user: { id: string }; access_token?: string; refresh_token?: string } | null) => {
-      if (!session?.user) {
-        setUser(null)
-        setOrganization(null)
-        setOrganizations([])
-        setIsSuperAdmin(false)
+    const loadInitialSession = async (retry = false) => {
+      if (typeof window === 'undefined') {
         setLoading(false)
         return
       }
-      setUser(session.user)
-      if (session.access_token && session.refresh_token) {
-        await supabase.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token })
+
+      const stored = getStoredAuth()
+      if (stored.hasValidCache && mounted) {
+        setUser({ id: stored.userId, email: stored.userEmail ?? undefined })
+        const currentOrg = stored.organizations.find((o) => o.id === stored.organizationId) ?? stored.organizations[0]
+        setOrganization(currentOrg ?? null)
+        setOrganizations(stored.organizations)
+        setLoading(false)
+        supabase.auth.getSession().then(({ data: { session }, error }) => {
+          if (!mounted || error?.message?.includes('Refresh') || error?.message?.includes('JWT')) return
+          if (session?.access_token && session?.refresh_token) {
+            supabase.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token })
+          }
+        })
+        return
       }
-      try {
-        const verifyUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/verify-admin` : '/api/verify-admin'
-        const verifyRes = await fetch(verifyUrl, { method: 'GET', credentials: 'include' })
-        const verifyData = await verifyRes.json().catch(() => ({ isAdmin: false }))
-        if (verifyData?.isAdmin === true) {
+
+      const { data: { session }, error } = await supabase.auth.getSession()
+      if (!mounted) return
+      if (error?.message?.includes('Refresh') || error?.message?.includes('JWT')) {
+        clearAuthStorage()
+        setUser(null)
+        setOrganization(null)
+        setOrganizations([])
+        setLoading(false)
+        supabase.auth.signOut().then(() => { if (typeof window !== 'undefined') window.location.href = '/login' })
+        return
+      }
+
+      if (session?.user) {
+        const verifyAdminUrl = `${window.location.origin}/api/verify-admin`
+        const verifyAdminRes = await fetch(verifyAdminUrl, { method: 'GET', credentials: 'include' })
+        const adminData = await verifyAdminRes.json().catch(() => ({ isAdmin: false }))
+        if (adminData?.isAdmin === true && mounted) {
           setIsSuperAdmin(true)
+          setUser(session.user)
           setOrganization(null)
           setOrganizations([])
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('current_organization_id')
-            localStorage.removeItem('restaurantInfo')
-            localStorage.removeItem('organization_cache')
-            localStorage.removeItem('organizations_cache')
-            const path = window.location.pathname
-            if (!path.startsWith('/admin')) {
-              window.location.href = '/admin/dashboard'
-            }
-          }
+          clearAuthStorage()
           setLoading(false)
+          if (!window.location.pathname.startsWith('/admin')) window.location.href = '/admin/dashboard'
           return
         }
-        setIsSuperAdmin(false)
-        if (typeof window !== 'undefined') {
-          const cachedOrgId = localStorage.getItem('current_organization_id')
-          let cachedOrg: { id: string; name: string; display_name: string } | null = null
-          let cachedOrgs: { id: string; name: string; display_name: string }[] = []
-          try {
-            const raw = localStorage.getItem('organization_cache')
-            if (raw) cachedOrg = JSON.parse(raw) as { id: string; name: string; display_name: string }
-            const rawList = localStorage.getItem('organizations_cache')
-            if (rawList) cachedOrgs = JSON.parse(rawList) as { id: string; name: string; display_name: string }[]
-          } catch {
-            // ignore
-          }
-          if (cachedOrgId && cachedOrg && cachedOrgs.length > 0) {
-            if (mounted) {
-              setOrganizations(cachedOrgs)
-              setOrganization(cachedOrg)
-            }
-            setLoading(false)
-            return
-          }
-        }
-        const verifyUserUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/verify-user` : '/api/verify-user'
-        const verifyUserRes = await fetch(verifyUserUrl, {
+        const verifyUserRes = await fetch(`${window.location.origin}/api/verify-user`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ access_token: session.access_token ?? '' }),
           credentials: 'include',
         })
         const verifyUserData = await verifyUserRes.json().catch(() => ({ isUser: false, organizationId: null, organizations: [] }))
-        if (verifyUserData?.isUser && verifyUserData?.organizationId) {
+        if (verifyUserData?.isUser && verifyUserData?.organizationId && mounted) {
           const orgId = verifyUserData.organizationId as string
           const orgsFromApi = (verifyUserData.organizations ?? []) as { id: string; name: string; display_name: string }[]
           const firstOrg = orgsFromApi[0] ?? { id: orgId, name: '', display_name: '' }
           const orgsToSet = orgsFromApi.length > 0 ? orgsFromApi : [{ id: orgId, name: firstOrg.name, display_name: firstOrg.display_name || firstOrg.name }]
           const orgToSet = { id: orgId, name: firstOrg.name, display_name: firstOrg.display_name || firstOrg.name }
-          if (mounted) {
-            setOrganizations(orgsToSet)
-            setOrganization(orgToSet)
+          setUser(session.user)
+          setOrganizations(orgsToSet)
+          setOrganization(orgToSet)
+          if (session.access_token && session.refresh_token) {
+            await supabase.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token })
           }
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('current_organization_id', orgId)
-            localStorage.setItem('restaurantInfo', JSON.stringify({ name: orgToSet.display_name || orgToSet.name }))
-            localStorage.setItem('organization_cache', JSON.stringify(orgToSet))
-            localStorage.setItem('organizations_cache', JSON.stringify(orgsToSet))
-          }
-        } else {
-          if (mounted) {
-            setOrganization(null)
-            setOrganizations([])
-          }
+          localStorage.setItem(AUTH_KEYS.userId, session.user.id)
+          localStorage.setItem(AUTH_KEYS.userEmail, session.user.email ?? '')
+          localStorage.setItem(AUTH_KEYS.organizationId, orgId)
+          localStorage.setItem(AUTH_KEYS.organizations, JSON.stringify(orgsToSet))
+          localStorage.setItem(AUTH_KEYS.restaurantInfo, JSON.stringify({ name: orgToSet.display_name || orgToSet.name }))
+        } else if (mounted) {
+          setUser(session.user)
+          setOrganization(null)
+          setOrganizations([])
         }
-      } catch (e) {
-        if (mounted) setLoading(false)
-      } finally {
-        if (mounted) setLoading(false)
+        setLoading(false)
+        return
       }
-    }
 
-    // Initial load: use getSession() so we have access_token for verify-user POST (avoids cookie reading on Netlify)
-    const loadInitialSession = async (retry = false) => {
-      const { data: { session }, error } = await supabase.auth.getSession()
-      if (!mounted) return
-      if (error?.message?.includes('Refresh') || error?.message?.includes('JWT')) {
-        supabase.auth.signOut().then(() => {
-          if (typeof window !== 'undefined') window.location.href = '/login'
-        })
-        return
-      }
-      if (session?.user) {
-        await applySession({
-          user: session.user,
-          access_token: session.access_token,
-          refresh_token: session.refresh_token,
-        })
-        return
-      }
-      // Session might not be ready on first paint; retry once
-      if (!retry && typeof window !== 'undefined') {
+      if (!retry) {
         setTimeout(() => loadInitialSession(true), 400)
         return
       }
-      // No session (e.g. lost on Netlify reload) – restore org from cache so "No organization" doesn't show
-      if (typeof window !== 'undefined') {
-        const cachedOrgId = localStorage.getItem('current_organization_id')
-        let cachedOrg: { id: string; name: string; display_name: string } | null = null
-        let cachedOrgs: { id: string; name: string; display_name: string }[] = []
-        try {
-          const raw = localStorage.getItem('organization_cache')
-          if (raw) cachedOrg = JSON.parse(raw) as { id: string; name: string; display_name: string }
-          const rawList = localStorage.getItem('organizations_cache')
-          if (rawList) cachedOrgs = JSON.parse(rawList) as { id: string; name: string; display_name: string }[]
-        } catch {
-          // ignore
-        }
-        if (cachedOrgId && cachedOrg && cachedOrgs.length > 0) {
-          setOrganizations(cachedOrgs)
-          setOrganization(cachedOrg)
-          setLoading(false)
-          return
-        }
+
+      if (stored.organizationId && stored.organizations.length > 0 && mounted) {
+        const currentOrg = stored.organizations.find((o) => o.id === stored.organizationId) ?? stored.organizations[0]
+        setOrganization(currentOrg ?? null)
+        setOrganizations(stored.organizations)
+      } else {
+        setOrganization(null)
+        setOrganizations([])
       }
-      setOrganization(null)
       setLoading(false)
     }
+
     loadInitialSession()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!mounted) return
-        try {
-          if (event === 'SIGNED_IN' && session?.user) {
-            await applySession(session)
-          } else if (event === 'INITIAL_SESSION' && session?.user) {
-            await applySession(session)
-          } else if (event === 'SIGNED_OUT' || !session) {
-            setUser(null)
-            setOrganization(null)
-            setOrganizations([])
-            if (typeof window !== 'undefined') {
-              localStorage.removeItem('current_organization_id')
-              localStorage.removeItem('restaurantInfo')
-              localStorage.removeItem('organization_cache')
-              localStorage.removeItem('organizations_cache')
-            }
-            setLoading(false)
-          }
-        } catch (e) {
-          if (e instanceof Error && e.name === 'AbortError') return
-          if (mounted) setLoading(false)
-        }
-      }
-    )
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (!mounted || event !== 'SIGNED_OUT') return
+      setUser(null)
+      setOrganization(null)
+      setOrganizations([])
+      clearAuthStorage()
+      setLoading(false)
+    })
 
     return () => {
       mounted = false
@@ -226,7 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // When user exists but organization is null (e.g. loadOrganizations failed after redirect), restore from localStorage
   useEffect(() => {
     if (!user || organization || typeof window === 'undefined') return
-    const savedId = localStorage.getItem('current_organization_id')
+    const savedId = localStorage.getItem(AUTH_KEYS.organizationId)
     if (!savedId) return
     let cancelled = false
     fetchOrganizationById(savedId).then(({ data: orgRow, error }) => {
@@ -298,7 +264,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setOrganization(null)
         setLoading(false)
         if (typeof window !== 'undefined') {
-          const savedId = localStorage.getItem('current_organization_id')
+          const savedId = localStorage.getItem(AUTH_KEYS.organizationId)
           if (savedId) {
             try {
               const { data: orgRow } = await fetchOrganizationById(savedId)
@@ -306,10 +272,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setOrganization({ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name })
                 setOrganizations([{ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name }])
               } else {
-                localStorage.removeItem('current_organization_id')
+                localStorage.removeItem(AUTH_KEYS.organizationId)
               }
             } catch {
-              localStorage.removeItem('current_organization_id')
+              localStorage.removeItem(AUTH_KEYS.organizationId)
             }
           }
         }
@@ -323,7 +289,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false)
         // Fallback: restore org from localStorage if we had it before (e.g. after refresh when query failed)
         if (typeof window !== 'undefined') {
-          const savedId = localStorage.getItem('current_organization_id')
+          const savedId = localStorage.getItem(AUTH_KEYS.organizationId)
           if (savedId) {
             const { data: orgRow } = await fetchOrganizationById(savedId)
             if (orgRow) {
@@ -335,7 +301,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setOrganizations([{ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name }])
             } else {
               // Stale org id – clear it so that empty tenants don't keep causing RLS/permission noise
-              localStorage.removeItem('current_organization_id')
+              localStorage.removeItem(AUTH_KEYS.organizationId)
             }
           }
         }
@@ -363,14 +329,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const currentOrg = orgs[0]
       setOrganization(currentOrg)
       if (typeof window !== 'undefined' && currentOrg?.id) {
-        localStorage.setItem('current_organization_id', currentOrg.id)
+        localStorage.setItem(AUTH_KEYS.organizationId, currentOrg.id)
         log('localStorage.setItem', { orgId: currentOrg.id })
       }
       return currentOrg?.id ?? null
     } catch (e) {
       log('catch', { error: e })
         if (typeof window !== 'undefined') {
-          const savedId = localStorage.getItem('current_organization_id')
+          const savedId = localStorage.getItem(AUTH_KEYS.organizationId)
           if (savedId) {
             try {
               const { data: orgRow } = await fetchOrganizationById(savedId)
@@ -388,21 +354,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signIn = async (email: string, password: string) => {
-    const log = (msg: string, extra?: unknown) => {
-      if (typeof window !== 'undefined') {
-        console.log('[signIn]', msg, extra ?? '')
-      }
-    }
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    })
-
-    if (error || !data.user) {
-      return { data, error }
-    }
-
-    log('signInWithPassword success', { userId: data.user.id })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error || !data.user) return { data, error }
 
     const accessToken = data.session?.access_token
     let verifyRes: Response
@@ -414,21 +367,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
     } catch (e) {
       if ((e as Error)?.name === 'AbortError') {
-        return {
-          data: null,
-          error: { message: 'Request was cancelled. Please try again.' } as unknown as Error
-        }
+        return { data: null, error: { message: 'Request was cancelled. Please try again.' } as unknown as Error }
       }
       throw e
     }
     const verifyData = await verifyRes.json().catch(() => ({ isUser: false, organizationId: null, organizations: [] }))
-
-    log('verify-user response', {
-      isUser: verifyData?.isUser,
-      organizationId: verifyData?.organizationId,
-      organizations: verifyData?.organizations,
-      raw: verifyData,
-    })
 
     if (!verifyData.isUser || !verifyData.organizationId) {
       await supabase.auth.signOut()
@@ -441,20 +384,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const orgId = verifyData.organizationId as string
     const orgsFromApi = (verifyData.organizations ?? []) as { id: string; name: string; display_name: string }[]
     const firstOrg = orgsFromApi[0] ?? { id: orgId, name: '', display_name: '' }
-
     const orgsToSet = orgsFromApi.length > 0 ? orgsFromApi : [{ id: orgId, name: firstOrg.name, display_name: firstOrg.display_name || firstOrg.name }]
     const orgToSet = { id: orgId, name: firstOrg.name, display_name: firstOrg.display_name || firstOrg.name }
 
-    log('setting state', { orgId, orgsFromApi, firstOrg, orgsToSet, orgToSet })
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('current_organization_id', orgId)
-      localStorage.setItem('restaurantInfo', JSON.stringify({ name: orgToSet.display_name || orgToSet.name }))
-      localStorage.setItem('organization_cache', JSON.stringify(orgToSet))
-      localStorage.setItem('organizations_cache', JSON.stringify(orgsToSet))
-    }
+    setUser(data.user)
     setOrganizations(orgsToSet)
     setOrganization(orgToSet)
+    if (data.session?.access_token && data.session?.refresh_token) {
+      await supabase.auth.setSession({ access_token: data.session.access_token, refresh_token: data.session.refresh_token })
+    }
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(AUTH_KEYS.userId, data.user.id)
+      localStorage.setItem(AUTH_KEYS.userEmail, data.user.email ?? '')
+      localStorage.setItem(AUTH_KEYS.organizationId, orgId)
+      localStorage.setItem(AUTH_KEYS.organizations, JSON.stringify(orgsToSet))
+      localStorage.setItem(AUTH_KEYS.restaurantInfo, JSON.stringify({ name: orgToSet.display_name || orgToSet.name }))
+    }
 
     router.push('/dashboard')
     return { data, error: null }
@@ -496,7 +442,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const orgId = await loadOrganizations(authData.user.id)
       if (typeof window !== 'undefined' && orgId) {
-        localStorage.setItem('current_organization_id', orgId)
+        localStorage.setItem(AUTH_KEYS.organizationId, orgId)
       }
       router.push('/dashboard')
 
@@ -506,21 +452,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // ===== FIXED SIGNOUT - clears state, cookies, then redirects =====
   const signOut = async () => {
-    // 1. Clear React state immediately
     setUser(null)
     setOrganization(null)
     setOrganizations([])
-
-    // 2. Clear localStorage
+    setIsSuperAdmin(false)
+    clearAuthStorage()
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('current_organization_id')
-      localStorage.removeItem('restaurantInfo')
-      localStorage.removeItem('organization_cache')
-      localStorage.removeItem('organizations_cache')
-
-      // 3. Clear all Supabase auth cookies manually
       document.cookie.split(';').forEach(c => {
         const name = c.trim().split('=')[0]
         if (name.startsWith('sb-') || name.includes('supabase') || name.includes('auth')) {
@@ -529,28 +467,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       })
     }
-
-    // 4. Try Supabase signOut with timeout (don't let it block)
     try {
       await Promise.race([
         supabase.auth.signOut(),
         new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
       ])
     } catch {
-      // ignore - redirect anyway
+      // ignore
     }
-
-    // 5. Always redirect
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login'
-    }
+    if (typeof window !== 'undefined') window.location.href = '/login'
   }
 
   const refreshOrganization = async () => {
     if (!user?.id) return
     if (typeof window === 'undefined') return
 
-    const savedOrgId = localStorage.getItem('current_organization_id')
+    const savedOrgId = localStorage.getItem(AUTH_KEYS.organizationId)
     if (!savedOrgId) return
 
     const { data, error } = await supabase
@@ -573,7 +505,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (newOrg) {
       setOrganization(newOrg)
       if (typeof window !== 'undefined') {
-        localStorage.setItem('current_organization_id', orgId)
+        localStorage.setItem(AUTH_KEYS.organizationId, orgId)
       }
       window.location.reload()
     }
