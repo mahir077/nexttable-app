@@ -125,18 +125,48 @@ export async function POST(request: Request) {
 
     console.log('✅ Organization created:', org.name)
 
+    console.log('🔧 Creating users row (required for verify-user / client login)...')
+
+    const { data: userRow, error: userInsertError } = await supabaseAdmin
+      .from('users')
+      .insert({
+        auth_user_id: newUser.user.id,
+        organization_id: org.id,
+        name: ownerName ?? ownerEmail,
+        email: ownerEmail,
+        role: 'owner',
+        is_active: true,
+      })
+      .select('id')
+      .single()
+
+    if (userInsertError || !userRow) {
+      console.error('❌ Users row creation failed:', userInsertError)
+      await supabaseAdmin.from('organizations').delete().eq('id', org.id)
+      await supabaseAdmin.auth.admin.deleteUser(newUser.user.id)
+      return NextResponse.json(
+        { error: userInsertError?.message ?? 'Failed to create user record' },
+        { status: 400 }
+      )
+    }
+
+    console.log('✅ Users row created')
+
     console.log('🔧 Linking user to organization...')
 
     const { error: linkError } = await supabaseAdmin
       .from('user_organizations')
       .insert({
-        user_id: newUser.user.id,
+        user_id: userRow.id,
         organization_id: org.id,
         role: 'owner',
       })
 
     if (linkError) {
       console.error('❌ User-org link failed:', linkError)
+      await supabaseAdmin.from('users').delete().eq('id', userRow.id)
+      await supabaseAdmin.from('organizations').delete().eq('id', org.id)
+      await supabaseAdmin.auth.admin.deleteUser(newUser.user.id)
       return NextResponse.json({ error: linkError.message }, { status: 400 })
     }
 

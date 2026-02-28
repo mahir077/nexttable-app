@@ -79,6 +79,7 @@ export default function SettingsPage() {
   })
   const [restaurantSettingsId, setRestaurantSettingsId] = useState<string | null>(null)
   const [restaurantInfoLoading, setRestaurantInfoLoading] = useState(false)
+  const [savingRestaurantInfo, setSavingRestaurantInfo] = useState(false)
 
   // Track if loadSettings has run to prevent re-runs
   const loadSettingsRanRef = useRef(false)
@@ -134,31 +135,32 @@ export default function SettingsPage() {
     loadInvoiceSettings()
   }, [orgId])
 
-  // loadSettings with timeout to prevent hanging on slow/serverless
-  const loadSettings = async (skipLoadingState?: boolean) => {
-    if (!orgId) return
+  // loadSettings with timeout to prevent hanging on slow/serverless; use overrideOrgId when loading from AuthContext
+  const loadSettings = async (skipLoadingState?: boolean, overrideOrgId?: string | null) => {
+    const effectiveOrgId = overrideOrgId ?? orgId
+    if (!effectiveOrgId) return
     if (!skipLoadingState) {
       setRestaurantInfoLoading(true)
       const safetyTimer = setTimeout(() => setRestaurantInfoLoading(false), 10000)
       try {
-        await loadSettingsInner(false)
+        await loadSettingsInner(false, effectiveOrgId)
       } finally {
         clearTimeout(safetyTimer)
         setRestaurantInfoLoading(false)
       }
       return
     }
-    await loadSettingsInner(true)
+    await loadSettingsInner(true, effectiveOrgId)
   }
 
-  const loadSettingsInner = async (skipLoadingState: boolean) => {
-    if (!orgId) return
+  const loadSettingsInner = async (skipLoadingState: boolean, effectiveOrgId: string) => {
+    if (!effectiveOrgId) return
     const timeout = (ms: number) => new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
     try {
       let orgData: { id: string; name: string; display_name?: string | null } | null = null
 
       const { data: orgResp, error: orgError } = await Promise.race([
-        fetchOrganizationById(orgId),
+        fetchOrganizationById(effectiveOrgId),
         timeout(8000)
       ]) as any
 
@@ -171,7 +173,7 @@ export default function SettingsPage() {
       }
 
       const { data: settingsData, error: settingsError } = await Promise.race([
-        fetchRestaurantSettingsForOrg(orgId),
+        fetchRestaurantSettingsForOrg(effectiveOrgId),
         timeout(8000)
       ]) as any
 
@@ -202,13 +204,13 @@ export default function SettingsPage() {
     }
   }
 
-  // Run loadSettings once when orgId is available (no skipLoadingState = show loading)
+  // Run loadSettings when organization is available from AuthContext (avoids empty form / timing in production)
   useEffect(() => {
-    if (orgId) {
-      loadSettingsRanRef.current = false
-      loadSettings()
-    }
-  }, [orgId])
+    const effectiveOrgId = organization?.id ?? null
+    if (!effectiveOrgId) return
+    loadSettingsRanRef.current = false
+    loadSettings(false, effectiveOrgId)
+  }, [organization?.id])
 
   const fetchFloors = async () => {
     if (!orgId) return
@@ -254,9 +256,9 @@ export default function SettingsPage() {
       showToast('No organization selected. Please wait or refresh.', 'error')
       return
     }
-    setRestaurantInfoLoading(true)
+    setSavingRestaurantInfo(true)
     const safetyTimer = setTimeout(() => {
-      setRestaurantInfoLoading(false)
+      setSavingRestaurantInfo(false)
     }, 15000)
     const timeoutMs = 12000
     const timeoutPromise = new Promise<never>((_, reject) =>
@@ -310,7 +312,7 @@ export default function SettingsPage() {
       }
     } finally {
       clearTimeout(safetyTimer)
-      setRestaurantInfoLoading(false)
+      setSavingRestaurantInfo(false)
     }
   }
 
@@ -650,10 +652,10 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={handleSaveRestaurantInfo}
-            disabled={restaurantInfoLoading || !orgId}
+            disabled={restaurantInfoLoading || savingRestaurantInfo || !orgId}
             className="mt-6 px-8 py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-colors disabled:opacity-60"
           >
-            {!orgId ? 'No organization' : restaurantInfoLoading ? 'Saving…' : '💾 Save Restaurant Info'}
+            {!orgId ? 'No organization' : savingRestaurantInfo ? 'Saving…' : restaurantInfoLoading ? 'Loading…' : '💾 Save Restaurant Info'}
           </button>
         </div>
       )}

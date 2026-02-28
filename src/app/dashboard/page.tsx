@@ -157,6 +157,7 @@ export default function DashboardPage() {
         setFloors(floorsData)
         if (floorsData.length > 0) {
           setSelectedFloor(floorsData[0])
+          setLoading(false)
         } else {
           setSelectedFloor(null)
           setTables([])

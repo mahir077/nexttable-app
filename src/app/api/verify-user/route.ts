@@ -31,6 +31,8 @@ async function getAuthUserId(request: NextRequest): Promise<string | null> {
   }
 
   const cookieStore = await cookies()
+  const cookieNames = cookieStore.getAll().map((c) => c.name)
+  console.log('[verify-user GET] cookie names from store:', cookieNames)
   const supabase = createServerClient(url, anonKey, {
     cookies: {
       getAll() {
@@ -45,6 +47,7 @@ async function getAuthUserId(request: NextRequest): Promise<string | null> {
   })
   const { data: { user }, error } = await supabase.auth.getUser()
   if (!error && user?.id) return user.id
+  console.log('[verify-user GET] getUser result:', { hasUser: !!user?.id, error: error?.message })
   return null
 }
 
@@ -64,7 +67,15 @@ async function runVerify(request: NextRequest) {
       return NextResponse.json({ isUser: false, organizationId: null }, { status: 500 })
     }
 
+    const cookieHeader = request.headers.get('cookie')
+    const authCookieNames = cookieHeader
+      ? cookieHeader.split(';').map((s) => s.trim().split('=')[0]).filter(Boolean)
+      : []
+    console.log('[verify-user] request cookie header names:', authCookieNames)
+
     const userId = await getAuthUserId(request)
+    console.log('[verify-user] getAuthUserId result:', userId ?? null)
+
     if (!userId) {
       return NextResponse.json({ isUser: false, organizationId: null }, { status: 401 })
     }
