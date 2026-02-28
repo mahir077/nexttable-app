@@ -376,7 +376,7 @@ export default function DashboardPage() {
         getAllTables(orgId!),
       ])
       const tablesList = tablesRes || []
-      setActiveDineInOrders((ordersRes.data as Order[]) || [])
+      setActiveDineInOrders((ordersRes.data as unknown as Order[]) || [])
       setAvailableTables(tablesList.filter(t => t.status === 'available'))
       setAllTables(tablesList)
     } catch (e) {
