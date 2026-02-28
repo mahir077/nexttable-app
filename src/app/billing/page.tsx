@@ -88,13 +88,20 @@ export default function BillingPage() {
         .from('orders')
         .select(`
           id,
-          order_number,
-          order_type,
-          total,
-          status,
-          created_at,
+          organization_id,
           table_id,
-          customer_name,
+          token_number,
+          total,
+          subtotal,
+          discount_amount,
+          tax_rate,
+          tax_amount,
+          status,
+          payment_method,
+          discount_type,
+          notes,
+          created_at,
+          updated_at,
           table:tables (
             table_number,
             floor:floors (

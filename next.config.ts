@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Ensure static assets and CSS are emitted for Netlify runtime
+  productionBrowserSourceMaps: false,
 };
 
 export default nextConfig;

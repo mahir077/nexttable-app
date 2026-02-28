@@ -78,7 +78,12 @@ export default function DashboardPage() {
   // Available tables count (for Dine-in quick action)
   const [availableTablesCount, setAvailableTablesCount] = useState<number>(0)
 
-  const orgIdFromStorage = typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null
+  const [orgIdFromStorage, setOrgIdFromStorage] = useState<string | null>(null)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    setOrgIdFromStorage(localStorage.getItem('current_organization_id'))
+  }, [])
+
   const orgId = organization?.id ?? orgIdFromStorage
   const hasOrg = !!organization?.id
 
@@ -115,14 +120,16 @@ export default function DashboardPage() {
       } catch (e) {
         if (e instanceof Error && e.message !== 'timeout') console.error('Error fetching restaurant info:', e)
       }
-      try {
-        const saved = localStorage.getItem('restaurantInfo')
-        if (saved) {
-          const info = JSON.parse(saved) as { name?: string }
-          if (info.name && typeof info.name === 'string') setRestaurantName(info.name)
+      if (typeof window !== 'undefined') {
+        try {
+          const saved = localStorage.getItem('restaurantInfo')
+          if (saved) {
+            const info = JSON.parse(saved) as { name?: string }
+            if (info.name && typeof info.name === 'string') setRestaurantName(info.name)
+          }
+        } catch {
+          // keep current
         }
-      } catch {
-        // keep current
       }
     }
     fetchRestaurantInfo()

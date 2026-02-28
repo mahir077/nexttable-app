@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase-client'
+import { supabase, ensureSession } from '@/lib/supabase-client'
 
 export { supabase }
 
@@ -7,7 +7,7 @@ export interface Category {
   id: string
   name: string
   display_order: number
-  icon: string | null
+  icon?: string | null
   is_active: boolean
 }
 
@@ -30,18 +30,22 @@ export interface CartItem extends MenuItem {
   notes?: string
 }
 
-// Fetch categories (optionally scoped to organization)
+// Fetch categories (optionally scoped to organization). Columns: id, organization_id, name, display_order, is_active, created_at, updated_at, deleted_at
 export async function getCategories(organizationId?: string | null): Promise<Category[]> {
+  console.log('[getCategories] organizationId:', organizationId)
   let query = supabase
     .from('categories')
-    .select('*')
+    .select('id, organization_id, name, display_order, is_active, created_at, updated_at, deleted_at')
     .eq('is_active', true)
     .order('display_order')
   if (organizationId) {
     query = query.eq('organization_id', organizationId)
   }
   const { data, error } = await query
-  if (error) throw error
+  if (error) {
+    console.error('[getCategories] error:', JSON.stringify(error), error?.message, error?.code, error?.details)
+    throw error
+  }
   return data || []
 }
 
@@ -55,7 +59,6 @@ export async function getMenuItemsByCategory(categoryId: string, organizationId:
     `)
     .eq('category_id', categoryId)
     .eq('organization_id', organizationId)
-    .eq('is_active', true)
     .eq('is_available', true)
   
   if (error) throw error
@@ -64,6 +67,7 @@ export async function getMenuItemsByCategory(categoryId: string, organizationId:
 
 // Fetch all menu items (organizationId required for multi-tenant)
 export async function getAllMenuItems(organizationId: string): Promise<MenuItem[]> {
+  console.log('[getAllMenuItems] organizationId:', organizationId)
   const { data, error } = await supabase
     .from('menu_items')
     .select(`
@@ -71,14 +75,16 @@ export async function getAllMenuItems(organizationId: string): Promise<MenuItem[
       category:categories(*)
     `)
     .eq('organization_id', organizationId)
-    .eq('is_active', true)
     .eq('is_available', true)
   
-  if (error) throw error
+  if (error) {
+    console.error('[getAllMenuItems] error:', JSON.stringify(error), error?.message, error?.code, error?.details)
+    throw error
+  }
   return data || []
 }
 
-// Create new menu item (pass organizationId for multi-tenant; required for RLS)
+// Create new menu item. Columns: id, organization_id, category_id, name, description, price, cost, is_available, display_order, image_url, created_at, updated_at, deleted_at
 export async function createMenuItem(
   itemData: {
     category_id: string
@@ -91,18 +97,16 @@ export async function createMenuItem(
   },
   organizationId?: string | null
 ) {
+  await ensureSession()
   const insert: Record<string, unknown> = {
     category_id: itemData.category_id,
     name: itemData.name,
     price: Number(itemData.price),
     is_available: true,
-    is_active: true,
     ...(organizationId && { organization_id: organizationId }),
-    ...(itemData.name_bangla != null && itemData.name_bangla !== '' && { name_bangla: itemData.name_bangla }),
     ...(itemData.description != null && itemData.description !== '' && { description: itemData.description }),
     ...(itemData.image_url != null && itemData.image_url !== '' && { image_url: itemData.image_url }),
-    // Only send making_cost if column exists and value is set (omit when 0 to avoid "column does not exist" if migration not run)
-    ...(typeof itemData.making_cost === 'number' && !Number.isNaN(itemData.making_cost) && itemData.making_cost > 0 && { making_cost: itemData.making_cost }),
+    ...(typeof itemData.making_cost === 'number' && !Number.isNaN(itemData.making_cost) && { cost: itemData.making_cost }),
   }
 
   const { data, error } = await supabase
@@ -118,7 +122,7 @@ export async function createMenuItem(
   return { data, error: null }
 }
 
-// Update menu item
+// Update menu item (only columns that exist: name, description, price, cost, category_id, image_url, is_available, display_order, updated_at)
 export async function updateMenuItem(
   itemId: string,
   updates: Partial<{
@@ -130,14 +134,22 @@ export async function updateMenuItem(
     category_id: string
     image_url: string
     is_available: boolean
+    display_order: number
   }>
 ) {
+  await ensureSession()
+  const allowed: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (updates.name !== undefined) allowed.name = updates.name
+  if (updates.description !== undefined) allowed.description = updates.description
+  if (updates.price !== undefined) allowed.price = updates.price
+  if (updates.making_cost !== undefined) allowed.cost = updates.making_cost
+  if (updates.category_id !== undefined) allowed.category_id = updates.category_id
+  if (updates.image_url !== undefined) allowed.image_url = updates.image_url
+  if (updates.is_available !== undefined) allowed.is_available = updates.is_available
+  if (updates.display_order !== undefined) allowed.display_order = updates.display_order
   const { data, error } = await supabase
     .from('menu_items')
-    .update({
-      ...updates,
-      updated_at: new Date().toISOString()
-    })
+    .update(allowed)
     .eq('id', itemId)
     .select()
     .single()
@@ -151,6 +163,7 @@ export async function updateMenuItem(
 
 // Delete menu item
 export async function deleteMenuItem(itemId: string) {
+  await ensureSession()
   const { error } = await supabase
     .from('menu_items')
     .delete()
@@ -168,7 +181,7 @@ export async function toggleItemAvailability(itemId: string, isAvailable: boolea
   return updateMenuItem(itemId, { is_available: isAvailable })
 }
 
-// Create new category (pass organizationId for multi-tenant)
+// Create new category (pass organizationId for multi-tenant). Columns: id, organization_id, name, display_order, is_active, created_at, updated_at, deleted_at
 export async function createCategory(
   categoryData: {
     name: string
@@ -177,10 +190,12 @@ export async function createCategory(
   },
   organizationId?: string | null
 ) {
+  await ensureSession()
   const { data, error } = await supabase
     .from('categories')
     .insert({
-      ...categoryData,
+      name: categoryData.name,
+      display_order: categoryData.display_order,
       ...(organizationId && { organization_id: organizationId }),
       is_active: true
     })
@@ -194,7 +209,7 @@ export async function createCategory(
   return data
 }
 
-// Update category
+// Update category (only columns that exist: name, display_order; id/organization_id/is_active/created_at/updated_at/deleted_at)
 export async function updateCategory(
   categoryId: string,
   updates: Partial<{
@@ -203,9 +218,13 @@ export async function updateCategory(
     display_order: number
   }>
 ) {
+  await ensureSession()
+  const allowed: Record<string, unknown> = {}
+  if (updates.name !== undefined) allowed.name = updates.name
+  if (updates.display_order !== undefined) allowed.display_order = updates.display_order
   const { data, error } = await supabase
     .from('categories')
-    .update(updates)
+    .update(allowed)
     .eq('id', categoryId)
     .select()
     .single()
@@ -219,6 +238,7 @@ export async function updateCategory(
 
 // Delete category
 export async function deleteCategory(categoryId: string) {
+  await ensureSession()
   const { error } = await supabase
     .from('categories')
     .delete()

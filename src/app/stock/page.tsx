@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase-client'
+import { supabase, ensureSession } from '@/lib/supabase-client'
 import BackButton from '@/components/BackButton'
 import { useToast } from '@/hooks/useToast'
 import Toast from '@/components/Toast'
@@ -46,6 +46,7 @@ export default function StockPage() {
   }, [orgId])
 
   const fetchData = async () => {
+    await ensureSession()
     if (!orgId) return
     try {
       setLoading(true)

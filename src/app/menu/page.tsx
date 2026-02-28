@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { ensureSession } from '@/lib/supabase-client'
 import {
   supabase,
   getCategories,
@@ -57,19 +58,23 @@ export default function MenuManagementPage() {
 
   // Fetch data (categories + items scoped to current org)
   const fetchData = async () => {
-    if (!orgId) return
+    await ensureSession()
+    const organizationId =
+      organization?.id ??
+      (typeof window !== 'undefined' ? localStorage.getItem('current_organization_id') : null)
+    if (!organizationId || organizationId === '') return
     try {
       const [categoriesData, itemsData] = await Promise.all([
-        getCategories(orgId),
-        getAllMenuItems(orgId)
+        getCategories(organizationId),
+        getAllMenuItems(organizationId)
       ])
       setCategories(categoriesData)
       setMenuItems(itemsData)
       if (categoriesData.length > 0 && !formData.category_id) {
         setFormData(prev => ({ ...prev, category_id: categoriesData[0].id }))
       }
-    } catch (error) {
-      console.error('Error fetching categories and menu items:', error)
+    } catch (error: any) {
+      console.error('Menu fetch error:', JSON.stringify(error), error?.message, error?.code, error?.details)
     } finally {
       setLoading(false)
     }

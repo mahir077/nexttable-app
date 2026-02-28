@@ -4,10 +4,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-let browserClient: SupabaseClient | null = null
+let browserClient: SupabaseClient
 
 export function getSupabase(): SupabaseClient {
-  // Always create singleton client
   if (!browserClient) {
     browserClient = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
@@ -16,19 +15,30 @@ export function getSupabase(): SupabaseClient {
         detectSessionInUrl: true,
       },
     })
+    // Trigger session restoration from localStorage (async, non-blocking)
+    browserClient.auth.getSession().then(({ data: { session }, error }) => {
+      if (!error && session?.access_token && session?.refresh_token) {
+        browserClient.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token })
+      }
+    })
   }
   return browserClient
 }
 
-export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
-  get(_, prop) {
-    const client = getSupabase()
-    return (client as any)[prop]
-  },
-})
-
-export const getCurrentUser = async () => {
+/** Call before querying to ensure the client has restored session from localStorage. */
+export async function ensureSession() {
   const client = getSupabase()
-  const { data: { user }, error } = await client.auth.getUser()
-  return { user, error }
+  const { data: { session } } = await client.auth.getSession()
+  if (session?.access_token) return session
+
+  // Fallback: use stored tokens
+  const access_token = typeof window !== 'undefined' ? localStorage.getItem('sb_access_token') : null
+  const refresh_token = typeof window !== 'undefined' ? localStorage.getItem('sb_refresh_token') : null
+  if (access_token && refresh_token) {
+    const { data } = await client.auth.setSession({ access_token, refresh_token })
+    return data.session
+  }
+  return null
 }
+
+export const supabase = getSupabase()

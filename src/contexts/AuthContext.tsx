@@ -2,7 +2,6 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { useSupabase } from '@/contexts/SupabaseContext'
-import { fetchOrganizationById } from '@/app/lib/db/org'
 import { useRouter } from 'next/navigation'
 
 interface Organization {
@@ -75,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true
 
-    const loadInitialSession = async (retry = false) => {
+    const loadInitialSession = async () => {
       if (typeof window === 'undefined') {
         setLoading(false)
         return
@@ -156,19 +155,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      if (!retry) {
-        setTimeout(() => loadInitialSession(true), 400)
-        return
-      }
-
-      if (stored.organizationId && stored.organizations.length > 0 && mounted) {
-        const currentOrg = stored.organizations.find((o) => o.id === stored.organizationId) ?? stored.organizations[0]
-        setOrganization(currentOrg ?? null)
-        setOrganizations(stored.organizations)
-      } else {
-        setOrganization(null)
-        setOrganizations([])
-      }
       setLoading(false)
     }
 
@@ -188,170 +174,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe()
     }
   }, [])
-
-  // When user exists but organization is null (e.g. loadOrganizations failed after redirect), restore from localStorage
-  useEffect(() => {
-    if (!user || organization || typeof window === 'undefined') return
-    const savedId = localStorage.getItem(AUTH_KEYS.organizationId)
-    if (!savedId) return
-    let cancelled = false
-    fetchOrganizationById(savedId).then(({ data: orgRow, error }) => {
-        if (cancelled || error || !orgRow) return
-        setOrganization({
-          id: orgRow.id,
-          name: orgRow.name,
-          display_name: orgRow.display_name || orgRow.name
-        })
-        setOrganizations([{
-          id: orgRow.id,
-          name: orgRow.name,
-          display_name: orgRow.display_name || orgRow.name
-        }])
-      })
-    return () => { cancelled = true }
-  }, [user, organization])
-
-  const loadOrganizations = async (userId: string): Promise<string | null> => {
-    const log = (msg: string, extra?: unknown) => {
-      if (typeof window !== 'undefined') {
-        console.log('[loadOrganizations]', msg, extra ?? '')
-      }
-    }
-    const timeout = (ms: number) => new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
-    try {
-      log('start', { userId })
-      // Verify session before querying
-      const { data: { user: currentUser } } = await supabase.auth.getUser()
-      log('getUser result', { hasUser: !!currentUser, userId: currentUser?.id ?? null })
-      if (!currentUser) {
-        setLoading(false)
-        log('early return: no currentUser')
-        return null
-      }
-
-      let data: unknown
-      let error: { message?: string } | null = null
-      try {
-        const result = await Promise.race([
-          supabase
-            .from('user_organizations')
-            .select(`
-              organization_id,
-              role,
-              organizations (
-                id,
-                name,
-                display_name
-              )
-            `)
-            .eq('user_id', currentUser.id),
-          timeout(12000)
-        ]) as { data: unknown; error: { message?: string } | null }
-        data = result.data
-        error = result.error
-      } catch (queryErr) {
-        log('user_organizations query threw (e.g. 400 for super admin)', queryErr)
-        setOrganizations([])
-        setOrganization(null)
-        setLoading(false)
-        return null
-      }
-
-      log('user_organizations query', { error: error?.message ?? null, rowCount: Array.isArray(data) ? data.length : 0 })
-
-      if (error) {
-        setOrganizations([])
-        setOrganization(null)
-        setLoading(false)
-        if (typeof window !== 'undefined') {
-          const savedId = localStorage.getItem(AUTH_KEYS.organizationId)
-          if (savedId) {
-            try {
-              const { data: orgRow } = await fetchOrganizationById(savedId)
-              if (orgRow) {
-                setOrganization({ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name })
-                setOrganizations([{ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name }])
-              } else {
-                localStorage.removeItem(AUTH_KEYS.organizationId)
-              }
-            } catch {
-              localStorage.removeItem(AUTH_KEYS.organizationId)
-            }
-          }
-        }
-        log('early return: query error (no UI error shown)')
-        return null
-      }
-
-      if (!data || !Array.isArray(data) || data.length === 0) {
-        setOrganizations([])
-        setOrganization(null)
-        setLoading(false)
-        // Fallback: restore org from localStorage if we had it before (e.g. after refresh when query failed)
-        if (typeof window !== 'undefined') {
-          const savedId = localStorage.getItem(AUTH_KEYS.organizationId)
-          if (savedId) {
-            const { data: orgRow } = await fetchOrganizationById(savedId)
-            if (orgRow) {
-              setOrganization({
-                id: orgRow.id,
-                name: orgRow.name,
-                display_name: orgRow.display_name || orgRow.name
-              })
-              setOrganizations([{ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name }])
-            } else {
-              // Stale org id – clear it so that empty tenants don't keep causing RLS/permission noise
-              localStorage.removeItem(AUTH_KEYS.organizationId)
-            }
-          }
-        }
-        log('early return: no data or empty')
-        return null
-      }
-
-      type OrgShape = { name: string; display_name?: string }
-      const rows = data as unknown as Array<{ organization_id: string; organizations: OrgShape | OrgShape[] | null }>
-      const orgs: Organization[] = rows
-        .filter((uo) => uo.organizations)
-        .map((uo) => {
-          const raw = uo.organizations
-          const org = Array.isArray(raw) ? raw[0] : raw
-          if (!org) return null
-          return {
-            id: uo.organization_id,
-            name: org.name,
-            display_name: org.display_name || org.name
-          }
-        })
-        .filter((o): o is Organization => o != null)
-
-      setOrganizations(orgs)
-      const currentOrg = orgs[0]
-      setOrganization(currentOrg)
-      if (typeof window !== 'undefined' && currentOrg?.id) {
-        localStorage.setItem(AUTH_KEYS.organizationId, currentOrg.id)
-        log('localStorage.setItem', { orgId: currentOrg.id })
-      }
-      return currentOrg?.id ?? null
-    } catch (e) {
-      log('catch', { error: e })
-        if (typeof window !== 'undefined') {
-          const savedId = localStorage.getItem(AUTH_KEYS.organizationId)
-          if (savedId) {
-            try {
-              const { data: orgRow } = await fetchOrganizationById(savedId)
-              if (orgRow) {
-                setOrganization({ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name })
-                setOrganizations([{ id: orgRow.id, name: orgRow.name, display_name: orgRow.display_name || orgRow.name }])
-              }
-            } catch { /* ignore */ }
-          }
-        }
-      return null
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
@@ -400,6 +222,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(AUTH_KEYS.organizationId, orgId)
       localStorage.setItem(AUTH_KEYS.organizations, JSON.stringify(orgsToSet))
       localStorage.setItem(AUTH_KEYS.restaurantInfo, JSON.stringify({ name: orgToSet.display_name || orgToSet.name }))
+      if (data.session?.access_token) localStorage.setItem('sb_access_token', data.session.access_token)
+      if (data.session?.refresh_token) localStorage.setItem('sb_refresh_token', data.session.refresh_token)
     }
 
     router.push('/dashboard')
@@ -440,9 +264,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: 'owner'
         })
 
-      const orgId = await loadOrganizations(authData.user.id)
-      if (typeof window !== 'undefined' && orgId) {
-        localStorage.setItem(AUTH_KEYS.organizationId, orgId)
+      const orgToSet: Organization = {
+        id: org.id,
+        name: org.name,
+        display_name: org.display_name ?? org.name
+      }
+      setUser(authData.user)
+      setOrganizations([orgToSet])
+      setOrganization(orgToSet)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(AUTH_KEYS.userId, authData.user.id)
+        localStorage.setItem(AUTH_KEYS.userEmail, authData.user.email ?? '')
+        localStorage.setItem(AUTH_KEYS.organizationId, org.id)
+        localStorage.setItem(AUTH_KEYS.organizations, JSON.stringify([orgToSet]))
+        localStorage.setItem(AUTH_KEYS.restaurantInfo, JSON.stringify({ name: orgToSet.display_name || orgToSet.name }))
       }
       router.push('/dashboard')
 
@@ -459,6 +294,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsSuperAdmin(false)
     clearAuthStorage()
     if (typeof window !== 'undefined') {
+      localStorage.removeItem('sb_access_token')
+      localStorage.removeItem('sb_refresh_token')
       document.cookie.split(';').forEach(c => {
         const name = c.trim().split('=')[0]
         if (name.startsWith('sb-') || name.includes('supabase') || name.includes('auth')) {
@@ -487,7 +324,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data, error } = await supabase
       .from('organizations')
-      .select('id, name, display_name')
+      .select('id, name')
       .eq('id', savedOrgId)
       .single()
 
@@ -495,7 +332,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setOrganization({
         id: data.id,
         name: data.name,
-        display_name: data.display_name || data.name
+        display_name: data.name
       })
     }
   }

@@ -28,6 +28,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   }, [organization?.id])
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
     const saved = localStorage.getItem('sidebarCollapsed')
     if (saved !== null) setIsCollapsed(saved === 'true')
   }, [])
@@ -35,7 +36,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const toggleCollapsed = () => {
     const newState = !isCollapsed
     setIsCollapsed(newState)
-    localStorage.setItem('sidebarCollapsed', String(newState))
+    if (typeof window !== 'undefined') localStorage.setItem('sidebarCollapsed', String(newState))
   }
 
   const menuItems = [

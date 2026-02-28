@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { ensureSession } from '@/lib/supabase-client'
 import BackButton from '@/components/BackButton'
 import { useToast } from '@/hooks/useToast'
 import Toast from '@/components/Toast'
@@ -85,6 +86,7 @@ export default function PurchasesPage() {
   }, [orgId])
 
   const fetchData = async () => {
+    await ensureSession()
     if (!orgId) return
     try {
       setLoading(true)

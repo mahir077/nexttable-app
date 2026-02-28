@@ -83,9 +83,8 @@ export async function rejectOrder(
     .from('orders')
     .update({
       status: 'rejected',
-      rejected_at: new Date().toISOString(),
       rejected_by: rejectedBy,
-      rejection_reason: reason,
+      reject_reason: reason,
     })
     .eq('id', orderId)
     .eq('organization_id', orgId)
@@ -188,7 +187,7 @@ export function getOrdersReportFallbackQuery(orgId: string) {
   return supabase
     .from('orders')
     .select(
-      'id, total, created_at, payment_method, order_type, status, order_items (quantity, unit_price, item_name, menu_item_id, menu_item:menu_items (name, making_cost))'
+      'id, total, created_at, payment_method, status, order_items (quantity, unit_price, item_name, menu_item_id, menu_item:menu_items (name, making_cost))'
     )
     .eq('organization_id', orgId)
     .order('created_at', { ascending: false })
@@ -199,9 +198,8 @@ export function getOrdersReportFallbackQuery(orgId: string) {
 export async function fetchActiveDineInOrders(orgId: string) {
   return supabase
     .from('orders')
-    .select('*')
+    .select('id, organization_id, table_id, token_number, total, subtotal, discount_amount, tax_rate, tax_amount, status, payment_method, discount_type, notes, reject_reason, rejected_by, created_by, created_at, updated_at, closed_at, deleted_at')
     .eq('organization_id', orgId)
-    .eq('order_type', 'dine-in')
     .not('table_id', 'is', null)
     .in('status', ['pending', 'preparing', 'ready', 'served'])
     .order('created_at', { ascending: false })

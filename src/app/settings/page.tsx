@@ -7,6 +7,7 @@ import { getCashDrawerUrl, setCashDrawerUrl as saveCashDrawerUrl } from '@/app/l
 import BackButton from '@/components/BackButton'
 import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
+import { ensureSession } from '@/lib/supabase-client'
 import {
   fetchOrganizationById,
   fetchRestaurantSettingsForOrg,
@@ -54,14 +55,14 @@ const defaultInvoiceSettings: InvoiceSettings = {
 export default function SettingsPage() {
   // ===== FIX 1: Get org from AuthContext + localStorage fallback =====
   const { user, organization, refreshOrganization } = useAuth()
-  const [orgId, setOrgId] = useState<string | null>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('current_organization_id')
-    }
-    return null
-  })
+  const [orgId, setOrgId] = useState<string | null>(null)
 
-  // Sync with AuthContext when it loads (takes priority)
+  // Load orgId from localStorage in browser only (avoid SSR)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const stored = localStorage.getItem('current_organization_id')
+    if (stored) setOrgId(stored)
+  }, [])
   useEffect(() => {
     if (organization?.id && organization.id !== orgId) {
       setOrgId(organization.id)
@@ -155,6 +156,8 @@ export default function SettingsPage() {
 
   const loadSettingsInner = async (skipLoadingState: boolean, effectiveOrgId: string) => {
     if (!effectiveOrgId) return
+    const sessionResult = await ensureSession()
+    console.log('session result', sessionResult)
     const timeout = (ms: number) => new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
     try {
       let orgData: { id: string; name: string; display_name?: string | null } | null = null
@@ -171,27 +174,37 @@ export default function SettingsPage() {
           name: (orgResp.display_name || orgResp.name) ?? prev.name
         }))
       }
+      console.log('orgData result', orgData, orgError)
 
       const { data: settingsData, error: settingsError } = await Promise.race([
         fetchRestaurantSettingsForOrg(effectiveOrgId),
         timeout(8000)
       ]) as any
 
+      console.log('settingsData result', settingsData, settingsError)
+
       if (settingsData && !settingsError) {
         setRestaurantSettingsId(settingsData.id)
-        setRestaurantInfo({
-          name: (orgData?.display_name || orgData?.name) || (settingsData.display_name as string) || '',
+        const restaurantInfoToSet = {
+          name: (settingsData.display_name as string) || orgData?.name || '',
           address: (settingsData.address as string) ?? '',
           phone: (settingsData.phone as string) ?? '',
           email: (settingsData.email as string) ?? ''
-        })
+        }
+        console.log('restaurantInfo being set', restaurantInfoToSet)
+        setRestaurantInfo(restaurantInfoToSet)
       } else {
-        setRestaurantInfo(prev => ({
-          name: (orgData?.display_name || orgData?.name) ?? prev.name,
-          address: prev.address,
-          phone: prev.phone,
-          email: prev.email
-        }))
+        // No restaurant_settings row: form only from org (name) and empty for rest — never from localStorage/cache
+        console.log('restaurantInfo being set (fallback)', {
+          nameFromOrg: (orgData?.display_name || orgData?.name) ?? null,
+          addressPhoneEmail: 'empty (DB only)'
+        })
+        setRestaurantInfo({
+          name: (orgData?.display_name || orgData?.name) ?? '',
+          address: '',
+          phone: '',
+          email: ''
+        })
       }
     } catch (e) {
       if (e instanceof Error && (e.name === 'AbortError' || e.message === 'timeout')) {
@@ -256,6 +269,7 @@ export default function SettingsPage() {
       showToast('No organization selected. Please wait or refresh.', 'error')
       return
     }
+    await ensureSession()
     setSavingRestaurantInfo(true)
     const safetyTimer = setTimeout(() => {
       setSavingRestaurantInfo(false)
@@ -283,7 +297,7 @@ export default function SettingsPage() {
         if (orgError) throw orgError
 
         // 3) Update localStorage so sidebar and other pages see the new name immediately
-        localStorage.setItem('restaurantInfo', JSON.stringify(restaurantInfo))
+        if (typeof window !== 'undefined') localStorage.setItem('restaurantInfo', JSON.stringify(restaurantInfo))
       })()
 
       await Promise.race([savePromise, timeoutPromise])
@@ -293,7 +307,26 @@ export default function SettingsPage() {
 
       // 4) Update AuthContext organization state so sidebar name updates without reload
       await refreshOrganization()
-      localStorage.setItem('restaurantInfo', JSON.stringify(restaurantInfo))
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('restaurantInfo', JSON.stringify(restaurantInfo))
+        // Update organizations cache in localStorage with new name
+        const cachedOrgs = localStorage.getItem('organizations_cache')
+        if (cachedOrgs) {
+          const orgs = JSON.parse(cachedOrgs)
+          const updated = orgs.map((o: { id: string; name?: string; display_name?: string }) =>
+            o.id === orgId ? { ...o, name: displayName, display_name: displayName } : o
+          )
+          localStorage.setItem('organizations_cache', JSON.stringify(updated))
+        }
+        // Update organization_cache single org
+        const cachedOrg = localStorage.getItem('organization_cache')
+        if (cachedOrg) {
+          const org = JSON.parse(cachedOrg) as { id: string; name?: string; display_name?: string }
+          if (org.id === orgId) {
+            localStorage.setItem('organization_cache', JSON.stringify({ ...org, name: displayName, display_name: displayName }))
+          }
+        }
+      }
     } catch (error) {
       // ===== FIX: Ignore AbortError silently =====
       if (error instanceof Error && error.name === 'AbortError') {

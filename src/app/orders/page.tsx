@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase-client'
+import { supabase, ensureSession } from '@/lib/supabase-client'
 import { getOrderWithItems } from '@/app/lib/api/orders'
 import { openCashDrawer } from '@/app/lib/cashDrawer'
 import BackButton from '@/components/BackButton'
@@ -95,6 +95,7 @@ export default function OrdersPage() {
   }, [searchQuery, selectedYear, selectedMonth, selectedDate, orders])
 
   const fetchOrders = async () => {
+    await ensureSession()
     if (!orgId) return
     try {
       const { data, error } = await supabase
@@ -116,6 +117,7 @@ export default function OrdersPage() {
   }
 
   const fetchOrderDetails = async (orderId: string) => {
+    await ensureSession()
     if (!orgId) return
     try {
       const { order, items } = await getOrderWithItems(orgId, orderId)

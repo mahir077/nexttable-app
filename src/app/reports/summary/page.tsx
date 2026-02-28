@@ -74,7 +74,6 @@ export default function ReportsSummaryPage() {
           total,
           created_at,
           payment_method,
-          order_type,
           status,
           order_items (
             quantity,
@@ -112,7 +111,7 @@ export default function ReportsSummaryPage() {
         console.warn('Reports query with joins failed, trying simple query:', error.message)
         let fallback = supabase
           .from('orders')
-          .select('id, total, created_at, payment_method, order_type, status, order_items (quantity, unit_price, item_name, menu_item_id, menu_item:menu_items (name, making_cost))')
+          .select('id, total, created_at, payment_method, status, order_items (quantity, unit_price, item_name, menu_item_id, menu_item:menu_items (name, making_cost))')
           .eq('organization_id', orgId)
           .order('created_at', { ascending: false })
         if (dateFilter === 'today') {

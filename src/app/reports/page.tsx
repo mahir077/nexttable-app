@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { ensureSession } from '@/lib/supabase-client'
 import BackButton from '@/components/BackButton'
 import { useAuth } from '@/contexts/AuthContext'
 import {
@@ -49,6 +50,7 @@ export default function ReportsPage() {
   const [dateFilter, setDateFilter] = useState('today')
 
   const fetchStockData = async () => {
+    await ensureSession()
     if (!orgId) return
     try {
       const { data, error } = await getStockSummaryBaseQuery(orgId)
@@ -67,6 +69,7 @@ export default function ReportsPage() {
   }
 
   const fetchPurchases = async () => {
+    await ensureSession()
     if (!orgId) return
     try {
       const { data, error } = await fetchPurchasesWithSuppliers(orgId)
@@ -114,6 +117,7 @@ export default function ReportsPage() {
   }, [orgId, dateFilter])
 
   const fetchOrders = async () => {
+    await ensureSession()
     if (!orgId) return
     try {
       setLoading(true)

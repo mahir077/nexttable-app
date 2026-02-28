@@ -1,16 +1,17 @@
-import { supabase } from '@/lib/supabase-client'
+import { supabase, ensureSession } from '@/lib/supabase-client'
 
 // Organization and settings helpers shared across Settings, Dashboard, AuthContext, etc.
 
 export async function fetchOrganizationById(orgId: string) {
   return supabase
     .from('organizations')
-    .select('id, name, display_name')
+    .select('id, name')
     .eq('id', orgId)
     .single()
 }
 
 export async function fetchRestaurantSettingsForOrg(orgId: string) {
+  await ensureSession()
   return supabase
     .from('restaurant_settings')
     .select('*')
@@ -37,36 +38,21 @@ export async function upsertRestaurantSettings(
     updated_at?: string
   }
 ) {
+  await ensureSession()
   const { display_name, address, phone, email, updated_at } = fields
-
-  const base = {
-    display_name,
-    address: address ?? null,
-    phone: phone ?? null,
-    email: email ?? null,
-    ...(updated_at && { updated_at }),
-  }
-
-  const { data: existing } = await supabase
-    .from('restaurant_settings')
-    .select('id')
-    .eq('organization_id', orgId)
-    .limit(1)
-    .maybeSingle()
-
-  if (existing) {
-    return supabase
-      .from('restaurant_settings')
-      .update(base)
-      .eq('id', existing.id)
-  }
-
   return supabase
     .from('restaurant_settings')
-    .insert({
-      organization_id: orgId,
-      ...base,
-    })
+    .upsert(
+      {
+        organization_id: orgId,
+        display_name,
+        address: address ?? null,
+        phone: phone ?? null,
+        email: email ?? null,
+        ...(updated_at && { updated_at }),
+      },
+      { onConflict: 'organization_id' }
+    )
 }
 
 export async function updateOrganizationDisplayName(
@@ -74,6 +60,7 @@ export async function updateOrganizationDisplayName(
   displayName: string,
   updatedAt: string
 ) {
+  await ensureSession()
   return supabase
     .from('organizations')
     .update({ name: displayName, updated_at: updatedAt })

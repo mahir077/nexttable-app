@@ -72,29 +72,23 @@ export async function createOrder(orderData: CreateOrderData): Promise<Order | n
   try {
     // Calculate totals
     const subtotal = orderData.items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-    const tax = 0
-    const total = subtotal + tax
-
-    // Generate order number
-    const orderNumber = await generateOrderNumber()
+    const total = subtotal
 
     const orgId = orderData.organization_id
-    // Create order
+    // Create order (only columns that exist: id, organization_id, table_id, token_number, total, subtotal, discount_amount, tax_rate, tax_amount, status, payment_method, discount_type, notes, reject_reason, rejected_by, created_by, created_at, updated_at, closed_at, deleted_at)
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
         organization_id: orgId,
-        order_number: orderNumber,
         table_id: orderData.table_id || null,
-        order_type: orderData.order_type,
+        token_number: null,
+        subtotal,
+        discount_amount: 0,
+        tax_rate: 0,
+        tax_amount: 0,
+        total,
         status: 'pending',
-        subtotal: subtotal,
-        tax: tax,
-        discount: 0,
-        total: total,
-        customer_name: orderData.customer_name,
-        customer_phone: orderData.customer_phone,
-        notes: orderData.notes
+        notes: orderData.notes ?? null,
       })
       .select()
       .single()
@@ -270,7 +264,7 @@ export async function getPaidOrders(organizationId: string): Promise<Order[]> {
     .select('*')
     .eq('organization_id', organizationId)
     .eq('status', 'paid')
-    .order('paid_at', { ascending: false })
+    .order('closed_at', { ascending: false })
     .limit(50)
 
   if (error) throw error
@@ -325,29 +319,29 @@ export async function getTodayStats(organizationId: string): Promise<TodayStats>
     const startOfToday = getStartOfTodayISO()
     const endOfToday = getEndOfTodayISO()
 
-    const { data: ordersWithPaidAt, error: ordersError } = await supabase
+    const { data: ordersWithClosedAt, error: ordersError } = await supabase
       .from('orders')
       .select('*')
       .eq('organization_id', organizationId)
       .eq('status', 'paid')
-      .gte('paid_at', startOfToday)
-      .lte('paid_at', endOfToday)
-      .order('paid_at', { ascending: false })
+      .gte('closed_at', startOfToday)
+      .lte('closed_at', endOfToday)
+      .order('closed_at', { ascending: false })
 
-    const { data: ordersNullPaidAt } = await supabase
+    const { data: ordersNullClosedAt } = await supabase
       .from('orders')
       .select('*')
       .eq('organization_id', organizationId)
       .eq('status', 'paid')
-      .is('paid_at', null)
+      .is('closed_at', null)
       .gte('updated_at', startOfToday)
       .lte('updated_at', endOfToday)
 
     if (ordersError) return empty
 
     const orderList = [
-      ...(ordersWithPaidAt || []),
-      ...(ordersNullPaidAt || []).filter((o: { id: string }) => !(ordersWithPaidAt || []).some((p: { id: string }) => p.id === o.id))
+      ...(ordersWithClosedAt || []),
+      ...(ordersNullClosedAt || []).filter((o: { id: string }) => !(ordersWithClosedAt || []).some((p: { id: string }) => p.id === o.id))
     ]
 
     const totalRevenue = orderList.reduce((sum, o) => sum + o.total, 0)
@@ -415,35 +409,35 @@ export async function getWeeklyStats(organizationId: string): Promise<WeeklyStat
     const startOfWeek = getStartOfDaysAgoISO(7)
     const endOfToday = getEndOfTodayISO()
 
-    const { data: ordersWithPaidAt, error } = await supabase
+    const { data: ordersWithClosedAt, error } = await supabase
       .from('orders')
-      .select('id, total, paid_at, updated_at')
+      .select('id, total, closed_at, updated_at')
       .eq('organization_id', organizationId)
       .eq('status', 'paid')
-      .gte('paid_at', startOfWeek)
-      .lte('paid_at', endOfToday)
+      .gte('closed_at', startOfWeek)
+      .lte('closed_at', endOfToday)
 
-    const { data: ordersNullPaidAt } = await supabase
+    const { data: ordersNullClosedAt } = await supabase
       .from('orders')
-      .select('id, total, paid_at, updated_at')
+      .select('id, total, closed_at, updated_at')
       .eq('organization_id', organizationId)
       .eq('status', 'paid')
-      .is('paid_at', null)
+      .is('closed_at', null)
       .gte('updated_at', startOfWeek)
       .lte('updated_at', endOfToday)
 
     if (error) return empty
 
-    const idsWithPaidAt = new Set((ordersWithPaidAt || []).map((o: { id: string }) => o.id))
-    const extra = (ordersNullPaidAt || []).filter((o: { id: string }) => !idsWithPaidAt.has(o.id))
-    const orderList = [...(ordersWithPaidAt || []), ...extra]
+    const idsWithClosedAt = new Set((ordersWithClosedAt || []).map((o: { id: string }) => o.id))
+    const extra = (ordersNullClosedAt || []).filter((o: { id: string }) => !idsWithClosedAt.has(o.id))
+    const orderList = [...(ordersWithClosedAt || []), ...extra]
 
     const totalRevenue = orderList.reduce((sum, o: { total: number }) => sum + o.total, 0)
     const totalOrders = orderList.length
 
     const dailyRevenue: Record<string, number> = {}
-    for (const o of orderList as { total: number; paid_at?: string | null; updated_at?: string }[]) {
-      const dateStr = (o.paid_at || o.updated_at || '').slice(0, 10)
+    for (const o of orderList as { total: number; closed_at?: string | null; updated_at?: string }[]) {
+      const dateStr = (o.closed_at || o.updated_at || '').slice(0, 10)
       if (dateStr) dailyRevenue[dateStr] = (dailyRevenue[dateStr] || 0) + o.total
     }
 

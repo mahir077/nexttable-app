@@ -1,5 +1,4 @@
 # Netlify deployment for Next.js
-# Let the plugin control publish directory so CSS and static assets load correctly.
 # https://docs.netlify.com/frameworks/next-js/overview/
 
 [build]
@@ -7,6 +6,7 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  NEXT_TELEMETRY_DISABLED = "1"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"

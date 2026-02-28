@@ -94,7 +94,6 @@ export async function getOrCreateRawMaterialMenuItemId(orgId: string): Promise<s
       price: 0,
       making_cost: 0,
       is_available: false,
-      is_active: true,
       organization_id: orgId,
     })
     .select('id')
