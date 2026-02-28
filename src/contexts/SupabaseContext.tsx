@@ -1,27 +1,17 @@
 'use client'
 
 import { createContext, useContext, useMemo } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { setSupabaseClient } from '@/lib/supabase-client'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+import { getSupabase } from '@/lib/supabase-client'
 
 const SupabaseContext = createContext<SupabaseClient | null>(null)
 
 export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => {
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.error(
-        '[Supabase] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY. ' +
-        'Set them at BUILD time (e.g. Netlify → Environment variables → Build).'
-      )
+    const client = getSupabase()
+    if (!client) {
       throw new Error('Supabase env vars missing. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY at build time.')
     }
-    // No custom storage: @supabase/ssr uses cookies so middleware sees session
-    const client = createBrowserClient(supabaseUrl, supabaseAnonKey)
-    setSupabaseClient(client)
     return client
   }, [])
 
