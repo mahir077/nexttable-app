@@ -1,9 +1,9 @@
 # Netlify deployment for Next.js
-# https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/
+# Let the plugin control publish directory so CSS and static assets load correctly.
+# https://docs.netlify.com/frameworks/next-js/overview/
 
 [build]
   command = "npm run build"
-  publish = ".next"
 
 [build.environment]
   NODE_VERSION = "20"
