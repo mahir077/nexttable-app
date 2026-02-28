@@ -1,62 +1,41 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
-/** Get auth user id from access_token in body (POST) or from session cookies (GET) */
+/** Get auth user id from access_token in request body (POST only). Does not rely on cookies. */
 async function getAuthUserId(request: NextRequest): Promise<string | null> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!url || !anonKey) return null
 
-  if (request.method === 'POST') {
-    try {
-      const body = await request.json().catch(() => null)
-      const accessToken = body?.access_token as string | undefined
-      if (accessToken?.length) {
-        const res = await fetch(`${url}/auth/v1/user`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            apikey: anonKey,
-          },
-        })
-        if (res.ok) {
-          const user = await res.json()
-          if (user?.id) return user.id
-        }
-      }
-    } catch {
-      // ignore
-    }
+  if (request.method !== 'POST') return null
+
+  try {
+    const body = await request.json().catch(() => null)
+    const accessToken = body?.access_token as string | undefined
+    if (!accessToken?.length) return null
+    const res = await fetch(`${url}/auth/v1/user`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        apikey: anonKey,
+      },
+    })
+    if (!res.ok) return null
+    const user = await res.json()
+    return user?.id ?? null
+  } catch {
     return null
   }
-
-  const cookieStore = await cookies()
-  const cookieNames = cookieStore.getAll().map((c) => c.name)
-  console.log('[verify-user GET] cookie names from store:', cookieNames)
-  const supabase = createServerClient(url, anonKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll()
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) =>
-          cookieStore.set(name, value, options)
-        )
-      },
-    },
-  })
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (!error && user?.id) return user.id
-  console.log('[verify-user GET] getUser result:', { hasUser: !!user?.id, error: error?.message })
-  return null
-}
-
-export async function GET(request: NextRequest) {
-  return runVerify(request)
 }
 
 export async function POST(request: NextRequest) {
   return runVerify(request)
+}
+
+/** GET not supported; use POST with body { access_token } so Netlify doesn't rely on cookie reading. */
+export async function GET() {
+  return NextResponse.json(
+    { error: 'Use POST with body: { access_token: "<session.access_token>" }' },
+    { status: 405 }
+  )
 }
 
 async function runVerify(request: NextRequest) {
@@ -67,15 +46,7 @@ async function runVerify(request: NextRequest) {
       return NextResponse.json({ isUser: false, organizationId: null }, { status: 500 })
     }
 
-    const cookieHeader = request.headers.get('cookie')
-    const authCookieNames = cookieHeader
-      ? cookieHeader.split(';').map((s) => s.trim().split('=')[0]).filter(Boolean)
-      : []
-    console.log('[verify-user] request cookie header names:', authCookieNames)
-
     const userId = await getAuthUserId(request)
-    console.log('[verify-user] getAuthUserId result:', userId ?? null)
-
     if (!userId) {
       return NextResponse.json({ isUser: false, organizationId: null }, { status: 401 })
     }

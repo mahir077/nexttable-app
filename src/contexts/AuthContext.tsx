@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true
 
-    const applySession = async (session: { user: { id: string } } | null) => {
+    const applySession = async (session: { user: { id: string }; access_token?: string } | null) => {
       if (!session?.user) {
         setUser(null)
         setOrganization(null)
@@ -80,7 +80,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         setIsSuperAdmin(false)
         const verifyUserUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/verify-user` : '/api/verify-user'
-        const verifyUserRes = await fetch(verifyUserUrl, { method: 'GET', credentials: 'include' })
+        const verifyUserRes = await fetch(verifyUserUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ access_token: session.access_token ?? '' }),
+          credentials: 'include',
+        })
         const verifyUserData = await verifyUserRes.json().catch(() => ({ isUser: false, organizationId: null, organizations: [] }))
         if (verifyUserData?.isUser && verifyUserData?.organizationId) {
           const orgId = verifyUserData.organizationId as string
@@ -109,9 +114,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // Initial load: use getUser() so session is validated with server
+    // Initial load: use getSession() so we have access_token for verify-user POST (avoids cookie reading on Netlify)
     const loadInitialSession = async (retry = false) => {
-      const { data: { user }, error } = await supabase.auth.getUser()
+      const { data: { session }, error } = await supabase.auth.getSession()
       if (!mounted) return
       if (error?.message?.includes('Refresh') || error?.message?.includes('JWT')) {
         supabase.auth.signOut().then(() => {
@@ -119,11 +124,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })
         return
       }
-      if (user) {
-        await applySession({ user } as { user: { id: string } })
+      if (session?.user) {
+        await applySession({ user: session.user, access_token: session.access_token })
         return
       }
-      // Cookie might not be ready on first paint; retry once
+      // Session might not be ready on first paint; retry once
       if (!retry && typeof window !== 'undefined') {
         setTimeout(() => loadInitialSession(true), 400)
       } else {
