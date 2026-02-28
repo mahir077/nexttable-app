@@ -73,6 +73,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (typeof window !== 'undefined') {
             localStorage.removeItem('current_organization_id')
             localStorage.removeItem('restaurantInfo')
+            localStorage.removeItem('organization_cache')
+            localStorage.removeItem('organizations_cache')
             const path = window.location.pathname
             if (!path.startsWith('/admin')) {
               window.location.href = '/admin/dashboard'
@@ -82,6 +84,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return
         }
         setIsSuperAdmin(false)
+        if (typeof window !== 'undefined') {
+          const cachedOrgId = localStorage.getItem('current_organization_id')
+          let cachedOrg: { id: string; name: string; display_name: string } | null = null
+          let cachedOrgs: { id: string; name: string; display_name: string }[] = []
+          try {
+            const raw = localStorage.getItem('organization_cache')
+            if (raw) cachedOrg = JSON.parse(raw) as { id: string; name: string; display_name: string }
+            const rawList = localStorage.getItem('organizations_cache')
+            if (rawList) cachedOrgs = JSON.parse(rawList) as { id: string; name: string; display_name: string }[]
+          } catch {
+            // ignore
+          }
+          if (cachedOrgId && cachedOrg && cachedOrgs.length > 0) {
+            if (mounted) {
+              setOrganizations(cachedOrgs)
+              setOrganization(cachedOrg)
+            }
+            setLoading(false)
+            return
+          }
+        }
         const verifyUserUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/verify-user` : '/api/verify-user'
         const verifyUserRes = await fetch(verifyUserUrl, {
           method: 'POST',
@@ -103,6 +126,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (typeof window !== 'undefined') {
             localStorage.setItem('current_organization_id', orgId)
             localStorage.setItem('restaurantInfo', JSON.stringify({ name: orgToSet.display_name || orgToSet.name }))
+            localStorage.setItem('organization_cache', JSON.stringify(orgToSet))
+            localStorage.setItem('organizations_cache', JSON.stringify(orgsToSet))
           }
         } else {
           if (mounted) {
@@ -160,6 +185,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (typeof window !== 'undefined') {
               localStorage.removeItem('current_organization_id')
               localStorage.removeItem('restaurantInfo')
+              localStorage.removeItem('organization_cache')
+              localStorage.removeItem('organizations_cache')
             }
             setLoading(false)
           }
@@ -403,6 +430,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== 'undefined') {
       localStorage.setItem('current_organization_id', orgId)
       localStorage.setItem('restaurantInfo', JSON.stringify({ name: orgToSet.display_name || orgToSet.name }))
+      localStorage.setItem('organization_cache', JSON.stringify(orgToSet))
+      localStorage.setItem('organizations_cache', JSON.stringify(orgsToSet))
     }
     setOrganizations(orgsToSet)
     setOrganization(orgToSet)
@@ -468,6 +497,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('current_organization_id')
       localStorage.removeItem('restaurantInfo')
+      localStorage.removeItem('organization_cache')
+      localStorage.removeItem('organizations_cache')
 
       // 3. Clear all Supabase auth cookies manually
       document.cookie.split(';').forEach(c => {
