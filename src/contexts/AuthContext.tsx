@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true
 
-    const applySession = async (session: { user: { id: string }; access_token?: string } | null) => {
+    const applySession = async (session: { user: { id: string }; access_token?: string; refresh_token?: string } | null) => {
       if (!session?.user) {
         setUser(null)
         setOrganization(null)
@@ -59,6 +59,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
       setUser(session.user)
+      if (session.access_token && session.refresh_token) {
+        await supabase.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token })
+      }
       try {
         const verifyUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/verify-admin` : '/api/verify-admin'
         const verifyRes = await fetch(verifyUrl, { method: 'GET', credentials: 'include' })
@@ -125,7 +128,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
       if (session?.user) {
-        await applySession({ user: session.user, access_token: session.access_token })
+        await applySession({
+          user: session.user,
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+        })
         return
       }
       // Session might not be ready on first paint; retry once
