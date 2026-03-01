@@ -8,6 +8,7 @@ import { getCategories, getMenuItemsByCategory, type CartItem, type Category, ty
 import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
 import { useAuth } from '@/contexts/AuthContext'
+import { ensureSession } from '@/lib/supabase-client'
 import { createOrder, insertOrderItems } from '@/app/lib/db/orders'
 import { getTableStatus, updateTableStatus } from '@/app/lib/db/tables'
 
@@ -435,6 +436,7 @@ function POSContent() {
   }
 
   const handleSendKOT = async () => {
+    await ensureSession()
     if (!orgId) {
       showToast('Restaurant not selected. Please go to Dashboard first or refresh the page.', 'error')
       return
@@ -483,6 +485,7 @@ function POSContent() {
         item_name_bangla: item.name_bangla ?? null,
         quantity: item.quantity,
         unit_price: item.price,
+        item_price: item.price,
         subtotal: item.price * item.quantity,
         status: 'pending',
         ...(orgId && { organization_id: orgId }),
@@ -514,7 +517,7 @@ function POSContent() {
       setEventDate('')
       router.push('/billing')
     } catch (err) {
-      console.error(err)
+      console.error('KOT error:', JSON.stringify(err), (err as { message?: string })?.message, (err as { code?: string })?.code, (err as { details?: unknown })?.details)
       showToast('Failed to create order', 'error')
     }
   }

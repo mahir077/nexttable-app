@@ -36,12 +36,15 @@ export default function SuperAdminDashboard() {
   })
 
   useEffect(() => {
-    checkAdminAndLoadData()
+    const controller = new AbortController()
+    const signal = controller.signal
+    checkAdminAndLoadData(signal)
+    return () => controller.abort()
   }, [])
 
-  const checkAdminAndLoadData = async () => {
+  const checkAdminAndLoadData = async (signal?: AbortSignal) => {
     try {
-      const response = await fetch('/api/check-admin')
+      const response = await fetch('/api/check-admin', { signal })
       const data = await response.json()
 
       if (!data.isAdmin) {
@@ -49,17 +52,18 @@ export default function SuperAdminDashboard() {
         return
       }
 
-      await loadClients()
+      await loadClients(signal)
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return
       console.error('Error:', error)
       router.push('/admin/login')
     }
   }
 
-  const loadClients = async () => {
+  const loadClients = async (signal?: AbortSignal) => {
     setLoading(true)
     try {
-      const response = await fetch('/api/admin/clients')
+      const response = await fetch('/api/admin/clients', { ...(signal && { signal }) })
       const data = await response.json()
 
       if (!response.ok) {
@@ -78,6 +82,7 @@ export default function SuperAdminDashboard() {
         overdue: list.filter((c: Client) => c.payment_status === 'overdue').length,
       })
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return
       console.error('Error loading clients:', error)
       setClients([])
     } finally {
@@ -209,7 +214,7 @@ export default function SuperAdminDashboard() {
             ➕ Create New Client
           </button>
           <button
-            onClick={loadClients}
+            onClick={() => loadClients()}
             className="px-6 py-3 bg-slate-200 rounded-lg font-bold hover:bg-slate-300"
           >
             🔄 Refresh

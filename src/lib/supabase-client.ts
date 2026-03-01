@@ -14,8 +14,15 @@ export function getSupabase(): SupabaseClient {
         autoRefreshToken: true,
         detectSessionInUrl: true,
       },
+      db: {
+        schema: 'public',
+      },
+      global: {
+        headers: {
+          'x-application-name': 'nexttable',
+        },
+      },
     })
-    // Trigger session restoration from localStorage (async, non-blocking)
     browserClient.auth.getSession().then(({ data: { session }, error }) => {
       if (!error && session?.access_token && session?.refresh_token) {
         browserClient.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token })
@@ -25,13 +32,11 @@ export function getSupabase(): SupabaseClient {
   return browserClient
 }
 
-/** Call before querying to ensure the client has restored session from localStorage. */
 export async function ensureSession() {
   const client = getSupabase()
   const { data: { session } } = await client.auth.getSession()
   if (session?.access_token) return session
 
-  // Fallback: use stored tokens
   const access_token = typeof window !== 'undefined' ? localStorage.getItem('sb_access_token') : null
   const refresh_token = typeof window !== 'undefined' ? localStorage.getItem('sb_refresh_token') : null
   if (access_token && refresh_token) {

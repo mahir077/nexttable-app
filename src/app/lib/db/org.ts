@@ -1,7 +1,5 @@
 import { supabase, ensureSession } from '@/lib/supabase-client'
 
-// Organization and settings helpers shared across Settings, Dashboard, AuthContext, etc.
-
 export async function fetchOrganizationById(orgId: string) {
   return supabase
     .from('organizations')
@@ -67,8 +65,6 @@ export async function updateOrganizationDisplayName(
     .eq('id', orgId)
 }
 
-// Invoice settings
-
 export async function fetchInvoiceSettings(orgId: string) {
   return supabase
     .from('invoice_settings')
@@ -82,6 +78,7 @@ export async function upsertInvoiceSettings(
   data: Record<string, unknown>,
   updatedAt: string
 ) {
+  await ensureSession()
   const { data: existing } = await supabase
     .from('invoice_settings')
     .select('id')
@@ -100,4 +97,3 @@ export async function upsertInvoiceSettings(
     .from('invoice_settings')
     .insert({ ...data, organization_id: orgId, updated_at: updatedAt })
 }
-

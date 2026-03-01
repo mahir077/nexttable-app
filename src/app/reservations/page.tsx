@@ -15,15 +15,20 @@ import {
 
 interface Reservation {
   id: string
-  date: string
-  time: string
+  reserved_at: string
   table_id: string
-  guest_name: string
-  guest_phone: string | null
-  guest_count: number | null
-  special_requests: string | null
+  customer_name: string
+  customer_phone: string | null
+  party_size: number | null
+  notes: string | null
   status: string
   created_at: string
+  // computed for display
+  date?: string
+  time?: string
+  guest_name?: string
+  guest_phone?: string | null
+  guest_count?: number | null
 }
 
 export default function ReservationsPage() {
@@ -54,7 +59,15 @@ export default function ReservationsPage() {
     if (!orgId) return
     setLoading(true)
     const { data } = await fetchPendingReservations(orgId)
-    setReservations((data as Reservation[]) || [])
+    const mapped = (data || []).map((r: Reservation) => ({
+      ...r,
+      date: r.reserved_at?.split('T')[0] ?? '',
+      time: r.reserved_at?.split('T')[1]?.slice(0, 5) ?? '',
+      guest_name: r.customer_name,
+      guest_phone: r.customer_phone,
+      guest_count: r.party_size,
+    }))
+    setReservations(mapped as Reservation[])
     setLoading(false)
   }
 

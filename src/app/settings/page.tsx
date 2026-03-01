@@ -119,13 +119,17 @@ export default function SettingsPage() {
 
   // Fetch data when org is available
   useEffect(() => {
-    if (orgId) fetchFloors()
+    if (!orgId) return
+    const controller = new AbortController()
+    fetchFloors(controller.signal)
+    return () => controller.abort()
   }, [orgId])
 
   useEffect(() => {
-    if (selectedFloor) {
-      fetchTables()
-    }
+    if (!selectedFloor) return
+    const controller = new AbortController()
+    fetchTables(controller.signal)
+    return () => controller.abort()
   }, [selectedFloor])
 
   useEffect(() => {
@@ -133,40 +137,46 @@ export default function SettingsPage() {
   }, [activeTab])
 
   useEffect(() => {
-    loadInvoiceSettings()
+    if (!orgId) return
+    const controller = new AbortController()
+    loadInvoiceSettings(controller.signal)
+    return () => controller.abort()
   }, [orgId])
 
   // loadSettings with timeout to prevent hanging on slow/serverless; use overrideOrgId when loading from AuthContext
-  const loadSettings = async (skipLoadingState?: boolean, overrideOrgId?: string | null) => {
+  const loadSettings = async (skipLoadingState?: boolean, overrideOrgId?: string | null, signal?: AbortSignal) => {
     const effectiveOrgId = overrideOrgId ?? orgId
     if (!effectiveOrgId) return
     if (!skipLoadingState) {
       setRestaurantInfoLoading(true)
       const safetyTimer = setTimeout(() => setRestaurantInfoLoading(false), 10000)
       try {
-        await loadSettingsInner(false, effectiveOrgId)
+        await loadSettingsInner(false, effectiveOrgId, signal)
       } finally {
         clearTimeout(safetyTimer)
         setRestaurantInfoLoading(false)
       }
       return
     }
-    await loadSettingsInner(true, effectiveOrgId)
+    await loadSettingsInner(true, effectiveOrgId, signal)
   }
 
-  const loadSettingsInner = async (skipLoadingState: boolean, effectiveOrgId: string) => {
+  const loadSettingsInner = async (skipLoadingState: boolean, effectiveOrgId: string, signal?: AbortSignal) => {
     if (!effectiveOrgId) return
+    if (signal?.aborted) return
     const sessionResult = await ensureSession()
     console.log('session result', sessionResult)
     const timeout = (ms: number) => new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
     try {
       let orgData: { id: string; name: string; display_name?: string | null } | null = null
 
+      if (signal?.aborted) return
       const { data: orgResp, error: orgError } = await Promise.race([
         fetchOrganizationById(effectiveOrgId),
         timeout(8000)
       ]) as any
 
+      if (signal?.aborted) return
       if (orgResp && !orgError) {
         orgData = orgResp
         setRestaurantInfo(prev => ({
@@ -176,11 +186,13 @@ export default function SettingsPage() {
       }
       console.log('orgData result', orgData, orgError)
 
+      if (signal?.aborted) return
       const { data: settingsData, error: settingsError } = await Promise.race([
         fetchRestaurantSettingsForOrg(effectiveOrgId),
         timeout(8000)
       ]) as any
 
+      if (signal?.aborted) return
       console.log('settingsData result', settingsData, settingsError)
 
       if (settingsData && !settingsError) {
@@ -207,11 +219,8 @@ export default function SettingsPage() {
         })
       }
     } catch (e) {
-      if (e instanceof Error && (e.name === 'AbortError' || e.message === 'timeout')) {
-        console.log('loadSettings timeout/abort - using cached data')
-      } else {
-        console.error('Load settings error:', e)
-      }
+      if (e instanceof Error && (e.name === 'AbortError' || e.message === 'timeout')) return
+      console.error('Load settings error:', e)
     } finally {
       if (!skipLoadingState) setRestaurantInfoLoading(false)
     }
@@ -222,13 +231,16 @@ export default function SettingsPage() {
     const effectiveOrgId = organization?.id ?? null
     if (!effectiveOrgId) return
     loadSettingsRanRef.current = false
-    loadSettings(false, effectiveOrgId)
+    const controller = new AbortController()
+    loadSettings(false, effectiveOrgId, controller.signal)
+    return () => controller.abort()
   }, [organization?.id])
 
-  const fetchFloors = async () => {
+  const fetchFloors = async (signal?: AbortSignal) => {
     if (!orgId) return
     try {
       const { data, error } = await fetchFloorsForOrg(orgId)
+      if (signal?.aborted) return
 
       if (error) {
         console.error('Error fetching floors:', error)
@@ -248,10 +260,11 @@ export default function SettingsPage() {
     }
   }
 
-  const fetchTables = async () => {
+  const fetchTables = async (signal?: AbortSignal) => {
     if (!selectedFloor || !orgId) return
     try {
       const data = await getTablesByFloor(selectedFloor.id, orgId)
+      if (signal?.aborted) return
       setTables(data)
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') return
@@ -370,6 +383,7 @@ export default function SettingsPage() {
         setFloorForm({ name: '' })
         setFloors(prev => prev.map(f => f.id === editingFloor.id ? { ...f, name: floorForm.name.trim() } : f))
       } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') return
         console.error('Error saving floor:', error)
         const errMsg = error instanceof Error ? error.message : JSON.stringify(error)
         showToast('Failed to save floor: ' + errMsg, 'error')
@@ -397,6 +411,7 @@ export default function SettingsPage() {
       showToast('Floor added!', 'success')
       setFloors(prev => prev.map(f => f.id === tempId ? (data as Floor) : f))
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return
       console.error('Floor insert error:', error)
       setFloors(prev => prev.filter(f => f.id !== tempId))
       const errMsg = (error as { message?: string })?.message ?? (error instanceof Error ? error.message : JSON.stringify(error))
@@ -425,6 +440,7 @@ export default function SettingsPage() {
       if (error) throw error
       showToast('Floor deleted!', 'success')
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return
       console.error('Error deleting floor:', error)
       setFloors(prevFloors)
       if (selectedFloor?.id === floor.id) setSelectedFloor(floor)
@@ -460,6 +476,7 @@ export default function SettingsPage() {
           ? { ...t, table_number: parseInt(tableForm.table_number, 10) || t.table_number, seats: parseInt(tableForm.seats, 10) || 4 }
           : t))
       } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') return
         console.error('Error saving table:', error)
         showToast('Failed to save table', 'error')
       }
@@ -500,6 +517,7 @@ export default function SettingsPage() {
       showToast('Table created successfully!', 'success')
       setTables(prev => prev.map(t => t.id === tempId ? (data as Table) : t))
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return
       console.error('Table creation error:', error)
       setTables(prev => prev.filter(t => t.id !== tempId))
       const errMsg = (error as { message?: string })?.message ?? (error instanceof Error ? error.message : JSON.stringify(error))
@@ -522,6 +540,7 @@ export default function SettingsPage() {
       if (error) throw error
       showToast('Table deleted!', 'success')
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return
       console.error('Error deleting table:', error)
       setTables(prevTables)
       showToast('Failed to delete table', 'error')
@@ -540,15 +559,16 @@ export default function SettingsPage() {
       showToast('✅ Invoice settings saved!', 'success')
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') return
-      console.error('Save error:', error)
+      console.error('Save error:', JSON.stringify(error), error)
       showToast('Failed to save settings', 'error')
     }
   }
 
-  const loadInvoiceSettings = async () => {
+  const loadInvoiceSettings = async (signal?: AbortSignal) => {
     if (!orgId) return
     try {
       const { data, error } = await fetchInvoiceSettings(orgId)
+      if (signal?.aborted) return
 
       if (!error && data) {
         setInvoiceSettings(prev => ({
@@ -557,8 +577,9 @@ export default function SettingsPage() {
           ...(data as Partial<InvoiceSettings>),
         }))
       }
-    } catch {
-      // keep default invoice settings
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return
+      // keep default invoice settings on other errors
     }
   }
 

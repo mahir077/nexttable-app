@@ -6,8 +6,7 @@ export async function fetchPendingReservations(orgId: string) {
     .select('*')
     .eq('organization_id', orgId)
     .eq('status', 'pending')
-    .order('date', { ascending: true })
-    .order('time', { ascending: true })
+    .order('reserved_at', { ascending: true })
 }
 
 export interface NewReservationPayload {
@@ -23,7 +22,18 @@ export interface NewReservationPayload {
 }
 
 export async function createReservation(payload: NewReservationPayload) {
-  return supabase.from('reservations').insert(payload)
+  const reserved_at = `${payload.date}T${payload.time}:00`
+  
+  return supabase.from('reservations').insert({
+    organization_id: payload.organization_id,
+    table_id: payload.table_id,
+    customer_name: payload.guest_name,
+    customer_phone: payload.guest_phone,
+    party_size: payload.guest_count,
+    reserved_at: reserved_at,
+    status: payload.status,
+    notes: payload.special_requests,
+  })
 }
 
 export async function markReservationArrived(
@@ -58,4 +68,3 @@ export async function cancelReservationById(orgId: string, reservationId: string
     .eq('id', reservationId)
     .eq('organization_id', orgId)
 }
-

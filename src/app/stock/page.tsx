@@ -58,7 +58,7 @@ export default function StockPage() {
         .order('last_updated', { ascending: false })
 
       if (stockError) {
-        console.error('Stock error:', stockError)
+        console.error('Stock error:', JSON.stringify(stockError), stockError)
         throw stockError
       }
 
@@ -427,8 +427,8 @@ export default function StockPage() {
                 </tr>
               </thead>
               <tbody>
-                {stockData.map(item => (
-                  <tr key={item.id} className="border-b hover:bg-slate-50">
+              {stockData.map((item, idx) => (
+        <tr key={item.menu_item_id ?? idx} className="border-b hover:bg-slate-50">
                     <td className="px-4 py-3 font-bold text-slate-900">
                       {item.menu_item?.name}
                     </td>
@@ -438,19 +438,19 @@ export default function StockPage() {
                         : String(item.menu_item?.category ?? '')}
                     </td>
                     <td className="px-4 py-3 text-right font-semibold">
-                      {item.current_quantity.toFixed(2)}
+                    {(item.current_quantity ?? 0).toFixed(2)}
                     </td>
                     <td className="px-4 py-3 text-right text-blue-600">
-                      ৳{item.opening_value.toFixed(2)}
+                    ৳{(item.opening_value ?? 0).toFixed(2)}
                     </td>
                     <td className="px-4 py-3 text-right text-emerald-600 font-bold">
-                      +৳{item.total_in_value.toFixed(2)}
+                    +৳{(item.total_in_value ?? 0).toFixed(2)}
                     </td>
                     <td className="px-4 py-3 text-right text-red-600 font-bold">
-                      -৳{item.total_out_value.toFixed(2)}
+                    -৳{(item.total_out_value ?? 0).toFixed(2)}
                     </td>
                     <td className="px-4 py-3 text-right font-black text-lg text-slate-900">
-                      ৳{item.current_value.toFixed(2)}
+                    ৳{(item.current_value ?? 0).toFixed(2)}
                     </td>
                   </tr>
                 ))}
@@ -459,16 +459,16 @@ export default function StockPage() {
                 <tr className="border-t-2 bg-slate-100 font-bold">
                   <td colSpan={3} className="px-4 py-4 text-right">TOTAL:</td>
                   <td className="px-4 py-4 text-right text-blue-700">
-                    ৳{stockData.reduce((s, i) => s + i.opening_value, 0).toFixed(2)}
+                    ৳{stockData.reduce((s, i) => s + (i.opening_value ?? 0), 0).toFixed(2)}
                   </td>
                   <td className="px-4 py-4 text-right text-emerald-700">
-                    +৳{totalInValue.toFixed(2)}
+                    +৳{(totalInValue ?? 0).toFixed(2)}
                   </td>
                   <td className="px-4 py-4 text-right text-red-700">
-                    -৳{totalOutValue.toFixed(2)}
+                    -৳{(totalOutValue ?? 0).toFixed(2)}
                   </td>
                   <td className="px-4 py-4 text-right text-xl text-slate-900">
-                    ৳{totalStockValue.toFixed(2)}
+                    ৳{(totalStockValue ?? 0).toFixed(2)}
                   </td>
                 </tr>
               </tbody>
