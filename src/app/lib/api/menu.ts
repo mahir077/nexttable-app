@@ -166,11 +166,14 @@ export async function deleteMenuItem(itemId: string) {
   await ensureSession()
   const { error } = await supabase
     .from('menu_items')
-    .delete()
+    .update({ 
+      deleted_at: new Date().toISOString(),
+      is_available: false 
+    })
     .eq('id', itemId)
 
   if (error) {
-    console.error('Error deleting menu item:', error)
+    console.error('Error deleting menu item:', JSON.stringify(error), error)
     return false
   }
   return true

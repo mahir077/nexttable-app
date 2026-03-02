@@ -354,7 +354,7 @@ export default function KitchenPage() {
     if (!orgId) return
     try {
       setLoading(true)
-      const activeStatuses = ['pending', 'preparing', 'ready', 'served', 'rejected']
+      const activeStatuses = ['pending', 'ready', 'served', 'rejected']
       const data = await getOrders(orgId, activeStatuses)
       setOrders(data ?? [])
     } catch (error) {
@@ -395,7 +395,7 @@ export default function KitchenPage() {
       return
     }
     fetchOrders()
-    const interval = setInterval(fetchOrders, 5000)
+    const interval = setInterval(fetchOrders, 30000)
     return () => clearInterval(interval)
   }, [orgId])
 
@@ -780,21 +780,13 @@ export default function KitchenPage() {
           {order.status === 'pending' && (
             <button
               type="button"
-              onClick={e => { e.stopPropagation(); handleStatusChange(order.id, 'preparing') }}
-              className="w-full py-2.5 rounded-full bg-blue-500/95 hover:bg-blue-400 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-500/25 border border-blue-400/70 active:scale-[0.98] transition-all"
-            >
-              🔵 Start Preparing
-            </button>
-          )}
-          {order.status === 'preparing' && (
-            <button
-              type="button"
               onClick={e => { e.stopPropagation(); handleStatusChange(order.id, 'ready') }}
-              className="w-full py-2.5 rounded-full bg-emerald-500/95 hover:bg-emerald-400 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-md shadow-emerald-500/25 border border-emerald-400/70 active:scale-[0.98] transition-all"
+              className="w-full py-2.5 rounded-full bg-blue-500/95 hover:bg-blue-400 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-500/25 border border-blue-400/70 active:scale-[0.98] transition-all"
             >
               🟢 Mark Ready
             </button>
           )}
+          
           {order.status === 'ready' && (
             <button
               type="button"
@@ -809,7 +801,7 @@ export default function KitchenPage() {
               ✅ Completed
             </div>
           )}
-          {(order.status === 'pending' || order.status === 'preparing') && (
+          {order.status === 'pending' && (
             <div className="flex gap-2">
               <button
                 type="button"
@@ -868,7 +860,7 @@ export default function KitchenPage() {
           <div>
             <h1 className="text-3xl lg:text-4xl font-brand font-black tracking-tight">🍳 Kitchen</h1>
             <p className="text-slate-400 text-sm mt-0.5">
-              {orders.length} active · Pending {pendingOrders.length} · Preparing {preparingOrders.length} · Ready {readyOrders.length}
+            {orders.length} active · Pending {pendingOrders.length} · Ready {readyOrders.length}
             </p>
           </div>
         </div>
@@ -903,7 +895,7 @@ export default function KitchenPage() {
         />
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 lg:gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 lg:gap-6 mb-8">
             {/* Pending Column */}
             <div className="flex flex-col min-h-[200px]">
               <div className="bg-orange-500/15 rounded-xl p-4 mb-4 border-2 border-orange-400/40 shadow-lg shadow-orange-500/10">
@@ -923,24 +915,7 @@ export default function KitchenPage() {
               </div>
             </div>
 
-            {/* Preparing Column */}
-            <div className="flex flex-col min-h-[200px]">
-              <div className="bg-blue-500/15 rounded-xl p-4 mb-4 border-2 border-blue-400/40 shadow-lg shadow-blue-500/10">
-                <h3 className="font-bold text-blue-200 flex items-center justify-between text-lg">
-                  <span className="flex items-center gap-2">🔵 Preparing</span>
-                  <span className="bg-blue-500/30 text-white rounded-full w-10 h-10 flex items-center justify-center font-black text-lg tabular-nums">
-                    {preparingOrders.length}
-                  </span>
-                </h3>
-              </div>
-              <div className="space-y-4 flex-1">
-                {preparingOrders.length === 0 ? (
-                  <p className="text-slate-500 text-sm py-4 text-center">None in progress</p>
-                ) : (
-                  preparingOrders.map(order => <OrderCard key={order.id} order={order} />)
-                )}
-              </div>
-            </div>
+            
 
             {/* Ready Column */}
             <div className="flex flex-col min-h-[200px]">
@@ -1070,16 +1045,12 @@ export default function KitchenPage() {
               ))}
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
-              {selectedOrder.order.status === 'pending' && (
-                <button onClick={() => handleStatusChange(selectedOrder.order.id, 'preparing')} className="w-full sm:flex-1 min-h-[48px] py-4 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-bold text-base transition-all active:scale-[0.98] shadow-lg shadow-blue-500/25">
-                  🔵 Start Preparing
-                </button>
-              )}
-              {selectedOrder.order.status === 'preparing' && (
-                <button onClick={() => handleStatusChange(selectedOrder.order.id, 'ready')} className="w-full sm:flex-1 min-h-[48px] py-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-base transition-all active:scale-[0.98] shadow-lg shadow-emerald-500/25">
-                  🟢 Mark Ready
-                </button>
-              )}
+            {selectedOrder.order.status === 'pending' && (
+  <button onClick={() => handleStatusChange(selectedOrder.order.id, 'ready')} className="w-full sm:flex-1 min-h-[48px] py-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-base transition-all active:scale-[0.98] shadow-lg shadow-emerald-500/25">
+    🟢 Mark Ready
+  </button>
+)}
+              
               {selectedOrder.order.status === 'ready' && (
                 <button onClick={() => handleStatusChange(selectedOrder.order.id, 'served')} className="w-full sm:flex-1 min-h-[48px] py-4 rounded-xl bg-slate-600 hover:bg-slate-500 text-white font-bold text-base transition-all active:scale-[0.98]">
                   ✅ Mark Served

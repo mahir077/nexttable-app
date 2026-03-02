@@ -274,7 +274,11 @@ export default function DashboardPage() {
 
   // Handle table click — go to POS for that table
   const handleTableClick = (table: Table) => {
-    router.push(`/pos?type=dine-in&tableId=${table.id}&floorId=${table.floor_id}`)
+    if (table.status === 'occupied' || table.status === 'billing') {
+      router.push(`/billing?tableId=${table.id}`)
+    } else {
+      router.push(`/pos?type=dine-in&tableId=${table.id}&floorId=${table.floor_id}`)
+    }
   }
 
   // Handle status change

@@ -515,7 +515,7 @@ function POSContent() {
       setDeliveryTime('')
       setGuestCount('')
       setEventDate('')
-      router.push('/billing')
+      router.push('/kitchen')
     } catch (err) {
       console.error('KOT error:', JSON.stringify(err), (err as { message?: string })?.message, (err as { code?: string })?.code, (err as { details?: unknown })?.details)
       showToast('Failed to create order', 'error')
