@@ -34,13 +34,32 @@ export function getSupabase(): SupabaseClient {
 
 export async function ensureSession() {
   const client = getSupabase()
-  const { data: { session } } = await client.auth.getSession()
+  const { data: { session }, error } = await client.auth.getSession()
+  
+  if (error || !session) {
+    // Clear stale tokens and redirect to login
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('sb_access_token')
+      localStorage.removeItem('sb_refresh_token')
+      await client.auth.signOut()
+      window.location.href = '/login'
+    }
+    return null
+  }
+
   if (session?.access_token) return session
 
   const access_token = typeof window !== 'undefined' ? localStorage.getItem('sb_access_token') : null
   const refresh_token = typeof window !== 'undefined' ? localStorage.getItem('sb_refresh_token') : null
   if (access_token && refresh_token) {
-    const { data } = await client.auth.setSession({ access_token, refresh_token })
+    const { data, error: setError } = await client.auth.setSession({ access_token, refresh_token })
+    if (setError) {
+      localStorage.removeItem('sb_access_token')
+      localStorage.removeItem('sb_refresh_token')
+      await client.auth.signOut()
+      if (typeof window !== 'undefined') window.location.href = '/login'
+      return null
+    }
     return data.session
   }
   return null

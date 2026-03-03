@@ -175,7 +175,7 @@ export function getOrdersReportBaseQuery(orgId: string) {
         menu_item:menu_items (
           name,
           category:categories(name),
-          making_cost
+          cost
         )
       )
     `)
@@ -187,7 +187,7 @@ export function getOrdersReportFallbackQuery(orgId: string) {
   return supabase
     .from('orders')
     .select(
-      'id, total, created_at, payment_method, status, order_items (quantity, unit_price, item_name, menu_item_id, menu_item:menu_items (name, making_cost))'
+      'id, total, created_at, payment_method, status, order_items (quantity, unit_price, item_name, menu_item_id, menu_item:menu_items (name, cost))'
     )
     .eq('organization_id', orgId)
     .order('created_at', { ascending: false })

@@ -31,7 +31,7 @@ interface OrderItem {
   menu_item?: {
     name: string
     category: string | { name?: string }
-    making_cost?: number
+    cost?: number
   }
 }
 
@@ -153,7 +153,7 @@ export default function ReportsPage() {
         if (name) {
           const price = item.price ?? item.unit_price ?? 0
           const qty = item.quantity || 0
-          const makingCost = item.menu_item?.making_cost ?? 0
+          const makingCost = item.menu_item?.cost ?? 0
           if (!itemSales[name]) itemSales[name] = { name, quantity: 0, revenue: 0, cost: 0 }
           itemSales[name].quantity += qty
           itemSales[name].revenue += price * qty

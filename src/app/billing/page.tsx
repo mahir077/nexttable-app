@@ -29,7 +29,7 @@ interface Order {
     item_name_bangla: string | null
     subtotal?: number
     menu_item_id?: string | null
-    menu_item?: { id: string; making_cost?: number } | null
+    menu_item?: { id: string; cost?: number } | null
   }>
 }
 
@@ -115,7 +115,7 @@ export default function BillingPage() {
             item_name_bangla,
             subtotal,
             menu_item_id,
-            menu_item:menu_items(id, making_cost)
+            menu_item:menu_items(id, cost)
           )
         `)
         .eq('organization_id', orgId)
@@ -277,14 +277,14 @@ export default function BillingPage() {
           })
           .map(item => {
             const menuItemId = item.menu_item_id ?? item.menu_item?.id ?? ''
-            const makingCost = Number(item.menu_item?.making_cost) || 0
+            const cost = Number(item.menu_item?.cost) || 0
             const qty = Number(item.quantity) || 0
             return {
               menu_item_id: menuItemId,
               movement_type: 'sale',
               quantity: qty,
-              unit_cost: makingCost,
-              total_value: makingCost * qty,
+              unit_cost: cost,
+              total_value: cost * qty,
               reference_type: 'order',
               reference_id: selectedOrder.id,
               notes: `Sale - Order ${selectedOrder.order_number}`,

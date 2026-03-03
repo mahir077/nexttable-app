@@ -18,6 +18,7 @@ export interface MenuItem {
   name_bangla: string | null
   description: string | null
   price: number
+  cost?: number | null        // ← এটা add করো
   making_cost?: number | null
   image_url: string | null
   is_available: boolean

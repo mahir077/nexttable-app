@@ -336,7 +336,7 @@ export default function MenuManagementPage() {
       name_bangla: item.name_bangla || '',
       description: item.description || '',
       price: item.price.toString(),
-      making_cost: item.making_cost != null ? String(item.making_cost) : '0',
+      making_cost: item.cost != null ? String(item.cost) : '0',
       category_id: item.category_id,
       image_url: item.image_url || ''
     })
