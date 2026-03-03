@@ -9,7 +9,51 @@ export async function insertStockMovements(
     return { data: null, error: null }
   }
 
-  return supabase.from('stock_movements').insert(rows)
+  const { error } = await supabase.from('stock_movements').insert(rows)
+  if (error) return { data: null, error }
+
+  // Update stock_summary for each item
+  const orgId = rows[0].organization_id as string
+  const byItem: Record<string, number> = {}
+  rows.forEach(r => {
+    const id = r.menu_item_id as string
+    byItem[id] = (byItem[id] ?? 0) + (Number(r.total_value) || 0)
+  })
+
+  for (const [menuItemId, inValue] of Object.entries(byItem)) {
+    const { data: row } = await supabase
+      .from('stock_summary')
+      .select('total_in_value, current_value')
+      .eq('menu_item_id', menuItemId)
+      .eq('organization_id', orgId)
+      .maybeSingle()
+
+    if (row) {
+      await supabase
+        .from('stock_summary')
+        .update({
+          total_in_value: (Number(row.total_in_value) || 0) + inValue,
+          current_value: (Number(row.current_value) || 0) + inValue,
+          last_updated: new Date().toISOString(),
+        })
+        .eq('menu_item_id', menuItemId)
+        .eq('organization_id', orgId)
+    } else {
+      await supabase
+        .from('stock_summary')
+        .insert({
+          menu_item_id: menuItemId,
+          organization_id: orgId,
+          total_in_value: inValue,
+          current_value: inValue,
+          opening_value: 0,
+          total_out_value: 0,
+          last_updated: new Date().toISOString(),
+        })
+    }
+  }
+
+  return { data: null, error: null }
 }
 
 export interface BazaarStockPayload {
@@ -36,22 +80,50 @@ export async function insertBazaarStockMovement(
     try {
       insertPayload.movement_date = new Date().toISOString().slice(0, 19)
     } catch {
-      // ignore; will fall back without movement_date if needed
+      // ignore
     }
   }
 
   const { error } = await supabase.from('stock_movements').insert(insertPayload)
-  if (!error) return { error: null }
+  if (error) return { error }
 
-  const msg = (error as { message?: string }).message ?? ''
-  if (msg.includes('movement_date') || msg.includes('column')) {
-    const { error: err2 } = await supabase.from('stock_movements').insert(payload)
-    if (err2) return { error: err2 }
-    return { error: null }
+  // Update stock_summary
+  const inValue = Number(payload.total_value) || 0
+  const { data: row } = await supabase
+    .from('stock_summary')
+    .select('total_in_value, current_value')
+    .eq('menu_item_id', payload.menu_item_id)
+    .eq('organization_id', payload.organization_id)
+    .maybeSingle()
+
+  if (row) {
+    await supabase
+      .from('stock_summary')
+      .update({
+        total_in_value: (Number(row.total_in_value) || 0) + inValue,
+        current_value: (Number(row.current_value) || 0) + inValue,
+        last_updated: new Date().toISOString(),
+      })
+      .eq('menu_item_id', payload.menu_item_id)
+      .eq('organization_id', payload.organization_id)
+  } else {
+    await supabase
+      .from('stock_summary')
+      .insert({
+        menu_item_id: payload.menu_item_id,
+        organization_id: payload.organization_id,
+        total_in_value: inValue,
+        current_value: inValue,
+        opening_value: 0,
+        total_out_value: 0,
+        last_updated: new Date().toISOString(),
+      })
   }
 
-  return { error }
+  return { error: null }
 }
+
+ 
 
 // Ledger page helpers
 

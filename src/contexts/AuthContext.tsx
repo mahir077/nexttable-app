@@ -87,10 +87,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setOrganization(currentOrg ?? null)
         setOrganizations(stored.organizations)
         setLoading(false)
-        supabase.auth.getSession().then(({ data: { session }, error }) => {
+        // Admin check even with cache
+        supabase.auth.getSession().then(async ({ data: { session }, error }) => {
           if (!mounted || error?.message?.includes('Refresh') || error?.message?.includes('JWT')) return
-          if (session?.access_token && session?.refresh_token) {
-            supabase.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token })
+          if (session?.access_token) {
+            const adminRes = await fetch('/api/verify-admin', {
+              headers: { 'Authorization': `Bearer ${session.access_token}` }
+            })
+            const adminData = await adminRes.json().catch(() => ({ isAdmin: false }))
+            if (adminData?.isAdmin && mounted) setIsSuperAdmin(true)
+            supabase.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token! })
           }
         })
         return
@@ -110,7 +116,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (session?.user) {
         const verifyAdminUrl = `${window.location.origin}/api/verify-admin`
-        const verifyAdminRes = await fetch(verifyAdminUrl, { method: 'GET', credentials: 'include' })
+        const verifyAdminRes = await fetch(verifyAdminUrl, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Authorization': `Bearer ${session.access_token}` }
+        })
         const adminData = await verifyAdminRes.json().catch(() => ({ isAdmin: false }))
         if (adminData?.isAdmin === true && mounted) {
           setIsSuperAdmin(true)
@@ -180,6 +190,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error || !data.user) return { data, error }
 
     const accessToken = data.session?.access_token
+
+    // Check if super admin first
+    const adminRes = await fetch('/api/verify-admin', {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    })
+    const adminData = await adminRes.json().catch(() => ({ isAdmin: false }))
+    if (adminData?.isAdmin) {
+      setIsSuperAdmin(true)
+      setUser(data.user)
+      setOrganization(null)
+      setOrganizations([])
+      clearAuthStorage()
+      window.location.href = '/admin/dashboard'
+      return { data, error: null }
+    }
+
     let verifyRes: Response
     try {
       verifyRes = await fetch('/api/verify-user', {
@@ -231,12 +257,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signUp = async (email: string, password: string, orgName: string) => {
-    // 1. Sign up user
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password
-    })
-
+    const { data: authData, error: authError } = await supabase.auth.signUp({ email, password })
     if (authError || !authData.user) {
       return { data: null, error: authError }
     }
@@ -255,7 +276,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (orgError) throw orgError
 
-      // 3. Assign user to organization
       await supabase
         .from('user_organizations')
         .insert({
@@ -280,7 +300,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem(AUTH_KEYS.restaurantInfo, JSON.stringify({ name: orgToSet.display_name || orgToSet.name }))
       }
       router.push('/dashboard')
-
       return { data: authData, error: null }
     } catch (error) {
       return { data: null, error }

@@ -22,7 +22,7 @@ export async function fetchActiveSuppliers(orgId: string) {
 export async function fetchMenuItemsForPurchases(orgId: string) {
   return supabase
     .from('menu_items')
-    .select('id, name, making_cost')
+    .select('id, name, cost')
     .eq('organization_id', orgId)
     .order('name')
 }
@@ -92,7 +92,7 @@ export async function getOrCreateRawMaterialMenuItemId(orgId: string): Promise<s
       name: RAW_NAME,
       category_id: categoryId,
       price: 0,
-      making_cost: 0,
+      cost: 0,
       is_available: false,
       organization_id: orgId,
     })

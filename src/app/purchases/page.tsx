@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ensureSession } from '@/lib/supabase-client'
+import { ensureSession, supabase } from '@/lib/supabase-client'
 import BackButton from '@/components/BackButton'
 import { useToast } from '@/hooks/useToast'
 import Toast from '@/components/Toast'
@@ -27,7 +27,7 @@ interface Supplier {
 interface MenuItem {
   id: string
   name: string
-  making_cost: number
+  cost: number
 }
 
 interface PurchaseItem {
@@ -173,6 +173,20 @@ export default function PurchasesPage() {
         notes: bazaarNotes.trim() ? `Bazaar: ${bazaarNotes.trim()}` : 'Bazaar / Raw material',
         organization_id: orgId,
       }
+      // Also create a purchases record for bazaar
+const { error: purchaseError } = await supabase
+.from('purchases')
+.insert({
+  organization_id: orgId,
+  supplier_id: null,
+  total_amount: amount,
+  paid_amount: amount,
+  payment_status: 'paid',
+  purchase_date: bazaarDate || new Date().toISOString().split('T')[0],
+  notes: bazaarNotes.trim() ? `Bazaar: ${bazaarNotes.trim()}` : 'বাজার / Raw material',
+  purchase_number: 'BZ-' + new Date().toISOString().split('T')[0].replace(/-/g, ''),
+})
+if (purchaseError) throw purchaseError
       const movementDate = bazaarDate ? `${bazaarDate}T00:00:00` : undefined
       const { error } = await insertBazaarStockMovement(payload, movementDate)
       if (error) throw error
@@ -430,8 +444,8 @@ export default function PurchasesPage() {
                     onChange={(e) => {
                       setSelectedItem(e.target.value)
                       const item = menuItems.find(i => i.id === e.target.value)
-                      if (item && item.making_cost) {
-                        setItemCost(item.making_cost.toString())
+                      if (item && item.cost) {
+                        setItemCost(item.cost.toString())
                       }
                     }}
                     className="w-full px-4 py-3 border-2 border-slate-200 rounded-lg text-slate-900"

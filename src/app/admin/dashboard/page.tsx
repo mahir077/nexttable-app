@@ -42,9 +42,26 @@ export default function SuperAdminDashboard() {
     return () => controller.abort()
   }, [])
 
+  const getSession = async () => {
+    const { supabase } = await import('@/lib/supabase-client')
+    const { data: { session } } = await supabase.auth.getSession()
+    return session
+  }
+
   const checkAdminAndLoadData = async (signal?: AbortSignal) => {
     try {
-      const response = await fetch('/api/check-admin', { signal })
+      const session = await getSession()
+      if (!session) {
+        router.push('/admin/login')
+        return
+      }
+
+      const response = await fetch('/api/check-admin', {
+        signal,
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
       const data = await response.json()
 
       if (!data.isAdmin) {
@@ -55,7 +72,6 @@ export default function SuperAdminDashboard() {
       await loadClients(signal)
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') return
-      console.error('Error:', error)
       router.push('/admin/login')
     }
   }
@@ -63,7 +79,14 @@ export default function SuperAdminDashboard() {
   const loadClients = async (signal?: AbortSignal) => {
     setLoading(true)
     try {
-      const response = await fetch('/api/admin/clients', { ...(signal && { signal }) })
+      const session = await getSession()
+
+      const response = await fetch('/api/admin/clients', {
+        ...(signal && { signal }),
+        headers: {
+          ...(session?.access_token && { 'Authorization': `Bearer ${session.access_token}` })
+        }
+      })
       const data = await response.json()
 
       if (!response.ok) {
@@ -169,10 +192,7 @@ export default function SuperAdminDashboard() {
             </h1>
             <p className="text-slate-600">Manage all NextTable clients</p>
           </div>
-          <Link
-            href="/dashboard"
-            className="text-sm text-slate-500 hover:text-slate-700"
-          >
+          <Link href="/dashboard" className="text-sm text-slate-500 hover:text-slate-700">
             ← Back to app
           </Link>
         </div>
@@ -238,7 +258,7 @@ export default function SuperAdminDashboard() {
               </thead>
               <tbody className="divide-y">
                 {clients.map((client) => (
-                  <tr key={client.id} className={!client.is_active ? 'bg-red-50' : ''}>
+                  <tr key={client.id} className={!client.is_active ? 'bg-red-50 text-slate-800' : 'text-slate-800'}>
                     <td className="px-4 py-3">
                       <div className="font-bold">{client.restaurant_name}</div>
                       <div className="text-sm text-slate-500">
@@ -251,30 +271,20 @@ export default function SuperAdminDashboard() {
                     </td>
                     <td className="px-4 py-3">
                       {client.is_active ? (
-                        <span className="px-2 py-1 bg-emerald-100 text-emerald-900 rounded text-xs font-bold">
-                          ✅ Active
-                        </span>
+                        <span className="px-2 py-1 bg-emerald-100 text-emerald-900 rounded text-xs font-bold">✅ Active</span>
                       ) : (
-                        <span className="px-2 py-1 bg-red-100 text-red-900 rounded text-xs font-bold">
-                          ❌ Inactive
-                        </span>
+                        <span className="px-2 py-1 bg-red-100 text-red-900 rounded text-xs font-bold">❌ Inactive</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       {client.payment_status === 'paid' && (
-                        <span className="px-2 py-1 bg-blue-100 text-blue-900 rounded text-xs font-bold">
-                          💰 Paid
-                        </span>
+                        <span className="px-2 py-1 bg-blue-100 text-blue-900 rounded text-xs font-bold">💰 Paid</span>
                       )}
                       {client.payment_status === 'unpaid' && (
-                        <span className="px-2 py-1 bg-yellow-100 text-yellow-900 rounded text-xs font-bold">
-                          ⏳ Unpaid
-                        </span>
+                        <span className="px-2 py-1 bg-yellow-100 text-yellow-900 rounded text-xs font-bold">⏳ Unpaid</span>
                       )}
                       {client.payment_status === 'overdue' && (
-                        <span className="px-2 py-1 bg-orange-100 text-orange-900 rounded text-xs font-bold">
-                          🚨 Overdue
-                        </span>
+                        <span className="px-2 py-1 bg-orange-100 text-orange-900 rounded text-xs font-bold">🚨 Overdue</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -284,9 +294,7 @@ export default function SuperAdminDashboard() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div
-                        className={`text-sm font-bold ${client.days_until_due < 0 ? 'text-red-600' : ''}`}
-                      >
+                      <div className={`text-sm font-bold ${client.days_until_due < 0 ? 'text-red-600' : ''}`}>
                         {client.days_until_due < 0
                           ? `${Math.abs(client.days_until_due)} days overdue`
                           : `${client.days_until_due} days left`}
@@ -333,7 +341,9 @@ export default function SuperAdminDashboard() {
 
         {clients.length === 0 && (
           <div className="text-center py-12 text-slate-500">
-            No clients yet. Run the migration <code className="bg-slate-100 px-1 rounded">003_client_subscriptions.sql</code> in Supabase, then create your first client from Create New Client.
+            No clients yet. Run the migration{' '}
+            <code className="bg-slate-100 px-1 rounded">003_client_subscriptions.sql</code>{' '}
+            in Supabase, then create your first client from Create New Client.
           </div>
         )}
       </div>

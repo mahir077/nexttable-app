@@ -15,7 +15,7 @@ async function fetchWithServiceRole<T>(url: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -27,9 +27,7 @@ export async function GET() {
     const cookieStore = await cookies()
     const supabase = createServerClient(url, anonKey, {
       cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
+        getAll() { return cookieStore.getAll() },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) =>
             cookieStore.set(name, value, options)
@@ -38,7 +36,13 @@ export async function GET() {
       },
     })
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const authHeader = request.headers.get('Authorization')
+    const token = authHeader?.replace('Bearer ', '')
+
+    const { data: { user }, error: userError } = token
+      ? await supabase.auth.getUser(token)
+      : await supabase.auth.getUser()
+
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

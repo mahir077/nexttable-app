@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -25,7 +25,12 @@ export async function GET() {
       },
     })
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const authHeader = request.headers.get('Authorization')
+    const token = authHeader?.replace('Bearer ', '')
+
+    const { data: { user }, error: userError } = token
+      ? await supabase.auth.getUser(token)
+      : await supabase.auth.getUser()
 
     if (userError || !user) {
       return NextResponse.json({ isAdmin: false }, { status: 401 })

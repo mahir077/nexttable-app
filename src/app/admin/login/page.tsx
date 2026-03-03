@@ -45,10 +45,13 @@ function AdminLoginInner() {
 
   // When coming from Supabase recovery link, show password update form.
   useEffect(() => {
-    if (searchParams?.get('type') === 'recovery') {
-      setMode('update')
-    }
-  }, [searchParams])
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setMode('update')
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [supabase])
 
   // Brutal: suppress AbortError so Next.js Turbopack overlay never shows it
   useEffect(() => {
@@ -169,7 +172,7 @@ function AdminLoginInner() {
     setResetLoading(true)
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: 'https://nexttable.netlify.app/admin/login',
+        redirectTo: `${window.location.origin}/admin/login`,
       })
       if (!mountedRef.current) return
       if (error) {

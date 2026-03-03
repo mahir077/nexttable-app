@@ -24,7 +24,20 @@ export default function CreateClientPage() {
   const checkSuperAdmin = async () => {
     try {
       setVerifying(true)
-      const response = await fetch('/api/check-admin')
+      const { supabase } = await import('@/lib/supabase-client')
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session) {
+        alert('🚫 Access Denied\n\nThis page is only accessible to NextTable administrators.')
+        router.push('/admin/login')
+        return
+      }
+
+      const response = await fetch('/api/check-admin', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
       const data = await response.json()
 
       if (!data.isAdmin) {
@@ -59,10 +72,14 @@ export default function CreateClientPage() {
     setMessage('')
 
     try {
+      const { supabase } = await import('@/lib/supabase-client')
+      const { data: { session } } = await supabase.auth.getSession()
+
       const response = await fetch('/api/admin/create-client', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(session?.access_token && { 'Authorization': `Bearer ${session.access_token}` })
         },
         body: JSON.stringify({
           restaurantName: formData.restaurantName,
@@ -84,7 +101,6 @@ export default function CreateClientPage() {
         throw new Error(data.error || 'Account creation failed')
       }
 
-      // Success!
       const credentials = `
 ✅ CLIENT ACCOUNT CREATED!
 
@@ -102,8 +118,6 @@ Login URL: ${data.credentials.loginUrl}
     `
 
       setMessage(credentials)
-
-      // Reset form
       setFormData({
         restaurantName: '',
         ownerName: '',
@@ -139,10 +153,7 @@ Login URL: ${data.credentials.loginUrl}
             <h1 className="text-4xl font-black text-slate-900">🔐 Create Client Account</h1>
             <p className="text-slate-600">Add a new restaurant to NextTable</p>
           </div>
-          <Link
-            href="/admin/dashboard"
-            className="text-sm text-slate-500 hover:text-slate-700 font-medium"
-          >
+          <Link href="/admin/dashboard" className="text-sm text-slate-500 hover:text-slate-700 font-medium">
             🎛️ Mother Panel →
           </Link>
         </div>
@@ -206,7 +217,6 @@ Login URL: ${data.credentials.loginUrl}
                 placeholder="John Doe"
               />
             </div>
-
             <div>
               <label className="block text-sm font-bold mb-2">Phone</label>
               <input
