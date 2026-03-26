@@ -8,6 +8,7 @@ export async function fetchPurchasesWithSuppliers(orgId: string) {
     .select('*, supplier:suppliers(name)')
     .eq('organization_id', orgId)
     .order('purchase_date', { ascending: false })
+    .limit(100)
 }
 
 export async function fetchActiveSuppliers(orgId: string) {
@@ -17,6 +18,7 @@ export async function fetchActiveSuppliers(orgId: string) {
     .eq('organization_id', orgId)
     .eq('is_active', true)
     .order('name')
+    .limit(100)
 }
 
 export async function fetchMenuItemsForPurchases(orgId: string) {

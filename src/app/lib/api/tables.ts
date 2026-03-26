@@ -19,20 +19,17 @@ export interface Table {
   location?: string
 }
 
-// Fetch floors (optionally scoped to organization)
-export async function getFloors(organizationId?: string | null): Promise<Floor[]> {
+// Fetch floors (organizationId required for multi-tenant security)
+export async function getFloors(organizationId: string): Promise<Floor[]> {
   if (typeof window !== 'undefined') {
-    console.log('[getFloors] start', { organizationId: organizationId ?? 'null' })
+    console.log('[getFloors] start', { organizationId })
   }
-  let query = supabase
+  const { data, error } = await supabase
     .from('floors')
     .select('*')
+    .eq('organization_id', organizationId)
     .eq('is_active', true)
     .order('display_order')
-  if (organizationId) {
-    query = query.eq('organization_id', organizationId)
-  }
-  const { data, error } = await query
   if (typeof window !== 'undefined') {
     console.log('[getFloors] done', { count: data?.length ?? 0, error: error?.message ?? null })
   }

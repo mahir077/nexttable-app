@@ -121,6 +121,7 @@ export default function BillingPage() {
         .eq('organization_id', orgId)
         .in('status', ['pending', 'preparing', 'kot_sent', 'ready', 'served'])
         .order('created_at', { ascending: false })
+        .limit(100)
 
       if (error) {
         showToast('Could not load orders. Please refresh.', 'error')

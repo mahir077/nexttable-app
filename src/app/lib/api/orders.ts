@@ -138,7 +138,7 @@ export async function getOrders(organizationId: string, status?: string | string
     }
   }
 
-  const { data, error } = await query
+  const { data, error } = await query.limit(100)
 
   if (error) throw error
   return data || []
@@ -189,6 +189,7 @@ export async function getOrdersForBilling(organizationId: string): Promise<Order
     .eq('organization_id', organizationId)
     .in('status', ['ready', 'served'])
     .order('created_at', { ascending: false })
+    .limit(100)
 
   if (error) throw error
   return data || []
@@ -215,6 +216,7 @@ export async function getOrdersForBillingWithDetails(organizationId: string): Pr
     .eq('organization_id', organizationId)
     .in('status', ['ready', 'served'])
     .order('created_at', { ascending: false })
+    .limit(100)
 
   if (error) throw error
   const rows = data || []

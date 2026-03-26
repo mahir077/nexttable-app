@@ -103,7 +103,7 @@ function POSContent() {
   // Floors & tables for dine-in (current org only)
   useEffect(() => {
     if (!orgId) return
-    getFloors(orgId).then(setFloors)
+    getFloors(orgId!).then(setFloors)
   }, [orgId])
   useEffect(() => {
     if (!orgId || !selectedFloor) return
@@ -443,7 +443,7 @@ function POSContent() {
     }
     try {
       if (orderType === 'dine-in' && selectedTable) {
-        const { data: tableCheck } = await getTableStatus(orgId, selectedTable)
+        const { data: tableCheck } = await getTableStatus(orgId!, selectedTable)
 
         if (tableCheck && tableCheck.status !== 'available') {
           showToast('This table is no longer available! Please select another table.', 'error')

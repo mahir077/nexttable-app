@@ -173,7 +173,7 @@ export default function SettingsPage() {
       if (signal?.aborted) return
       const { data: orgResp, error: orgError } = await Promise.race([
         fetchOrganizationById(effectiveOrgId),
-        timeout(8000)
+        timeout(25000)
       ]) as any
 
       if (signal?.aborted) return
@@ -189,7 +189,7 @@ export default function SettingsPage() {
       if (signal?.aborted) return
       const { data: settingsData, error: settingsError } = await Promise.race([
         fetchRestaurantSettingsForOrg(effectiveOrgId),
-        timeout(8000)
+        timeout(25000)
       ]) as any
 
       if (signal?.aborted) return
@@ -325,18 +325,33 @@ export default function SettingsPage() {
         // Update organizations cache in localStorage with new name
         const cachedOrgs = localStorage.getItem('organizations_cache')
         if (cachedOrgs) {
-          const orgs = JSON.parse(cachedOrgs)
-          const updated = orgs.map((o: { id: string; name?: string; display_name?: string }) =>
-            o.id === orgId ? { ...o, name: displayName, display_name: displayName } : o
-          )
-          localStorage.setItem('organizations_cache', JSON.stringify(updated))
+          try {
+            const orgs = JSON.parse(cachedOrgs)
+            if (Array.isArray(orgs)) {
+              const updated = orgs.map((o: { id: string; name?: string; display_name?: string }) =>
+                o.id === orgId ? { ...o, name: displayName, display_name: displayName } : o
+              )
+              localStorage.setItem('organizations_cache', JSON.stringify(updated))
+            } else {
+              // restore valid shape in case of corrupted cache
+              localStorage.removeItem('organizations_cache')
+            }
+          } catch (e) {
+            console.warn('Invalid organizations_cache in localStorage, clearing.', e)
+            localStorage.removeItem('organizations_cache')
+          }
         }
         // Update organization_cache single org
         const cachedOrg = localStorage.getItem('organization_cache')
         if (cachedOrg) {
-          const org = JSON.parse(cachedOrg) as { id: string; name?: string; display_name?: string }
-          if (org.id === orgId) {
-            localStorage.setItem('organization_cache', JSON.stringify({ ...org, name: displayName, display_name: displayName }))
+          try {
+            const org = JSON.parse(cachedOrg) as { id: string; name?: string; display_name?: string }
+            if (org?.id === orgId) {
+              localStorage.setItem('organization_cache', JSON.stringify({ ...org, name: displayName, display_name: displayName }))
+            }
+          } catch (e) {
+            console.warn('Invalid organization_cache in localStorage, clearing.', e)
+            localStorage.removeItem('organization_cache')
           }
         }
       }

@@ -138,7 +138,7 @@ export function getStockMovementsBaseQuery(orgId: string) {
     )
     .eq('organization_id', orgId)
     .order('movement_date', { ascending: false })
-    .limit(200)
+    .limit(100)
 }
 
 export function getStockMovementsFallbackQuery(orgId: string) {
@@ -147,7 +147,7 @@ export function getStockMovementsFallbackQuery(orgId: string) {
     .select('*, menu_item:menu_items(name)')
     .eq('organization_id', orgId)
     .order('movement_date', { ascending: false })
-    .limit(200)
+    .limit(100)
 }
 
 export function getStockMovementsBareQuery(orgId: string) {
@@ -156,7 +156,7 @@ export function getStockMovementsBareQuery(orgId: string) {
     .select('*')
     .eq('organization_id', orgId)
     .order('movement_date', { ascending: false })
-    .limit(200)
+    .limit(100)
 }
 
 // Reports page helpers for stock_summary

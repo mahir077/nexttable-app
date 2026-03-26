@@ -491,9 +491,9 @@ export default function KitchenPage() {
     setAddItemQty({})
     try {
       const [cats, items, floors] = await Promise.all([
-        getCategories(orgId),
-        getAllMenuItems(orgId),
-        getFloors(orgId)
+        getCategories(orgId!),
+        getAllMenuItems(orgId!),
+        getFloors(orgId!)
       ])
       setAddCategories(cats)
       setAddMenuItems(items)

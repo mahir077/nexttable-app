@@ -110,7 +110,7 @@ export default function DashboardPage() {
       try {
         const result = await Promise.race([
           fetchRestaurantDisplayName(orgId),
-          timeout(8000),
+          timeout(25000),
         ]) as { data: { display_name?: string } | null; error: unknown }
 
         if (!result.error && result.data?.display_name) {
@@ -160,7 +160,7 @@ export default function DashboardPage() {
     const timeout = (ms: number) => new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
     async function loadFloors() {
       try {
-        const floorsData = await Promise.race([getFloors(orgId), timeout(25000)])
+        const floorsData = await Promise.race([getFloors(orgId!), timeout(25000)])
         setFloors(floorsData)
         if (floorsData.length > 0) {
           setSelectedFloor(floorsData[0])
@@ -205,16 +205,33 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!hasOrg || !orgId) return
     const oid = orgId
-    async function loadAvailableCount() {
+
+    async function loadDashboardData() {
       try {
-        const data = await getAllTables(oid)
-        setAvailableTablesCount(data.filter(t => t.status === 'available').length)
+        const [floorsData, allTablesData, today, weekly] = await Promise.all([
+          getFloors(oid),
+          getAllTables(oid),
+          getTodayStats(oid),
+          getWeeklyStats(oid),
+        ])
+
+        setFloors(floorsData)
+        if (!selectedFloor && floorsData.length > 0) {
+          setSelectedFloor(floorsData[0])
+        }
+
+        setAvailableTablesCount(allTablesData.filter(t => t.status === 'available').length)
+        setTodayStats(today)
+        setWeeklyRevenue(weekly.totalRevenue)
       } catch {
-        setAvailableTablesCount(0)
+        // Permission or network; keep default empty stats
       }
     }
-    loadAvailableCount()
-  }, [hasOrg, orgId])
+
+    loadDashboardData()
+    const interval = setInterval(loadDashboardData, 30000)
+    return () => clearInterval(interval)
+  }, [hasOrg, orgId, selectedFloor])
 
   useEffect(() => {
     if (!hasOrg || !orgId || tables.length === 0) {
@@ -251,26 +268,6 @@ export default function DashboardPage() {
     }
     fetchFoodStatusAndBills()
   }, [hasOrg, orgId, tables])
-
-  useEffect(() => {
-    if (!hasOrg || !orgId) return
-    const oid = orgId
-    async function loadAnalytics() {
-      try {
-        const [today, weekly] = await Promise.all([
-          getTodayStats(oid),
-          getWeeklyStats(oid)
-        ])
-        setTodayStats(today)
-        setWeeklyRevenue(weekly.totalRevenue)
-      } catch {
-        // Permission or network; keep default empty stats
-      }
-    }
-    loadAnalytics()
-    const interval = setInterval(loadAnalytics, 30000)
-    return () => clearInterval(interval)
-  }, [hasOrg, orgId])
 
   // Handle table click — go to POS for that table
   const handleTableClick = (table: Table) => {

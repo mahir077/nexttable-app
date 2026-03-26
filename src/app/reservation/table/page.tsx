@@ -18,7 +18,7 @@ export default function ReservationTablePage() {
 
   useEffect(() => {
     if (!orgId) return
-    getFloors(orgId).then(data => {
+    getFloors(orgId!).then(data => {
       setFloors(data)
       if (data.length > 0) setSelectedFloor(data[0])
     })

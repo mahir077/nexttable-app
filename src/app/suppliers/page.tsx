@@ -53,6 +53,7 @@ export default function SuppliersPage() {
         .select('*')
         .eq('organization_id', orgId)
         .order('created_at', { ascending: false })
+        .limit(100)
 
       if (error) throw error
       setSuppliers(data || [])

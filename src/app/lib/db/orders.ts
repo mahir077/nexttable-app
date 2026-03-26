@@ -107,6 +107,7 @@ export async function fetchActiveOrdersByTables(
     .eq('organization_id', orgId)
     .in('table_id', tableIds)
     .in('status', statuses)
+    .limit(100)
 }
 
 export async function fetchOrdersForTablesMerge(
@@ -124,6 +125,7 @@ export async function fetchOrdersForTablesMerge(
     .eq('organization_id', orgId)
     .in('table_id', tableIds)
     .in('status', statuses)
+    .limit(100)
 }
 
 export async function moveOrdersToTable(
@@ -181,6 +183,7 @@ export function getOrdersReportBaseQuery(orgId: string) {
     `)
     .eq('organization_id', orgId)
     .order('created_at', { ascending: false })
+    .limit(100)
 }
 
 export function getOrdersReportFallbackQuery(orgId: string) {
@@ -191,6 +194,7 @@ export function getOrdersReportFallbackQuery(orgId: string) {
     )
     .eq('organization_id', orgId)
     .order('created_at', { ascending: false })
+    .limit(100)
 }
 
 // Active dine-in orders for table change modal
@@ -203,6 +207,7 @@ export async function fetchActiveDineInOrders(orgId: string) {
     .not('table_id', 'is', null)
     .in('status', ['pending', 'preparing', 'ready', 'served'])
     .order('created_at', { ascending: false })
+    .limit(100)
 }
 
 
