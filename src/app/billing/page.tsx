@@ -46,6 +46,7 @@ export default function BillingPage() {
 
   // Print state
   const [isPrinting, setIsPrinting] = useState(false)
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
 
   // Cash drawer: true = auto-open on cash payment, false = stay closed
   const [cashDrawerEnabled, setCashDrawerEnabled] = useState(true)
@@ -900,7 +901,7 @@ export default function BillingPage() {
                 <div className="flex flex-col gap-2">
                   <button
                     type="button"
-                    onClick={handleCompletePayment}
+                    onClick={() => setShowConfirmModal(true)}
                     disabled={!selectedPaymentMethod}
                     className={`w-full py-3 rounded-lg font-bold text-lg transition-colors ${
                       selectedPaymentMethod
@@ -929,7 +930,32 @@ export default function BillingPage() {
           </div>
         </div>
       )}
-
+{showConfirmModal && (
+  <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center shadow-xl">
+      <div className="text-5xl mb-4">💳</div>
+      <h3 className="text-xl font-bold text-slate-900 mb-2">Confirm Payment?</h3>
+      <p className="text-slate-600 mb-2">Amount: <span className="font-black text-emerald-600 text-xl">৳{finalTotal.toFixed(2)}</span></p>
+      <p className="text-slate-500 text-sm mb-6">Method: <span className="font-bold uppercase">{selectedPaymentMethod}</span></p>
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={() => setShowConfirmModal(false)}
+          className="flex-1 py-3 rounded-lg bg-slate-200 text-slate-700 font-bold"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={() => { setShowConfirmModal(false); handleCompletePayment(); }}
+          className="flex-1 py-3 rounded-lg bg-emerald-500 text-white font-bold"
+        >
+          Confirm ✅
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
     </div>
   )
